@@ -1,0 +1,132 @@
+Framework Todo List
+----------------------
+1. Continue improving main ui.
+2. Windows support
+3. ability to remap controls across systems
+4. Stereo sound
+
+
+
+A2600 Todo List
+------------------
+1. The other player sprite sizes/copies
+2. bankswitching?
+3. Cart RAM detection?
+4. Audio?
+
+
+
+A5200 Todo List
+------------------
+1. Check what Berzerk is doing to render player and weapon fire and support that.
+2. Figure out what button fires player weapon
+3. Figure out how to emulate joystick position
+4. Find/try more games? Support the similar computers?
+
+
+
+C64 Todo List
+----------------
+1. Support cart ROM in order to run actual software
+2. Find software that uses basic bitmap mode to test support for graphical modes
+3. Likely give up unless can either:
+	a) figure why kernal detects the program name on the tape, but nothing gets past that point
+	b) understand at all the floppy clock/data mess
+
+
+
+NES Todo List
+----------------
+1. redo envelope and sweep, see if things get better
+2. Implement true per-dot rendering.
+3. More mappers? DMC/Frame IRQs?
+Notes: Zelda doesn't care, but Metroid depends on MMC1 shift register reset doing reg0|=0xc, otherwise unimpl. opc = $44 at PC=$C02E
+
+
+
+GB Todo List
+---------------
+1. sound
+
+
+
+Intellivision Todo List
+--------------------------
+1. sprites
+2. figure out why everything dies after the first screen
+
+
+
+IBM PC Todo List
+-------------------
+1. Implement pic handling so IRQs can theoretically be at a non-8 base.
+2. Implement proper floppy class, as well as a DMA controller.
+3. Keyboard and it's IRQ, once loading the first sector of a floppy works can test kb with boot sector games.
+
+
+
+Sony PS1 Todo List
+---------------------
+1. CD rewrite?
+2. Analog controllers, mouse
+3. Support more of the timer modes. better timing?
+4. SPU envelope and interpolation
+5. MDEC Rewrite?
+6. Better gpu?
+Status: Playable (as in they get to gameplay where a character can move): 
+		Mortal Kombat 2, Crash1&2, Ridge Racer (+Revolution via Caetla), CyberSled, Battle Arena Toshinden,
+		Spyro 1, Resident Evil 2, Metal Gear Solid, Final Fantasy 8, Duke Nukem: Time to Kill, Legend of Legaia
+	Puzzle Bobble 2 and Spyro 3 freeze eventually
+	FF7 ends up in loop past title screen
+	Croc only works loaded via EXE by Caetla, and only gets in game, past garbage title screen sometimes, but is playable when it works
+	Ridge Racer Type 4, wants a better Getloc CD response(?) while trying to MDEC it up.
+	Gran Turismo if it gets there at all reboots(?) into intro movie shortly after race-start loading screen
+	Tony Hawk's Pro Skater 2, boot failure
+	Twisted Metal 2, hits undef opcode, boot failure
+	Gran Turismo 2, managed to play it once, graphics messed up half way through, no longer works
+	NBA Hangtime, hits assertion "Line 636" after a few messed up screens of selecting garbled menu options
+Notes:	CD is still awful and audio (both DA&XA) is not supported.
+	Bunch of games only work if loaded by Caetla (whether via "Game start" or EXE select).
+	Currently sending out spurious SPU IRQs every vblank to satisfy MGS and Legend of Legaia
+	MDEC has some wrong colors and shifts, but PS1 is the first system in MultiE to have midrun bpp changes.
+		After adding a separate 24bit framebuffer, the MDEC results are atleast non-puke.
+		PS1 now switches between full-vram-view for 16bit and a separate 24bit framebuffer. 
+		Most games will don't show any MDEC output, but the ones that do work enough to make
+		me think the issue isn't the decoder itself. I'm leaving that alone for now.
+
+
+
+Sega SMS Todo List
+---------------------
+1. Line interrupt
+2. Have another look at PSG noise channel, probably not working
+3. Wrong tiles in 3dcity.sms (just sometimes? UB or forgot to initialize something?)
+4. cart ram + debug badapple
+
+
+
+Genesis Todo List
+--------------------
+1. Retest 68k core, including better cycle counts, with new MAME-based JSON tests
+2. Integrate Z80, figure out what NHL wants
+3. New VDP
+4. Directly c/p controller handling from original emu
+5. Integrate newer PSG
+6. My own FM Synth?
+
+
+
+GBA Todo List
+----------------
+1. Everything
+
+
+
+Casio PV-1000 Todo List
+--------------------------
+1. Throw in some sound
+2. Be more precise with the nesdev obscure wiki info
+Status: Everything I have shows a title screen, but only Super Cobra is playable.
+
+
+
