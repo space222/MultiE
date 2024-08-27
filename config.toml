@@ -1,0 +1,18 @@
+[dirs]
+saves = "./saves"
+firmware = "./bios"
+
+[a52]
+bios = "5200.ROM"
+
+
+[ibm]
+bios = "GLABIOS_0.2.5_8T.ROM"
+
+
+[psx]
+#bios = "./bios/openbios.bin"
+bios = "./bios/PSX.BIOS"
+cd = "./roms/psx/Crash1.bin"
+#exp1 = "./roms/psx/unirom/stuff/unirom_withcaetla.rom"
+exp1 = "./roms/psx/Caetla/EXPROM.BIN"
