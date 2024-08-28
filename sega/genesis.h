@@ -8,7 +8,8 @@
 class genesis : public console
 {
 public:
-	u32 fb_width() override { return 320; }
+	genesis() { vdp_width = 320; }
+	u32 fb_width() override { return vdp_width; }
 	u32 fb_height() override { return 224; }
 	u8* framebuffer() override { return (u8*)&fbuf[0]; }
 	
@@ -24,6 +25,15 @@ public:
 	
 	u64 last_target;
 	u64 stamp;
+	
+	void vdp_ctrl(u16);
+	void vdp_data(u16);
+	void draw_line(u32);
+	bool vdp_latch, fill_pending;
+	u8 vreg[0x20];
+	u16 vdp_addr;
+	u32 vdp_width;
+	u8 vdp_cd;
 	
 	std::vector<u8> ROM;
 	u8 RAM[0x10000];

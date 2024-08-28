@@ -19,8 +19,24 @@ void genesis::write(u32 addr, u32 val, int size)
 		return;
 	}
 	
+	if( addr == 0xc0'0000 || addr == 0xc0'0002 )
+	{
+		if( size == 8 )
+		{
+			val = (val<<8)|(val&0xff);
+		}
+		vdp_data(val);
+		return;
+	}
+	
+	if( addr == 0xc0'0004 || addr == 0xc0'0006 )
+	{
+		vdp_ctrl(val);
+		return;
+	}
+	
 	printf("Write%i $%X = $%X\n", size, addr, val);
-	exit(1);
+	//exit(1);
 }
 
 u32 genesis::read(u32 addr, int size)
@@ -36,15 +52,17 @@ u32 genesis::read(u32 addr, int size)
 	if( addr >= 0xe00000 ) return __builtin_bswap16(*(u16*)&RAM[addr&0xffff]);
 	
 	if( addr == 0xA10000 ) return 0x80; //todo: detect rom region
+	if( addr == 0xA10008 || addr == 0xA1000C ) return 0;
 	
 	printf("%X: read%i <$%X\n", cpu.pc-2, size, addr);
-	exit(1);
+	//exit(1);
 	
 	return 0;
 }
 
 void genesis::run_frame()
 {
+	vdp_width = (vreg[12]&1) ? 320 : 256;
 	for(u32 line = 0; line < 262; ++line)
 	{
 		u64 target = last_target + 3360;
@@ -54,6 +72,8 @@ void genesis::run_frame()
 			stamp += cpu.icycles * 7;
 		}
 		last_target = target;
+		
+		if( line < 224 ) draw_line(line);
 	}
 }
 
@@ -72,9 +92,10 @@ u8 genread8(u32 addr)
 
 u16 genread16(u32 addr) 
 {
-	printf("genread16 $%X\n", addr); 
+	//printf("genread16 $%X\n", addr); 
 	return dynamic_cast<genesis*>(sys)->read(addr, 16); 
 }
+
 u32 genread32(u32 addr)
 {
 	u32 res = dynamic_cast<genesis*>(sys)->read(addr, 16)<<16;
@@ -105,6 +126,9 @@ void genesis::reset()
 	cpu.intack = []{};
 	
 	stamp = last_target = 0;
+	vdp_cd = vdp_addr = 0;
+	vdp_latch = fill_pending = false;
+	vdp_width = 320;
 	return;
 }
 

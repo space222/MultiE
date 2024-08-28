@@ -101,7 +101,7 @@ Sega SMS Todo List
 1. Line interrupt
 2. Have another look at PSG noise channel, probably not working
 3. Wrong tiles in 3dcity.sms (just sometimes? UB or forgot to initialize something?)
-4. cart ram + debug badapple
+4. cart ram + debug badapple + support other vram nt layouts
 
 
 
