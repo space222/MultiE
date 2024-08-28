@@ -74,6 +74,7 @@ void genesis::run_frame()
 		last_target = target;
 		
 		if( line < 224 ) draw_line(line);
+		if( line == 223 && (vreg[1]&BIT(5)) ) cpu.pending_irq = 6;
 	}
 }
 

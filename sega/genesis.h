@@ -29,6 +29,7 @@ public:
 	void vdp_ctrl(u16);
 	void vdp_data(u16);
 	void draw_line(u32);
+	void vdp_vram2vram();
 	bool vdp_latch, fill_pending;
 	u8 vreg[0x20];
 	u16 vdp_addr;

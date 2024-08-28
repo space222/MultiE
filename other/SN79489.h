@@ -8,7 +8,8 @@ public:
 	void reset();
 	u8 clock(u64 cycles);
 	void out(u8);
-
+	u8 cur() { return total; }
+	
 private:
 	u16 tone[4];
 	u16 cnt[4];

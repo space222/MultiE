@@ -2901,7 +2901,7 @@ void m68k::step()
 	if( sr.b.IPL < pending_irq ) 
 	{
 		m68k_trap(*this, EXC_LEVEL_1 + (pending_irq-1)*4, false);
-		printf("68K: IRQ %i\n", pending_irq);
+		//printf("68K: IRQ %i\n", pending_irq);
 		sr.b.IPL = pending_irq;
 		pending_irq = 0;
 		intack();
