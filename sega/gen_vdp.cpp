@@ -12,6 +12,8 @@ void genesis::draw_line(u32 line)
 	
 	const u32 nt_height= ntsize[(vreg[16]>>4)&3];
 	const u32 nt_width = ntsize[vreg[16]&3];
+	const u32 vmask = (nt_height*8)-1;
+	const u32 hmask = (nt_width*8)-1;
 	
 	const u32 hs_base = (vreg[0xD]&0x3F)<<10;
 	u32 hsA = __builtin_bswap16(*(u16*)&VRAM[hs_base]);
@@ -26,20 +28,31 @@ void genesis::draw_line(u32 line)
 		} else if( (vreg[0xB] & 3) == 2 ) {
 			hsA = __builtin_bswap16(*(u16*)&VRAM[hs_base + (line&~7)*4]);
 			hsB = __builtin_bswap16(*(u16*)&VRAM[hs_base + (line&~7)*4 + 2]);		
-		}
-		
+		}	
 		hsA &= 0x3ff;
 		hsB &= 0x3ff;
-	
-		u16 entryA = __builtin_bswap16(*(u16*)&VRAM[ntA + (((line/8)*nt_width) + (((px-hsA)&((nt_width*8)-1))/8))*2]);
-		u16 entryB = __builtin_bswap16(*(u16*)&VRAM[ntB + (((line/8)*nt_width) + (((px-hsB)&((nt_width*8)-1))/8))*2]);
 		
-		u32 lYA = (line&7) ^ ((entryA&BIT(12))?7:0);
+		u32 vsA = 0, vsB = 0;
+		if( vreg[0xB] & BIT(2) )
+		{
+			vsA = __builtin_bswap16(*(u16*)&VSRAM[(px>>4)*4]);
+			vsB = __builtin_bswap16(*(u16*)&VSRAM[(px>>4)*4 + 2]);
+		} else {
+			vsA = __builtin_bswap16(*(u16*)&VSRAM[0]);
+			vsB = __builtin_bswap16(*(u16*)&VSRAM[2]);
+		}
+		vsA &= 0x3ff;
+		vsB &= 0x3ff;
+		
+		u16 entryA = __builtin_bswap16(*(u16*)&VRAM[ntA + (((((line+vsA)&vmask)/8)*nt_width) + (((px-hsA)&hmask)/8))*2]);
+		u16 entryB = __builtin_bswap16(*(u16*)&VRAM[ntB + (((((line+vsB)&vmask)/8)*nt_width) + (((px-hsB)&hmask)/8))*2]);
+		
+		u32 lYA = ((line+vsA)&7) ^ ((entryA&BIT(12))?7:0);
 		u32 lXA = ((px-hsA)&7) ^ ((entryA&BIT(11))?7:0);
 		u8 tA = VRAM[(entryA&0x7ff)*32 + lYA*4 + ((lXA>>1))] >> ((lXA&1)?0:4);
 		tA &= 0xf;
 		
-		u32 lYB = (line&7) ^ ((entryB&BIT(12))?7:0);
+		u32 lYB = ((line+vsB)&7) ^ ((entryB&BIT(12))?7:0);
 		u32 lXB = ((px-hsB)&7) ^ ((entryB&BIT(11))?7:0);
 		u8 tB = VRAM[((entryB&0x7ff)*32 + lYB*4 + (lXB>>1))] >> ((lXB&1)?0:4);
 		tB &= 0xf;
@@ -137,7 +150,10 @@ void genesis::vdp_data(u16 val)
 		CRAM[index*2 + 1] = val;
 		break;
 	case 5:
-		//todo: VSRAM
+		//todo: check masking
+		index = (index % 80) & ~1;
+		VSRAM[index] = val>>8;
+		VSRAM[index+1] = val;
 		break;
 	default:
 		printf("GEN: VDP write $%X with cd = $%X\n", val, vdp_cd);
