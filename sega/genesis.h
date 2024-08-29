@@ -4,12 +4,14 @@
 #include "console.h"
 #include "z80.h"
 #include "68k.h"
+#include "SN79489.h"
 
 class genesis : public console
 {
 public:
 	genesis() { vdp_width = 320; }
 	u32 fb_width() override { return vdp_width; }
+	u32 fb_scale_w() override { return 320; }
 	u32 fb_height() override { return 224; }
 	u8* framebuffer() override { return (u8*)&fbuf[0]; }
 	
@@ -22,6 +24,7 @@ public:
 
 	z80 spu;
 	m68k cpu;
+	SN79489 psg;
 	
 	u64 last_target;
 	u64 stamp;
@@ -32,7 +35,7 @@ public:
 	void vdp_vram2vram();
 	bool vdp_latch, fill_pending;
 	u8 vreg[0x20];
-	u16 vdp_addr;
+	u16 vdp_addr, vdp_stat;
 	u32 vdp_width;
 	u8 vdp_cd;
 	

@@ -12,19 +12,35 @@ void genesis::draw_line(u32 line)
 	
 	const u32 nt_height= ntsize[(vreg[16]>>4)&3];
 	const u32 nt_width = ntsize[vreg[16]&3];
-
+	
+	const u32 hs_base = (vreg[0xD]&0x3F)<<10;
+	u32 hsA = __builtin_bswap16(*(u16*)&VRAM[hs_base]);
+	u32 hsB = __builtin_bswap16(*(u16*)&VRAM[hs_base+2]);
+	
 	for(u32 px = 0; px < vdp_width; ++px)
 	{
-		u16 entryA = __builtin_bswap16(*(u16*)&VRAM[ntA + (((line/8)*nt_width) + (px/8))*2]);
-		u16 entryB = __builtin_bswap16(*(u16*)&VRAM[ntB + (((line/8)*nt_width) + (px/8))*2]);
+		if( (vreg[0xB] & 3) == 3 )
+		{
+			hsA = __builtin_bswap16(*(u16*)&VRAM[hs_base + line*4]);
+			hsB = __builtin_bswap16(*(u16*)&VRAM[hs_base + line*4 + 2]);		
+		} else if( (vreg[0xB] & 3) == 2 ) {
+			hsA = __builtin_bswap16(*(u16*)&VRAM[hs_base + (line&~7)*4]);
+			hsB = __builtin_bswap16(*(u16*)&VRAM[hs_base + (line&~7)*4 + 2]);		
+		}
+		
+		hsA &= 0x3ff;
+		hsB &= 0x3ff;
+	
+		u16 entryA = __builtin_bswap16(*(u16*)&VRAM[ntA + (((line/8)*nt_width) + (((px-hsA)&((nt_width*8)-1))/8))*2]);
+		u16 entryB = __builtin_bswap16(*(u16*)&VRAM[ntB + (((line/8)*nt_width) + (((px-hsB)&((nt_width*8)-1))/8))*2]);
 		
 		u32 lYA = (line&7) ^ ((entryA&BIT(12))?7:0);
-		u32 lXA = (px&7) ^ ((entryA&BIT(11))?7:0);
+		u32 lXA = ((px-hsA)&7) ^ ((entryA&BIT(11))?7:0);
 		u8 tA = VRAM[(entryA&0x7ff)*32 + lYA*4 + ((lXA>>1))] >> ((lXA&1)?0:4);
 		tA &= 0xf;
 		
 		u32 lYB = (line&7) ^ ((entryB&BIT(12))?7:0);
-		u32 lXB = (px&7) ^ ((entryB&BIT(11))?7:0);
+		u32 lXB = ((px-hsB)&7) ^ ((entryB&BIT(11))?7:0);
 		u8 tB = VRAM[((entryB&0x7ff)*32 + lYB*4 + (lXB>>1))] >> ((lXB&1)?0:4);
 		tB &= 0xf;
 				
@@ -47,7 +63,7 @@ void genesis::vdp_ctrl(u16 val)
 {
 	if( !vdp_latch && (val&0xC000) == 0x8000 )
 	{
-		printf("VDP: regwrite = $%X\n", val);
+		//printf("VDP: regwrite = $%X\n", val);
 		u32 r = (val>>8)&0x1f;
 		vreg[r] = val;
 		return;	
@@ -125,7 +141,7 @@ void genesis::vdp_data(u16 val)
 		break;
 	default:
 		printf("GEN: VDP write $%X with cd = $%X\n", val, vdp_cd);
-		exit(1);
+		//exit(1);
 	}
 	
 }

@@ -35,6 +35,11 @@ void genesis::write(u32 addr, u32 val, int size)
 		return;
 	}
 	
+	if( addr >= 0xc0'0011 && addr < 0xc00018 )
+	{
+		psg.out(val);
+		return;
+	}
 	printf("Write%i $%X = $%X\n", size, addr, val);
 	//exit(1);
 }
@@ -54,6 +59,8 @@ u32 genesis::read(u32 addr, int size)
 	if( addr == 0xA10000 ) return 0x80; //todo: detect rom region
 	if( addr == 0xA10008 || addr == 0xA1000C ) return 0;
 	
+	if( addr == 0xC0'0004 ) return 0; //vdp_stat;
+
 	printf("%X: read%i <$%X\n", cpu.pc-2, size, addr);
 	//exit(1);
 	
@@ -69,7 +76,8 @@ void genesis::run_frame()
 		while( stamp < target )
 		{
 			cpu.step();
-			stamp += cpu.icycles * 7;
+			u64 mc = cpu.icycles * 7;
+			stamp += mc;
 		}
 		last_target = target;
 		
@@ -132,7 +140,6 @@ void genesis::reset()
 	vdp_width = 320;
 	return;
 }
-
 
 bool genesis::loadROM(const std::string fname)
 {
