@@ -17,7 +17,7 @@ void genesis::render_sprite(u32 y, u32 hpos, u32 htiles, u32 vtiles, u16 entry)
 	
 	for(u32 i = 0; i < htiles*8; ++i)
 	{
-		if( hpos < 128 || (sprbuf[hpos-128]&0xf) || (sprbuf[hpos-128]&0x80) ) { hpos+=1; continue; }
+		if( hpos < 128 || (sprbuf[hpos-128]&0xf) ) { hpos+=1; continue; }
 		u32 ind = ((entry&BIT(11))? (htiles*8)-1-i : i);
 		u8 t = 0xf & (tdata[ind>>1] >> ((ind&1)?0:4));
 		if( t )
@@ -124,7 +124,7 @@ void genesis::draw_line(u32 line)
 		} else if( sprbuf[px]&0xf ) {
 			tA = sprbuf[px]&0x3f;
 		} else {
-			tA |= vreg[7]&0x3F;
+			tA = vreg[7]&0x3F;
 		}
 		
 		u32 c = __builtin_bswap16(*(u16*)&CRAM[tA<<1]);
