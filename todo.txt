@@ -107,10 +107,11 @@ Sega SMS Todo List
 
 Genesis Todo List
 --------------------
-1. Sprites, window, shadow/highlight, etc.
-2. Copy controller from SisterJean
-3. Integrate newer PSG
-4. My own FM Synth?
+1. Copy controller from SisterJean
+2. window, shadow/highlight
+3. Let Z80 run
+4. Output the PSG samples
+5. My own FM Synth?
 
 
 

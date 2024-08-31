@@ -121,6 +121,8 @@ void genesis::reset()
 {
 	memset(&spu, 0, sizeof(spu));
 	memset(&cpu, 0, sizeof(cpu));
+	memset(&vreg, 0, 0x20);
+	
 	spu.reset();
 	if( !ROM.empty() )
 	{

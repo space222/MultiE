@@ -42,8 +42,10 @@ void genesis::eval_sprites(u32 line)
 	u32 num = 0;
 	u32 pix = 0;
 	u32 spr = 0;
+	u32 max = 0;
 	
 	do {
+		max += 1;
 		u32 vpos = (0x3FF & __builtin_bswap16(*(u16*)&VRAM[spraddr + (spr*8)]));
 		u32 vs = (VRAM[spraddr + (spr*8) + 2]&3)+1;
 		if( (line+128) >= vpos && (line+128) - vpos < (vs*8) )
@@ -56,8 +58,9 @@ void genesis::eval_sprites(u32 line)
 			u16 entry = __builtin_bswap16(*(u16*)&VRAM[spraddr + (spr*8) + 4]);
 			render_sprite((line+128)-vpos, hpos, hs, vs, entry);	
 		}
-	} while( num < (vdp_width==320 ? 20:16) && pix < vdp_width && (spr=VRAM[spraddr + (spr*8) + 3]&0x7f)  );
-	
+	} while( max < (vdp_width==320 ? 80:64) &&
+		 num < (vdp_width==320 ? 20:16) && 
+		 pix < vdp_width && (spr=VRAM[spraddr + (spr*8) + 3]&0x7f)  );	
 }
 
 void genesis::draw_line(u32 line)
