@@ -114,15 +114,19 @@ void genesis::draw_line(u32 line)
 		u8 tB = VRAM[((entryB&0x7ff)*32 + lYB*4 + (lXB>>1))] >> ((lXB&1)?0:4);
 		tB &= 0xf;
 		
-		if( !(sprbuf[px] & 0x80) && (sprbuf[px]&0xf) )
+		if( (sprbuf[px] & 0x80) && (sprbuf[px]&0xf) )
 		{
 			tA = sprbuf[px]&0x3f;
-		} else if( tA )	{
+		} else if( tA && (entryA&BIT(15)) ) {
 			tA |= (entryA>>9)&0x30;
-		} else if( tB ) {
+		} else if( tB && (entryB&BIT(15)) ) {
 			tA = tB | ((entryB>>9)&0x30);
-		} else if( sprbuf[px]&0xf ) {
+		} else if( !(sprbuf[px]&0x80) && (sprbuf[px]&0xf) ) {
 			tA = sprbuf[px]&0x3f;
+		} else if( tA && !(entryA&BIT(15)) ) {
+			tA |= (entryA>>9)&0x30;
+		} else if( tB && !(entryB&BIT(15)) ) {
+			tA = tB | ((entryB>>9)&0x30);
 		} else {
 			tA = vreg[7]&0x3F;
 		}
