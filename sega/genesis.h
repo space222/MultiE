@@ -42,6 +42,14 @@ public:
 	u8 vdp_cd;
 	u8 sprbuf[320];
 	
+	u32 pcycle, pcycle2;
+	u16 key1, key2, key3;
+	u16 pad2_key1, pad2_key2, pad2_key3;
+	u16 pad2_data, pad1_data, pad1_ctrl, pad2_ctrl;
+	void pad_get_keys();
+	u16 getpad1();
+	u16 getpad2();
+	
 	u16 z80_busreq, z80_reset;
 	
 	std::vector<u8> ROM;
@@ -52,4 +60,8 @@ public:
 	u8 ZRAM[0x2000];
 	u32 fbuf[320*224];
 };
+
+#define PAD_DATA_DEFAULT 0x40
+
+
 

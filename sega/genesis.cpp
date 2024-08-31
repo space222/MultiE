@@ -40,6 +40,42 @@ void genesis::write(u32 addr, u32 val, int size)
 		psg.out(val);
 		return;
 	}
+	
+	if( addr == 0xA10008 )
+	{
+		pcycle = 0;
+		pad1_data = PAD_DATA_DEFAULT;
+		pad1_ctrl = val;
+		return;
+	}
+	if( addr == 0xA1000A )
+	{
+		pcycle2 = 0;
+		pad2_data = PAD_DATA_DEFAULT;
+		pad2_ctrl = val;
+		return;
+	}
+	
+	if( addr == 0xA10003 )
+	{
+		if( (pad1_data^val)&0x40 )
+		{
+			pcycle++;
+			if( pcycle == 9 ) pcycle = 0;
+		}
+		pad1_data = val;
+		return;
+	}
+	if( addr == 0xA10005 )
+	{
+		if( (pad2_data^val)&0x40 )
+		{
+			pcycle2++;
+			if( pcycle2 == 9 ) pcycle2 = 0;
+		}
+		pad2_data = val;
+		return;
+	}
 	printf("Write%i $%X = $%X\n", size, addr, val);
 	//exit(1);
 }
@@ -57,7 +93,16 @@ u32 genesis::read(u32 addr, int size)
 	if( addr >= 0xe00000 ) return __builtin_bswap16(*(u16*)&RAM[addr&0xffff]);
 	
 	if( addr == 0xA10000 ) return 0x80; //todo: detect rom region
-	if( addr == 0xA10008 || addr == 0xA1000C ) return 0;
+	if( addr == 0xA1000C ) return 0;
+	
+	if( addr == 0xA10008 ) return pad1_ctrl;
+	if( addr == 0xA1000A ) return pad2_ctrl;
+	if( addr == 0xA10002 )
+	{
+		return getpad1();
+	}
+	
+	if( addr == 0xA10004 ) return getpad2();
 	
 	if( addr == 0xC0'0004 ) return vdp_stat;
 
@@ -69,6 +114,8 @@ u32 genesis::read(u32 addr, int size)
 
 void genesis::run_frame()
 {
+	pad_get_keys();
+
 	vdp_width = (vreg[12]&1) ? 320 : 256;
 	vdp_stat = 0;
 	for(u32 line = 0; line < 262; ++line)
@@ -140,6 +187,11 @@ void genesis::reset()
 	cpu.mem_write16 = genwrite16;
 	cpu.mem_write32 = genwrite32;
 	cpu.intack = []{};
+	
+	key1 = key2 = key3 = 0;
+	pad1_ctrl = pad2_ctrl = 0;
+	pcycle = pcycle2 = 0;
+	pad1_data = pad2_data = PAD_DATA_DEFAULT;
 	
 	stamp = last_target = 0;
 	vdp_cd = vdp_addr = 0;
