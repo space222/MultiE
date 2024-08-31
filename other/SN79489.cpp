@@ -34,15 +34,15 @@ void SN79489::run()
 			if( tone[3] & BIT(2) )
 			{
 				u16 bit0 = lfsr&1;
-				u16 bit3 = (lfsr>>4)&1;
+				u16 bit3 = (lfsr>>3)&1;
 				lfsr >>= 1;
 				lfsr |= (bit0^bit3)<<15;
 			} else {
 				lfsr = (lfsr<<15)|(lfsr>>1);
 			}			
 		}
-		if( lfsr & 1 ) total += vol[3];	
 	}
+	if( lfsr & 1 ) total += vol[3];	
 }
 
 u8 SN79489::clock(u64 cycles)

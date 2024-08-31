@@ -2960,8 +2960,12 @@ void m68k::step()
 			return;		
 		}
 	}*/
-	opcodes[opc](*this, opc);
-	
+	if( ! opcodes[opc] )
+	{
+		printf("GEN:%X: undef opcode = $%X\n", pc-2, opc);
+	} else {
+		opcodes[opc](*this, opc);
+	}
 	/*
 	if( (opc&0xf000) != 0xA000 )
 	{

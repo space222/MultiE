@@ -59,7 +59,7 @@ u32 genesis::read(u32 addr, int size)
 	if( addr == 0xA10000 ) return 0x80; //todo: detect rom region
 	if( addr == 0xA10008 || addr == 0xA1000C ) return 0;
 	
-	if( addr == 0xC0'0004 ) return 0; //vdp_stat;
+	if( addr == 0xC0'0004 ) return vdp_stat;
 
 	printf("%X: read%i <$%X\n", cpu.pc-2, size, addr);
 	//exit(1);
