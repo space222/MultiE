@@ -107,12 +107,10 @@ Sega SMS Todo List
 
 Genesis Todo List
 --------------------
-1. Retest 68k core, including better cycle counts, with new MAME-based JSON tests
-2. Integrate Z80, figure out what NHL wants
-3. New VDP
-4. Directly c/p controller handling from original emu
-5. Integrate newer PSG
-6. My own FM Synth?
+1. Sprites, window, shadow/highlight, etc.
+2. Copy controller from SisterJean
+3. Integrate newer PSG
+4. My own FM Synth?
 
 
 

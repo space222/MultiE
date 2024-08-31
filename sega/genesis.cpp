@@ -70,6 +70,7 @@ u32 genesis::read(u32 addr, int size)
 void genesis::run_frame()
 {
 	vdp_width = (vreg[12]&1) ? 320 : 256;
+	vdp_stat = 0;
 	for(u32 line = 0; line < 262; ++line)
 	{
 		u64 target = last_target + 3360;
@@ -82,7 +83,11 @@ void genesis::run_frame()
 		last_target = target;
 		
 		if( line < 224 ) draw_line(line);
-		if( line == 223 && (vreg[1]&BIT(5)) ) cpu.pending_irq = 6;
+		if( line == 223 ) 
+		{
+			if( (vreg[1]&BIT(5)) ) cpu.pending_irq = 6;
+			vdp_stat |= 0x80;
+		}
 	}
 }
 

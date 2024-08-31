@@ -33,11 +33,16 @@ public:
 	void vdp_data(u16);
 	void draw_line(u32);
 	void vdp_vram2vram();
+	void eval_sprites(u32);
+	void render_sprite(u32 y, u32 x, u32 hs, u32 vs, u16 entry);
 	bool vdp_latch, fill_pending;
 	u8 vreg[0x20];
 	u16 vdp_addr, vdp_stat;
 	u32 vdp_width;
 	u8 vdp_cd;
+	u8 sprbuf[320];
+	
+	u16 z80_busreq, z80_reset;
 	
 	std::vector<u8> ROM;
 	u8 RAM[0x10000];
