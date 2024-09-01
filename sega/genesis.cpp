@@ -41,7 +41,7 @@ void genesis::write(u32 addr, u32 val, int size)
 		return;
 	}
 	
-	if( addr >= 0xA00000 && addr < 0xA01000 )
+	if( addr >= 0xA00000 && addr < 0xA02000 )
 	{
 		ZRAM[addr&0x1fff] = val;
 		return;
@@ -98,7 +98,7 @@ u32 genesis::read(u32 addr, int size)
 	if( addr < 0x400000 ) return 0;
 	if( addr >= 0xe00000 ) return __builtin_bswap16(*(u16*)&RAM[addr&0xffff]);
 	
-	if( addr >= 0xA00000 && addr < 0xA01000 )
+	if( addr >= 0xA00000 && addr < 0xA02000 )
 	{
 		//ZRAM[addr&0x1fff] ^= 0xff;
 		return __builtin_bswap16(*(u16*)&ZRAM[addr&0x1fff]);
@@ -136,7 +136,7 @@ void genesis::run_frame()
 	vdp_stat = 0;
 	for(u32 line = 0; line < 262; ++line)
 	{
-		u64 target = last_target + 3360;
+		u64 target = last_target + 3420; // 3360;
 		while( stamp < target )
 		{
 			cpu.step();

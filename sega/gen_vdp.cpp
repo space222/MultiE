@@ -127,25 +127,23 @@ void genesis::draw_line(u32 line)
 		u16 entryA = __builtin_bswap16(*(u16*)&VRAM[ntA + (((((line+vsA)&vmask)/8)*nt_width) + (((px-hsA)&hmask)/8))*2]);
 		u16 entryB = __builtin_bswap16(*(u16*)&VRAM[ntB + (((((line+vsB)&vmask)/8)*nt_width) + (((px-hsB)&hmask)/8))*2]);
 		
-		u8 tA = 0;
-		
+		u8 tA = 0;	
 		if( vdp_in_window(line, px) )
 		{
 			entryA = __builtin_bswap16(*(u16*)&VRAM[ntW + (((line&vmask)/8)*nt_width + ((px&hmask)/8))*2]);
 			u32 lXW = ((px&7) ^ ((entryA&BIT(11))?7:0));
 			tA = VRAM[(entryA&0x7ff)*32 + ((line&7) ^ ((entryA&BIT(12))?7:0))*4 + (lXW>>1)];
 			tA >>= (lXW&1)?0:4;
-			tA &= 0xf;
 		} else {
 			u32 lYA = ((line+vsA)&7) ^ ((entryA&BIT(12))?7:0);
 			u32 lXA = ((px-hsA)&7) ^ ((entryA&BIT(11))?7:0);
-			tA = VRAM[(entryA&0x7ff)*32 + lYA*4 + ((lXA>>1))] >> ((lXA&1)?0:4);
-			tA &= 0xf;
+			tA = VRAM[(entryA&0x7ff)*32 + lYA*4 + (lXA>>1)] >> ((lXA&1)?0:4);
 		}
+		tA &= 0xf;
 		
 		u32 lYB = ((line+vsB)&7) ^ ((entryB&BIT(12))?7:0);
 		u32 lXB = ((px-hsB)&7) ^ ((entryB&BIT(11))?7:0);
-		u8 tB = VRAM[((entryB&0x7ff)*32 + lYB*4 + (lXB>>1))] >> ((lXB&1)?0:4);
+		u8 tB = VRAM[(entryB&0x7ff)*32 + lYB*4 + (lXB>>1)] >> ((lXB&1)?0:4);
 		tB &= 0xf;
 		
 		if( (sprbuf[px] & 0x80) && (sprbuf[px]&0xf) )
@@ -164,9 +162,9 @@ void genesis::draw_line(u32 line)
 		} else {
 			tA = vreg[7]&0x3F;
 		}
-		
+			
 		u32 c = __builtin_bswap16(*(u16*)&CRAM[tA<<1]);
-		fbuf[line*vdp_width + px] = ((c&0xe)<<28)|((c&0xe0)<<16)|((c&0xe00)<<4);	
+		fbuf[line*vdp_width + px] = ((c&0xe)<<28)|((c&0xe0)<<16)|((c&0xe00)<<4);
 	}
 	return;
 }
@@ -261,8 +259,15 @@ void genesis::vdp_data(u16 val)
 
 void genesis::vdp_vram2vram()
 {
-
-
-
+	u32 len = (vreg[0x14]<<8)|vreg[0x13];
+	len <<= 1;
+	if( len == 0 ) len = 0x10000;
+	u32 src = (vreg[0x16]<<8)|vreg[0x15];
+	for(u32 i = 0; i < len; ++i)
+	{
+		VRAM[vdp_addr] = VRAM[src];
+		src += 1;
+		vdp_addr += vreg[0xf];
+	}
 }
 

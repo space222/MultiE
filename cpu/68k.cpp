@@ -955,8 +955,8 @@ void stop(m68k& cpu, u16)
 	cpu.sr.b.pad2 = 0;
 	cpu.sr.b.pad3 = 0;
 	cpu.pc += 2;
-	printf("halted\n");
-	exit(1);
+	//printf("halted\n");
+	//exit(1);
 }
 
 void move_usp(m68k& cpu, u16 opc)

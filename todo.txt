@@ -107,11 +107,11 @@ Sega SMS Todo List
 
 Genesis Todo List
 --------------------
-1. Copy controller from SisterJean
-2. window, shadow/highlight
+1. better window
+2. shadow/highlight
 3. Let Z80 run
 4. Output the PSG samples
-5. My own FM Synth?
+5. start the yamaha chip with the timers + dac channel
 
 
 
