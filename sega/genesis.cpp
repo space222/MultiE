@@ -41,6 +41,12 @@ void genesis::write(u32 addr, u32 val, int size)
 		return;
 	}
 	
+	if( addr >= 0xA00000 && addr < 0xA01000 )
+	{
+		ZRAM[addr&0x1fff] = val;
+		return;
+	}
+	
 	if( addr == 0xA10008 )
 	{
 		pcycle = 0;
@@ -92,6 +98,12 @@ u32 genesis::read(u32 addr, int size)
 	if( addr < 0x400000 ) return 0;
 	if( addr >= 0xe00000 ) return __builtin_bswap16(*(u16*)&RAM[addr&0xffff]);
 	
+	if( addr >= 0xA00000 && addr < 0xA01000 )
+	{
+		//ZRAM[addr&0x1fff] ^= 0xff;
+		return __builtin_bswap16(*(u16*)&ZRAM[addr&0x1fff]);
+	}
+	
 	if( addr == 0xA10000 ) return 0x80; //todo: detect rom region
 	if( addr == 0xA1000C ) return 0;
 	
@@ -104,7 +116,11 @@ u32 genesis::read(u32 addr, int size)
 	
 	if( addr == 0xA10004 ) return getpad2();
 	
-	if( addr == 0xC0'0004 ) return vdp_stat;
+	if( addr == 0xC0'0004 ) 
+	{
+		//printf("VDP stat\n");
+		return vdp_stat;
+	}
 
 	printf("%X: read%i <$%X\n", cpu.pc-2, size, addr);
 	//exit(1);
@@ -133,7 +149,7 @@ void genesis::run_frame()
 		if( line == 223 ) 
 		{
 			if( (vreg[1]&BIT(5)) ) cpu.pending_irq = 6;
-			vdp_stat |= 0x80;
+			vdp_stat |= 8;
 		}
 	}
 }
