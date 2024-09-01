@@ -124,9 +124,7 @@ void genesis::draw_line(u32 line)
 		vsA &= 0x3ff;
 		vsB &= 0x3ff;
 		
-		u16 entryA = __builtin_bswap16(*(u16*)&VRAM[ntA + (((((line+vsA)&vmask)/8)*nt_width) + (((px-hsA)&hmask)/8))*2]);
-		u16 entryB = __builtin_bswap16(*(u16*)&VRAM[ntB + (((((line+vsB)&vmask)/8)*nt_width) + (((px-hsB)&hmask)/8))*2]);
-		
+		u16 entryA = 0;		
 		u8 tA = 0;	
 		if( vdp_in_window(line, px) )
 		{
@@ -135,12 +133,14 @@ void genesis::draw_line(u32 line)
 			tA = VRAM[(entryA&0x7ff)*32 + ((line&7) ^ ((entryA&BIT(12))?7:0))*4 + (lXW>>1)];
 			tA >>= (lXW&1)?0:4;
 		} else {
+			entryA = __builtin_bswap16(*(u16*)&VRAM[ntA + (((((line+vsA)&vmask)/8)*nt_width) + (((px-hsA)&hmask)/8))*2]);
 			u32 lYA = ((line+vsA)&7) ^ ((entryA&BIT(12))?7:0);
 			u32 lXA = ((px-hsA)&7) ^ ((entryA&BIT(11))?7:0);
 			tA = VRAM[(entryA&0x7ff)*32 + lYA*4 + (lXA>>1)] >> ((lXA&1)?0:4);
 		}
 		tA &= 0xf;
 		
+		u16 entryB = __builtin_bswap16(*(u16*)&VRAM[ntB + (((((line+vsB)&vmask)/8)*nt_width) + (((px-hsB)&hmask)/8))*2]);
 		u32 lYB = ((line+vsB)&7) ^ ((entryB&BIT(12))?7:0);
 		u32 lXB = ((px-hsB)&7) ^ ((entryB&BIT(11))?7:0);
 		u8 tB = VRAM[(entryB&0x7ff)*32 + lYB*4 + (lXB>>1)] >> ((lXB&1)?0:4);
@@ -196,12 +196,13 @@ void genesis::vdp_ctrl(u16 val)
 			} else {
 				u32 len = (vreg[0x14]<<8)|vreg[0x13];
 				if( len == 0 ) len = 0x10000;
-				u32 src = (vreg[0x17]<<16)|(vreg[0x16]<<8)|vreg[0x15];
-				src <<= 1;
+				u32 src = 0;
 				for(u32 i = 0; i < len; ++i)
 				{
-					vdp_data(read(src,16));
-					src += 2;
+					src = (vreg[0x17]<<16)|(vreg[0x16]<<8)|vreg[0x15];
+					vdp_data(read(src<<1,16));
+					vreg[0x15] += 1;
+					vreg[0x16] += ((vreg[0x15]==0)?1:0);
 				}
 			}
 		}
@@ -218,6 +219,22 @@ void genesis::vdp_ctrl(u16 val)
 	//printf("VDP: non-reg write = $%X\n", val);
 }
 
+u16 genesis::vdp_read()
+{
+	u16 index = vdp_addr;
+	vdp_addr += vreg[0xf];
+	
+	switch( vdp_cd & 0xf )
+	{
+	case 0: return __builtin_bswap16(*(u16*)&VRAM[index&0xfffe]);
+	case 8: return __builtin_bswap16(*(u16*)&CRAM[index&0x7e]);
+	default:
+		printf("VDP: Read with CD = $%X\n", vdp_cd);
+		exit(1);	
+	}
+	return 0;
+}
+
 void genesis::vdp_data(u16 val)
 {
 	if( fill_pending )
@@ -225,7 +242,12 @@ void genesis::vdp_data(u16 val)
 		fill_pending = false;
 		u32 len = (vreg[0x14]<<8)|vreg[0x13];
 		if( len == 0 ) len = 0x10000;
-		for(u32 i = 0; i < len; ++i) VRAM[(vdp_addr + i)&0xffff] = val;
+		if( (vdp_cd&0xf) != 1 )
+		{
+			printf("VDP Fill CD = $%X\n", vdp_cd);
+			//exit(1);
+		}
+		for(u32 i = 0; i < len; ++i) VRAM[(vdp_addr + i)&0xffff] = val>>8;
 		return;
 	}
 
@@ -262,11 +284,11 @@ void genesis::vdp_vram2vram()
 	u32 len = (vreg[0x14]<<8)|vreg[0x13];
 	len <<= 1;
 	if( len == 0 ) len = 0x10000;
-	u32 src = (vreg[0x16]<<8)|vreg[0x15];
 	for(u32 i = 0; i < len; ++i)
 	{
-		VRAM[vdp_addr] = VRAM[src];
-		src += 1;
+		VRAM[vdp_addr] = VRAM[(vreg[0x16]<<8)|vreg[0x15]];
+		vreg[0x15] += 1;
+		vreg[0x16] += ((vreg[0x15]==0)?1:0);
 		vdp_addr += vreg[0xf];
 	}
 }

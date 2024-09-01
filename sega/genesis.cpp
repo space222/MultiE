@@ -1,7 +1,10 @@
 #include <cstdlib>
 #include <cstdio>
+#include "Settings.h"
 #include "genesis.h"
 extern console* sys;
+
+#define Z80_RUNNING ((z80_busreq&BIT(8)) && (z80_reset&BIT(8)))
 
 void genesis::write(u32 addr, u32 val, int size)
 {
@@ -82,6 +85,34 @@ void genesis::write(u32 addr, u32 val, int size)
 		pad2_data = val;
 		return;
 	}
+	
+	if( addr == 0xA11100 )
+	{
+		if( size == 8 ) 
+		{
+			z80_busreq = val<<8;
+		} else {
+			z80_busreq = val;
+		}
+		z80_busreq ^= 0x100;
+		printf("Z80: Busreq%i = $%X\n", size, val);
+		return;
+	}
+	
+	if( addr == 0xA11200 )
+	{
+		if( size == 8 ) 
+		{
+			z80_reset = val<<8;
+		} else {
+			z80_reset = val;
+		}
+		spu.pc = 0;
+		return;
+	}
+	
+	if( addr == 0xA10009 || addr == 0xA1000B ) return;
+	
 	printf("Write%i $%X = $%X\n", size, addr, val);
 	//exit(1);
 }
@@ -104,7 +135,7 @@ u32 genesis::read(u32 addr, int size)
 		return __builtin_bswap16(*(u16*)&ZRAM[addr&0x1fff]);
 	}
 	
-	if( addr == 0xA10000 ) return 0x80; //todo: detect rom region
+	if( addr == 0xA10000 ) return 0x81; //todo: detect rom region
 	if( addr == 0xA1000C ) return 0;
 	
 	if( addr == 0xA10008 ) return pad1_ctrl;
@@ -121,10 +152,65 @@ u32 genesis::read(u32 addr, int size)
 		//printf("VDP stat\n");
 		return vdp_stat;
 	}
+	
+	if( addr == 0xC0'0000 || addr == 0xC0'0002 )
+	{
+		return vdp_read();
+	}
 
+	
+	if( addr == 0xA11100 )
+	{
+		return z80_busreq;	
+	}
+	
+	if( addr == 0xA11200 )
+	{
+		return z80_reset;
+	}
 	printf("%X: read%i <$%X\n", cpu.pc-2, size, addr);
+
 	//exit(1);
 	
+	return 0;
+}
+
+void genesis::z80_write(u16 addr, u8 val)
+{
+	if( addr < 0x4000 ) { ZRAM[addr&0x1fff] = val; return; }
+	if( addr < 0x6000 ) return; //{ printf("FM: Write $%X = $%X\n", addr, val); return; } //todo: fm.write(addr&1, val);
+	if( addr == 0x6000 )
+	{ // bank reg
+		z80_bank >>= 1;
+		z80_bank |= ((val&1)<<23);
+		z80_bank &= 0xFF8000;
+		//printf("z80_bank = $%X\n", z80_bank);
+		return;
+	}
+	printf("z80 write $%X = $%X\n", addr, val);
+	if( addr == 0x7F11 ) { psg.out(val); return; }
+	if( addr >= 0x8000 )
+	{
+		write(z80_bank|(addr&0x7fff), val, 8);
+		return;
+	}
+}
+
+u8 genesis::z80_read(u16 addr)
+{
+	if( addr < 0x4000 ) return ZRAM[addr&0x1fff];
+	if( addr < 0x6000 ) return 3; //todo: return fm.status
+	if( addr == 0x6000 )
+	{ // bank reg. looks like reading resets?
+		z80_bank = 0;
+		return 0xff;
+	}
+	if( addr >= 0x8000 )
+	{
+		u32 a = z80_bank|(addr&0x7fff);
+		u16 res = read(a&~1, 16);
+		return res >> ((a&1)*8);
+	}
 	return 0;
 }
 
@@ -139,18 +225,43 @@ void genesis::run_frame()
 		u64 target = last_target + 3420; // 3360;
 		while( stamp < target )
 		{
+			// run the 68k
 			cpu.step();
 			u64 mc = cpu.icycles * 7;
 			stamp += mc;
+			// run the z80
+			if( Z80_RUNNING )
+			{
+				while( spu_stamp < stamp )
+				{
+					spu_stamp += spu.step() * 15;
+				}
+			} else {
+				spu_stamp = stamp;
+			}
+			// run the psg
+			while( psg_stamp*15 < stamp )
+			{
+				psg_stamp += 1;
+				u8 t = psg.clock(1);
+				sample_cycles += 1;
+				if( sample_cycles >= 81 )
+				{
+					sample_cycles -= 81;
+					float sm = Settings::mute ? 0 : ((t/60.f)*2 - 1);
+					audio_add(sm,sm);
+				}
+			}			
 		}
 		last_target = target;
 		
 		if( line < 224 ) draw_line(line);
 		if( line == 223 ) 
 		{
-			if( (vreg[1]&BIT(5)) ) cpu.pending_irq = 6;
+			if( (vreg[1]&0x60)  ) { cpu.pending_irq = 6; spu.irq_line = 1; }
 			vdp_stat |= 8;
 		}
+		if( line == 224 ) { spu.irq_line = 0; }
 	}
 }
 
@@ -180,6 +291,9 @@ u32 genread32(u32 addr)
 	return res;
 }
 
+u8 z80read(u16 addr) { return dynamic_cast<genesis*>(sys)->z80_read(addr); }
+void z80write(u16 addr, u8 v) { dynamic_cast<genesis*>(sys)->z80_write(addr,v); }
+
 void genesis::reset()
 {
 	memset(&spu, 0, sizeof(spu));
@@ -187,6 +301,7 @@ void genesis::reset()
 	memset(&vreg, 0, 0x20);
 	
 	spu.reset();
+	spu.sp = 0x1ff0;
 	if( !ROM.empty() )
 	{
 		cpu.r[15] = *(u32*)&ROM[0];
@@ -204,15 +319,25 @@ void genesis::reset()
 	cpu.mem_write32 = genwrite32;
 	cpu.intack = []{};
 	
+	spu.write = z80write;
+	spu.read = z80read;
+	spu.in = [](u16)->u8{ return 0xff; };
+	spu.out = [](u16,u8){};
+	
 	key1 = key2 = key3 = 0;
 	pad1_ctrl = pad2_ctrl = 0;
 	pcycle = pcycle2 = 0;
 	pad1_data = pad2_data = PAD_DATA_DEFAULT;
 	
-	stamp = last_target = 0;
+	stamp = spu_stamp = last_target = 0;
 	vdp_cd = vdp_addr = 0;
 	vdp_latch = fill_pending = false;
 	vdp_width = 320;
+	
+	sample_cycles = 0;
+	z80_reset = 0x100;
+	z80_busreq = 0x100;
+	psg_stamp = 0;
 	return;
 }
 

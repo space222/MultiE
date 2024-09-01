@@ -9,7 +9,7 @@
 class genesis : public console
 {
 public:
-	genesis() { vdp_width = 320; }
+	genesis() { vdp_width = 320; setVsync(0); }
 	u32 fb_width() override { return vdp_width; }
 	u32 fb_scale_w() override { return 320; }
 	u32 fb_height() override { return 224; }
@@ -21,16 +21,19 @@ public:
 	
 	u32 read(u32, int);
 	void write(u32, u32, int);
-
+	u8 z80_read(u16);
+	void z80_write(u16, u8);
+	
 	z80 spu;
 	m68k cpu;
 	SN79489 psg;
 	
 	u64 last_target;
-	u64 stamp;
+	u64 stamp, spu_stamp;
 	
 	void vdp_ctrl(u16);
 	void vdp_data(u16);
+	u16 vdp_read();
 	void draw_line(u32);
 	void vdp_vram2vram();
 	void eval_sprites(u32);
@@ -52,6 +55,10 @@ public:
 	u16 getpad2();
 	
 	u16 z80_busreq, z80_reset;
+	u32 z80_bank;
+	u32 sample_cycles;
+	
+	u64 psg_stamp;
 	
 	std::vector<u8> ROM;
 	u8 RAM[0x10000];
