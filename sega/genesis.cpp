@@ -9,7 +9,15 @@ extern console* sys;
 void genesis::write(u32 addr, u32 val, int size)
 {
 	addr &= 0xffFFff;
-	if( addr < 0x400000 ) return;
+	if( addr < 0x400000 ) 
+	{
+		if( ROM.size() <= 2*1024*1024 && addr > 0x200000 && addr <= 0x20FFFF )
+		{
+			printf("Gen: save ram write $%X = $%X\n", addr, val);
+			save[addr&0xffff] = val;
+		}
+		return;
+	}
 	if( addr >= 0xe00000 )
 	{
 		if( size == 8 )
@@ -125,6 +133,10 @@ u32 genesis::read(u32 addr, int size)
 	}
 	addr &= 0xffFFff;
 	if( addr < ROM.size() ) return __builtin_bswap16(*(u16*)&ROM[addr]);
+	if( ROM.size() <= 2*1024*1024 && addr > 0x200000 && addr <= 0x20FFFF )
+	{
+		return save[addr&0xffff];
+	}
 	if( addr < 0x400000 ) return 0;
 	if( addr >= 0xe00000 ) return __builtin_bswap16(*(u16*)&RAM[addr&0xffff]);
 	
@@ -149,6 +161,7 @@ u32 genesis::read(u32 addr, int size)
 	if( addr == 0xC0'0004 || addr == 0xC0'0006 ) 
 	{
 		//printf("VDP stat\n");
+		vdp_latch = false;
 		return vdp_stat;
 	}
 	

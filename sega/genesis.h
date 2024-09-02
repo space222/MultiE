@@ -68,6 +68,7 @@ public:
 	u8 CRAM[128];
 	u8 VSRAM[128];
 	u8 ZRAM[0x2000];
+	u8 save[0x10000];
 	u32 fbuf[320*224];
 };
 

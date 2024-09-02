@@ -591,7 +591,7 @@ u32 psx::read(u32 addr, int size)
 	if( addr >= 0x1F801C00 && addr < 0x1F801E60 )
 	{
 		return spu_read(addr, size);
-	}	
+	}
 	
 	if( addr >= 0x1F801040 && addr < 0x1F801060 ) return pad_read(addr);
 	

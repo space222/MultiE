@@ -176,7 +176,11 @@ void genesis::vdp_ctrl(u16 val)
 		//printf("VDP: regwrite = $%X\n", val);
 		u32 r = (val>>8)&0x1f;
 		vreg[r] = val;
-		return;	
+		vdp_addr &= ~0x3fff;
+		vdp_addr |= (val&0x3fff);
+		vdp_cd &= ~3;
+		vdp_cd |= (val>>14);
+		return;
 	}
 	
 	if( vdp_latch )
@@ -205,8 +209,7 @@ void genesis::vdp_ctrl(u16 val)
 					vreg[0x16] += ((vreg[0x15]==0)?1:0);
 				}
 			}
-		}
-		
+		}	
 	} else {
 		//first write
 		vdp_addr &= ~0x3fff;
@@ -221,6 +224,7 @@ void genesis::vdp_ctrl(u16 val)
 
 u16 genesis::vdp_read()
 {
+	vdp_latch = false;
 	u16 index = vdp_addr;
 	vdp_addr += vreg[0xf];
 	
@@ -237,6 +241,7 @@ u16 genesis::vdp_read()
 
 void genesis::vdp_data(u16 val)
 {
+	vdp_latch = false;
 	if( fill_pending )
 	{
 		fill_pending = false;
@@ -268,9 +273,7 @@ void genesis::vdp_data(u16 val)
 		break;
 	case 5:
 		//todo: check masking
-		index = (index % 80) & ~1;
-		VSRAM[index] = val>>8;
-		VSRAM[index+1] = val;
+		*(u16*)&VSRAM[index&0x7e] = __builtin_bswap16(val);
 		break;
 	default:
 		printf("GEN: VDP write $%X with cd = $%X\n", val, vdp_cd);
