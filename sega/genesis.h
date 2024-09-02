@@ -24,6 +24,8 @@ public:
 	u8 z80_read(u16);
 	void z80_write(u16, u8);
 	
+	bool pal;
+	
 	z80 spu;
 	m68k cpu;
 	SN79489 psg;

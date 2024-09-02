@@ -95,7 +95,6 @@ void genesis::write(u32 addr, u32 val, int size)
 			z80_busreq = val;
 		}
 		z80_busreq ^= 0x100;
-		printf("Z80: Busreq%i = $%X\n", size, val);
 		return;
 	}
 	
@@ -135,11 +134,11 @@ u32 genesis::read(u32 addr, int size)
 		return __builtin_bswap16(*(u16*)&ZRAM[addr&0x1fff]);
 	}
 	
-	if( addr == 0xA10000 ) return 0x81; //todo: detect rom region
+	if( addr == 0xA10000 ) return (pal ? 0xc0 : 0x80);
 	if( addr == 0xA1000C ) return 0;
 	
 	if( addr == 0xA10008 ) return pad1_ctrl;
-	if( addr == 0xA1000A ) return pad2_ctrl;
+	if( addr == 0xA1000A ) return 0;
 	if( addr == 0xA10002 )
 	{
 		return getpad1();
@@ -147,7 +146,7 @@ u32 genesis::read(u32 addr, int size)
 	
 	if( addr == 0xA10004 ) return getpad2();
 	
-	if( addr == 0xC0'0004 ) 
+	if( addr == 0xC0'0004 || addr == 0xC0'0006 ) 
 	{
 		//printf("VDP stat\n");
 		return vdp_stat;
@@ -157,7 +156,6 @@ u32 genesis::read(u32 addr, int size)
 	{
 		return vdp_read();
 	}
-
 	
 	if( addr == 0xA11100 )
 	{
@@ -168,6 +166,7 @@ u32 genesis::read(u32 addr, int size)
 	{
 		return z80_reset;
 	}
+	
 	printf("%X: read%i <$%X\n", cpu.pc-2, size, addr);
 
 	//exit(1);
@@ -181,6 +180,7 @@ void genesis::z80_write(u16 addr, u8 val)
 	if( addr < 0x6000 ) return; //{ printf("FM: Write $%X = $%X\n", addr, val); return; } //todo: fm.write(addr&1, val);
 	if( addr == 0x6000 )
 	{ // bank reg
+		z80_bank &= 0xFF8000;
 		z80_bank >>= 1;
 		z80_bank |= ((val&1)<<23);
 		z80_bank &= 0xFF8000;
@@ -198,18 +198,20 @@ void genesis::z80_write(u16 addr, u8 val)
 
 u8 genesis::z80_read(u16 addr)
 {
+	//printf("z80 read $%X\n",addr);
 	if( addr < 0x4000 ) return ZRAM[addr&0x1fff];
-	if( addr < 0x6000 ) return 3; //todo: return fm.status
+	if( addr < 0x5000 ) { return 0; }//todo: return fm.status
 	if( addr == 0x6000 )
 	{ // bank reg. looks like reading resets?
-		z80_bank = 0;
+		//z80_bank = 0;
 		return 0xff;
 	}
 	if( addr >= 0x8000 )
 	{
 		u32 a = z80_bank|(addr&0x7fff);
-		u16 res = read(a&~1, 16);
-		return res >> ((a&1)*8);
+		if( a >= 0xff0000 ) return RAM[a&0xffff];
+		if( a < ROM.size() ) return ROM[a];
+		return 0;
 	}
 	return 0;
 }
@@ -310,7 +312,7 @@ void genesis::reset()
 		cpu.pc = __builtin_bswap32(cpu.pc);
 		cpu.sr.raw = 0x2700;	
 	}
-
+	
 	cpu.mem_read8 = genread8;
 	cpu.read_code16 = cpu.mem_read16 = genread16;
 	cpu.mem_read32 = genread32;
@@ -353,6 +355,18 @@ bool genesis::loadROM(const std::string fname)
 	ROM.resize(fsz);
 	[[maybe_unused]] int unu = fread(ROM.data(), 1, fsz, fp);
 	fclose(fp);
+	
+	if( ROM[0x1F0] == 'U' ||
+	    ROM[0x1F1] == 'U' ||
+	    ROM[0x1F2] == 'U' )
+	{
+		pal = false;
+	} else if( ROM[0x1F0] == 'J' || ROM[0x1F0] == 'E' ||
+	    	   ROM[0x1F1] == 'J' || ROM[0x1F1] == 'E' ||
+	   	   ROM[0x1F2] == 'J' || ROM[0x1F2] == 'E' )
+	{
+		pal = true;
+	}
 	
 	return true;
 }

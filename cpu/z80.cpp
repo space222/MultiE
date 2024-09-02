@@ -51,6 +51,7 @@ u64 z80::step()
 	{
 		push(pc);
 		pc = 0x38;
+		//irq_line = 0;
 		iff1 = 0;
 		halted = false;
 	}
