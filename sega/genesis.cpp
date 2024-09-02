@@ -14,7 +14,7 @@ void genesis::write(u32 addr, u32 val, int size)
 		if( ROM.size() <= 2*1024*1024 && addr > 0x200000 && addr <= 0x20FFFF )
 		{
 			printf("Gen: save ram write $%X = $%X\n", addr, val);
-			save[addr&0xffff] = val;
+			save[(addr&0xffff)>>1] = val;
 		}
 		return;
 	}
@@ -135,7 +135,7 @@ u32 genesis::read(u32 addr, int size)
 	if( addr < ROM.size() ) return __builtin_bswap16(*(u16*)&ROM[addr]);
 	if( ROM.size() <= 2*1024*1024 && addr > 0x200000 && addr <= 0x20FFFF )
 	{
-		return save[addr&0xffff];
+		return save[(addr&0xffff)>>1];
 	}
 	if( addr < 0x400000 ) return 0;
 	if( addr >= 0xe00000 ) return __builtin_bswap16(*(u16*)&RAM[addr&0xffff]);

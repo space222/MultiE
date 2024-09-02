@@ -224,7 +224,7 @@ void genesis::vdp_ctrl(u16 val)
 
 u16 genesis::vdp_read()
 {
-	vdp_latch = false;
+	//vdp_latch = false;
 	u16 index = vdp_addr;
 	vdp_addr += vreg[0xf];
 	
@@ -241,7 +241,7 @@ u16 genesis::vdp_read()
 
 void genesis::vdp_data(u16 val)
 {
-	vdp_latch = false;
+	//vdp_latch = false;
 	if( fill_pending )
 	{
 		fill_pending = false;
