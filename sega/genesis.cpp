@@ -36,6 +36,7 @@ void genesis::write(u32 addr, u32 val, int size)
 		{
 			val = (val<<8)|(val&0xff);
 		}
+		vdp_latch = false;
 		vdp_data(val);
 		return;
 	}
@@ -167,6 +168,7 @@ u32 genesis::read(u32 addr, int size)
 	
 	if( addr == 0xC0'0000 || addr == 0xC0'0002 )
 	{
+		vdp_latch = false;
 		return vdp_read();
 	}
 	
@@ -200,13 +202,13 @@ void genesis::z80_write(u16 addr, u8 val)
 		//printf("z80_bank = $%X\n", z80_bank);
 		return;
 	}
-	printf("z80 write $%X = $%X\n", addr, val);
 	if( addr == 0x7F11 ) { psg.out(val); return; }
 	if( addr >= 0x8000 )
 	{
 		write(z80_bank|(addr&0x7fff), val, 8);
 		return;
 	}
+	printf("z80 write $%X = $%X\n", addr, val);
 }
 
 u8 genesis::z80_read(u16 addr)

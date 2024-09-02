@@ -87,7 +87,7 @@ void genesis::draw_line(u32 line)
 	u32 ntA = ((vreg[2]>>3)&7) << 13;
 	u32 ntB = (vreg[4]&7) << 13;
 	u32 ntW = (vreg[3]>>1)&0x1f;
-	if( vdp_width == 320 ) ntW &= ~1;
+	//if( vdp_width == 320 ) ntW &= ~1;
 	ntW <<= 11;
 	
 	const u32 nt_height= ntsize[(vreg[16]>>4)&3];
@@ -177,9 +177,7 @@ void genesis::vdp_ctrl(u16 val)
 		u32 r = (val>>8)&0x1f;
 		vreg[r] = val;
 		vdp_addr &= ~0x3fff;
-		vdp_addr |= (val&0x3fff);
 		vdp_cd &= ~3;
-		vdp_cd |= (val>>14);
 		return;
 	}
 	
@@ -190,16 +188,17 @@ void genesis::vdp_ctrl(u16 val)
 		vdp_cd &= ~0x3c;
 		vdp_cd |= (val&0xf0)>>2;
 		//printf("%X: VDP: cd = $%X, addr = $%X\n", cpu.pc-2, vdp_cd, vdp_addr);
-		if( vdp_cd & BIT(5) )
+		if( (vdp_cd & BIT(5)) && (vreg[1]&BIT(4)) )
 		{
 			if( (vreg[0x17] & 0xc0) == 0x80 )
 			{
 				fill_pending = true;
 			} else if( (vreg[0x17] & 0xc0) == 0xc0 ) {
 				vdp_vram2vram();
+				vreg[0x14] = vreg[0x13] = 0;
 			} else {
 				u32 len = (vreg[0x14]<<8)|vreg[0x13];
-				if( len == 0 ) len = 0x10000;
+				if( len == 0 ) len = 0xffff;
 				u32 src = 0;
 				for(u32 i = 0; i < len; ++i)
 				{
@@ -208,6 +207,7 @@ void genesis::vdp_ctrl(u16 val)
 					vreg[0x15] += 1;
 					vreg[0x16] += ((vreg[0x15]==0)?1:0);
 				}
+				vreg[0x14] = vreg[0x13] = 0;
 			}
 		}	
 	} else {
@@ -224,7 +224,6 @@ void genesis::vdp_ctrl(u16 val)
 
 u16 genesis::vdp_read()
 {
-	//vdp_latch = false;
 	u16 index = vdp_addr;
 	vdp_addr += vreg[0xf];
 	
@@ -241,30 +240,33 @@ u16 genesis::vdp_read()
 
 void genesis::vdp_data(u16 val)
 {
-	//vdp_latch = false;
 	if( fill_pending )
 	{
 		fill_pending = false;
 		u32 len = (vreg[0x14]<<8)|vreg[0x13];
-		if( len == 0 ) len = 0x10000;
+		if( len == 0 ) len = 0xffff;
 		if( (vdp_cd&0xf) != 1 )
 		{
 			printf("VDP Fill CD = $%X\n", vdp_cd);
 			//exit(1);
 		}
-		for(u32 i = 0; i < len; ++i) VRAM[(vdp_addr + i)&0xffff] = val>>8;
+		for(u32 i = 0; i < len; ++i) 
+		{
+			VRAM[vdp_addr] = val;
+			vdp_addr += vreg[0xf];
+		}
+		vreg[0x14] = vreg[0x13] = 0;
 		return;
 	}
-
+	
 	u16 index = vdp_addr;
 	vdp_addr += vreg[0xf];
 	
 	switch( vdp_cd & 0xf )
 	{
 	case 1:
-		index &= 0xfffe;
 		VRAM[index] = val>>8;
-		VRAM[index+1] = val;	
+		VRAM[index^1] = val;	
 		break;
 	case 3:
 		index = (index>>1)&0x3F;
@@ -285,8 +287,7 @@ void genesis::vdp_data(u16 val)
 void genesis::vdp_vram2vram()
 {
 	u32 len = (vreg[0x14]<<8)|vreg[0x13];
-	len <<= 1;
-	if( len == 0 ) len = 0x10000;
+	if( len == 0 ) len = 0xffff;
 	for(u32 i = 0; i < len; ++i)
 	{
 		VRAM[vdp_addr] = VRAM[(vreg[0x16]<<8)|vreg[0x15]];
@@ -294,5 +295,6 @@ void genesis::vdp_vram2vram()
 		vreg[0x16] += ((vreg[0x15]==0)?1:0);
 		vdp_addr += vreg[0xf];
 	}
+	vreg[0x14] = vreg[0x13] = 0;
 }
 
