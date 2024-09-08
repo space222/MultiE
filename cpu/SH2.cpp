@@ -459,7 +459,6 @@ u64 SH2::step()
 u64 SH2::exec(u32 addr)
 {
 	u16 opc = memread(addr, 16); //, true);
-	//printf("running opc = $%04X\n", opc);
 	for(u32 i = 0; i < sizeof(optable)/sizeof(sh2instr); ++i)
 	{
 		if( (opc & optable[i].mask) == optable[i].res )
@@ -471,11 +470,16 @@ u64 SH2::exec(u32 addr)
 	
 	printf("SH2: Unimpl opc = $%04X\n", opc);
 	exit(1);	
-	return 4;
+	return 1;
 }
 
 u32 SH2::read(u32 addr, int size)
 {
+	if( addr >= 0xFFFFfe00 )
+	{
+		printf("SH2: internal reg access rd%i <$%X\n", size, addr);
+		exit(1);
+	}
 	return memread(addr,size); //,false);
 }
 
@@ -483,6 +487,13 @@ void SH2::write(u32 addr, u32 val, int size)
 {
 	if( size == 8 ) val &= 0xff;
 	else if( size == 16 ) val &= 0xffff;
+
+	if( addr >= 0xFFFFfe00 )
+	{
+		printf("SH2: internal reg access wr%i $%X = $%X\n", size, addr, val);
+		exit(1);
+	}
+
 	memwrite(addr, val, size);
 }
 

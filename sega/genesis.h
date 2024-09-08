@@ -5,6 +5,7 @@
 #include "z80.h"
 #include "68k.h"
 #include "SN79489.h"
+#include "SH2.h"
 
 class genesis : public console
 {
@@ -61,6 +62,8 @@ public:
 	u32 sample_cycles;
 	
 	u64 psg_stamp;
+	
+	SH2 cpu32x[2];
 	
 	std::vector<u8> ROM;
 	u8 RAM[0x10000];

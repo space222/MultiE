@@ -224,9 +224,12 @@ u8 genesis::z80_read(u16 addr)
 	if( addr >= 0x8000 )
 	{
 		u32 a = z80_bank|(addr&0x7fff);
-		if( a >= 0xff0000 ) return RAM[a&0xffff];
-		if( a < ROM.size() ) return ROM[a];
-		return 0;
+		//if( a >= 0xff0000 ) return RAM[a&0xffff];
+		//if( a < ROM.size() ) return ROM[a];
+		//return 0;
+		u16 v = read(a&~1, 16);
+		a ^= 1;
+		return v >> ((a&1)*8);
 	}
 	return 0;
 }

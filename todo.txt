@@ -107,11 +107,9 @@ Sega SMS Todo List
 
 Genesis Todo List
 --------------------
-1. better window
+1. Start 32X
 2. shadow/highlight
-3. Let Z80 run
-4. Output the PSG samples
-5. start the yamaha chip with the timers + dac channel
+3. fm chip timers + dac channel
 
 
 
