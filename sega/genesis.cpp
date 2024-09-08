@@ -275,7 +275,7 @@ void genesis::run_frame()
 		if( line < 224 ) draw_line(line);
 		if( line == 223 ) 
 		{
-			if( (vreg[1]&0x60)  ) { cpu.pending_irq = 6; spu.irq_line = 1; }
+			if( (vreg[1]&BIT(5))  ) { cpu.pending_irq = 6; spu.irq_line = 1; }
 			vdp_stat |= 8;
 		}
 		if( line == 224 ) { spu.irq_line = 0; }
