@@ -63,8 +63,6 @@ public:
 	
 	u64 psg_stamp;
 	
-	SH2 cpu32x[2];
-	
 	std::vector<u8> ROM;
 	u8 RAM[0x10000];
 	u8 VRAM[0x10000];
@@ -73,6 +71,16 @@ public:
 	u8 ZRAM[0x2000];
 	u8 save[0x10000];
 	u32 fbuf[320*224];
+
+	// 32X stuff
+	SH2 cpu32x[2];
+	u8 fb32x[256*1024];
+	u8 sdram[256*1024];
+	u8 vecrom[256];
+	void write32x(u32, u32, int);
+	u32 read32x(u32, int);
+	u32 ADEN, RV, FM, bank9, autofill_len, autofill_addr, autofill_val;
+	u16 bmpmode, fb_ctrl, fb_ctrl_fsnext;
 };
 
 #define PAD_DATA_DEFAULT 0x40

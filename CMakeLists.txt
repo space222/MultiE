@@ -16,7 +16,7 @@ ibm/ibmpc_fdc.cpp  imgui/backends/imgui_impl_sdlrenderer2.cpp ibm/ibmpc_pit.cpp 
 cpu/68k.cpp sony/psx_pad.cpp sony/psx_spu.cpp sega/sms.cpp sony/psx.cpp cpu/r3000.cpp cpu/r3000_gte.cpp 
 Scheduler.cpp sony/psx_gpu.cpp sony/psx_cd.cpp imgui/imgui.cpp imgui/imgui_draw.cpp imgui/imgui_tables.cpp 
 imgui/imgui_widgets.cpp other/SN79489.cpp sega/genesis.cpp sega/gen_vdp.cpp sega/gen_snd.cpp 
-other/casio_pv1k.cpp sega/gen_pad.cpp Settings.cpp cpu/SH2.cpp
+other/casio_pv1k.cpp sega/gen_pad.cpp Settings.cpp cpu/SH2.cpp sega/gen_32x.cpp
 )
 
 target_include_directories(test PUBLIC . ./imgui ./include ./sony ./other

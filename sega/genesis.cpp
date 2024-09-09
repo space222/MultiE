@@ -121,6 +121,20 @@ void genesis::write(u32 addr, u32 val, int size)
 	
 	if( addr == 0xA10009 || addr == 0xA1000B ) return;
 	
+	if( addr == 0xA15100 )
+	{
+		if( !ADEN ) ADEN = val&1;
+		FM = val&0x8000;
+		return;
+	}
+	if( addr == 0xA15101 ) { if( !ADEN ) ADEN = val&1; return; }
+	
+	if( ADEN )
+	{
+		write32x(addr, val, size);
+		return;
+	}
+	
 	printf("Write%i $%X = $%X\n", size, addr, val);
 	//exit(1);
 }
@@ -133,6 +147,7 @@ u32 genesis::read(u32 addr, int size)
 		exit(1);
 	}
 	addr &= 0xffFFff;
+	if( ADEN && addr < 0x400000 ) return read32x(addr, size);	
 	if( addr < ROM.size() ) return __builtin_bswap16(*(u16*)&ROM[addr]);
 	if( ROM.size() <= 2*1024*1024 && addr > 0x200000 && addr <= 0x20FFFF )
 	{
@@ -147,7 +162,8 @@ u32 genesis::read(u32 addr, int size)
 		return __builtin_bswap16(*(u16*)&ZRAM[addr&0x1fff]);
 	}
 	
-	if( addr == 0xA10000 ) return (pal ? 0xc0 : 0x80);
+	// Chaotix on 32X needs to see bit 6 set, but wasn't happening
+	if( addr == 0xA10000 ) return 0xc1; //(pal ? 0xc0 : 0x80);
 	if( addr == 0xA1000C ) return 0;
 	
 	if( addr == 0xA10008 ) return pad1_ctrl;
@@ -182,10 +198,12 @@ u32 genesis::read(u32 addr, int size)
 		return z80_reset;
 	}
 	
-	printf("%X: read%i <$%X\n", cpu.pc-2, size, addr);
+	if( addr == 0xA130EC ) return ('M'<<8)|'A';
+	if( addr == 0xA130EE ) return ('R'<<8)|'S';
+	if( addr == 0xA15100 ) return 0x80|ADEN;
+	if( ADEN ) return read32x(addr, size);
 
-	//exit(1);
-	
+	printf("%X: read%i <$%X\n", cpu.pc-2, size, addr);
 	return 0;
 }
 
@@ -358,6 +376,14 @@ void genesis::reset()
 	z80_reset = 0x100;
 	z80_busreq = 0x100;
 	psg_stamp = 0;
+	
+	ADEN = bank9 = 0;
+	RV = 0;
+	*(u32*)&vecrom[0] = 0;
+	for(u32 i = 0; i < 63; ++i)
+	{
+		*(u32*)&vecrom[(i+1)*4] = __builtin_bswap32(0x880200+i*6);
+	}
 	return;
 }
 
