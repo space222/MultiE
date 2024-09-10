@@ -478,7 +478,8 @@ u32 SH2::read(u32 addr, int size)
 	if( addr >= 0xFFFFfe00 )
 	{
 		printf("SH2: internal reg access rd%i <$%X\n", size, addr);
-		exit(1);
+		//exit(1);
+		return 0;
 	}
 	return memread(addr,size); //,false);
 }
@@ -491,7 +492,8 @@ void SH2::write(u32 addr, u32 val, int size)
 	if( addr >= 0xFFFFfe00 )
 	{
 		printf("SH2: internal reg access wr%i $%X = $%X\n", size, addr, val);
-		exit(1);
+		//exit(1);
+		return;
 	}
 
 	memwrite(addr, val, size);

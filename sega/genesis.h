@@ -77,9 +77,17 @@ public:
 	u8 fb32x[256*1024];
 	u8 sdram[256*1024];
 	u8 vecrom[256];
+	u8 uppercache[0x1000];
+	u8 comms[16];
+	u8 bios32xS[0x800];
+	u8 bios32xM[0x800];
 	void write32x(u32, u32, int);
 	u32 read32x(u32, int);
-	u32 ADEN, RV, FM, bank9, autofill_len, autofill_addr, autofill_val;
+	void sh2master_write(u32,u32,int);
+	void sh2slave_write(u32,u32,int);
+	u32 sh2master_read(u32,int);
+	u32 sh2slave_read(u32,int);
+	u32 ADEN, RES, RV, FM, bank9, autofill_len, autofill_addr, autofill_val;
 	u16 bmpmode, fb_ctrl, fb_ctrl_fsnext;
 };
 

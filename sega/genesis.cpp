@@ -121,13 +121,33 @@ void genesis::write(u32 addr, u32 val, int size)
 	
 	if( addr == 0xA10009 || addr == 0xA1000B ) return;
 	
-	if( addr == 0xA15100 )
+	if( addr == 0xA15100 || addr == 0xA15101 )
 	{
-		if( !ADEN ) ADEN = val&1;
-		FM = val&0x8000;
+		printf("ADEN =$%X\n", val);
+		if( !ADEN ) 
+		{
+			ADEN = val&1;
+			if( !ADEN ) return;
+			/*
+			// was going to HLE the 32X boot, but maybe that should wait
+			u32 cartaddr = __builtin_bswap32(*(u32*)&ROM[0x3D4]);
+			u32 ramaddr  = __builtin_bswap32(*(u32*)&ROM[0x3D8]);
+			u32 bytelen =  __builtin_bswap32(*(u32*)&ROM[0x3DC]);
+			printf("cartaddr = $%X, ramaddr = $%X, len = %i\n", cartaddr, ramaddr, bytelen);
+			for(u32 i = 0; i < bytelen; ++i) sdram[ramaddr+i] = ROM[cartaddr+i];
+			cpu32x[0].pc = __builtin_bswap32(*(u32*)&ROM[0x3E0]);
+			cpu32x[1].pc = __builtin_bswap32(*(u32*)&ROM[0x3E4]);
+			cpu32x[0].vbr= __builtin_bswap32(*(u32*)&ROM[0x3E8]);
+			cpu32x[1].vbr= __builtin_bswap32(*(u32*)&ROM[0x3EC]);
+			cpu32x[0].gbr = cpu32x[1].gbr = 0x20004000;
+			*(u32*)&comms[0] = __builtin_bswap32(0x4D5F4F4B);
+			*(u32*)&comms[4] = __builtin_bswap32(0x535F4F4B);
+			*/
+		}
+		if( !RES  ) RES = val&2;
+		if( size == 16 ) FM = val&0x8000;
 		return;
 	}
-	if( addr == 0xA15101 ) { if( !ADEN ) ADEN = val&1; return; }
 	
 	if( ADEN )
 	{
@@ -200,7 +220,7 @@ u32 genesis::read(u32 addr, int size)
 	
 	if( addr == 0xA130EC ) return ('M'<<8)|'A';
 	if( addr == 0xA130EE ) return ('R'<<8)|'S';
-	if( addr == 0xA15100 ) return 0x80|ADEN;
+	if( addr == 0xA15100 ) return 0x80|RES|ADEN;
 	if( ADEN ) return read32x(addr, size);
 
 	printf("%X: read%i <$%X\n", cpu.pc-2, size, addr);
@@ -258,6 +278,8 @@ void genesis::run_frame()
 
 	vdp_width = (vreg[12]&1) ? 320 : 256;
 	vdp_stat = 0;
+	fb_ctrl &= ~0x8000;
+	
 	for(u32 line = 0; line < 262; ++line)
 	{
 		u64 target = last_target + 3420; // 3360;
@@ -289,7 +311,17 @@ void genesis::run_frame()
 					float sm = Settings::mute ? 0 : ((t/60.f)*2 - 1);
 					audio_add(sm,sm);
 				}
-			}			
+			}
+			
+			// run the 32X
+			if( ADEN && RES )
+			{
+				for(u32 i = 0; i < cpu.icycles*3; ++i)
+				{
+					cpu32x[0].step();
+					cpu32x[1].step();
+				}
+			}
 		}
 		last_target = target;
 		
@@ -298,6 +330,7 @@ void genesis::run_frame()
 		{
 			if( (vreg[1]&BIT(5))  ) { cpu.pending_irq = 6; spu.irq_line = 1; }
 			vdp_stat |= 8;
+			fb_ctrl |= 0x8000;
 		}
 		if( line == 224 ) { spu.irq_line = 0; }
 	}
@@ -377,23 +410,60 @@ void genesis::reset()
 	z80_busreq = 0x100;
 	psg_stamp = 0;
 	
-	ADEN = bank9 = 0;
+	ADEN = bank9 = RES = bmpmode = fb_ctrl = 0;
 	RV = 0;
 	*(u32*)&vecrom[0] = 0;
 	for(u32 i = 0; i < 63; ++i)
 	{
 		*(u32*)&vecrom[(i+1)*4] = __builtin_bswap32(0x880200+i*6);
 	}
+	cpu32x[0].memread = [](u32 a, int s)->u32 { return dynamic_cast<genesis*>(sys)->sh2master_read(a,s); };
+	cpu32x[0].memwrite = [](u32 a, u32 v, int s) { dynamic_cast<genesis*>(sys)->sh2master_write(a,v,s); };
+	cpu32x[1].memread = [](u32 a, int s)->u32 { return dynamic_cast<genesis*>(sys)->sh2slave_read(a,s); };
+	cpu32x[1].memwrite = [](u32 a, u32 v, int s) { dynamic_cast<genesis*>(sys)->sh2slave_write(a,v,s); };
+	cpu32x[0].reset();
+	cpu32x[1].reset();
+	
+	cpu32x[0].pc = __builtin_bswap32(*(u32*)&bios32xM[0]);
+	cpu32x[1].pc = __builtin_bswap32(*(u32*)&bios32xS[0]);
+	printf("32X SH2 PCs = $%X, $%X\n", cpu32x[0].pc, cpu32x[1].pc);
+	cpu32x[0].r[15] = __builtin_bswap32(*(u32*)&bios32xM[4]);
+	cpu32x[1].r[15] = __builtin_bswap32(*(u32*)&bios32xS[4]);
+	
 	return;
 }
 
 bool genesis::loadROM(const std::string fname)
 {
-	FILE* fp = fopen(fname.c_str(), "rb");
+	FILE* fp = fopen("./bios/32X_BIOS1.bin", "rb");
+	if( ! fp ) 
+	{
+		printf("Cant find 32X SH2 bootroms\n");
+		return false;
+	}
+	fseek(fp, 0, SEEK_END);
+	auto fsz = ftell(fp);
+	fseek(fp, 0, SEEK_SET);
+	[[maybe_unused]] int u = fread(bios32xM, 1, fsz, fp);
+	fclose(fp);
+
+	fp = fopen("./bios/32X_BIOS2.bin", "rb");
+	if( ! fp ) 
+	{
+		printf("Cant find 32X SH2 bootroms\n");
+		return false;
+	}
+	fseek(fp, 0, SEEK_END);
+	fsz = ftell(fp);
+	fseek(fp, 0, SEEK_SET);
+	[[maybe_unused]] int u2 = fread(bios32xS, 1, fsz, fp);
+	fclose(fp);
+
+	fp = fopen(fname.c_str(), "rb");
 	if(!fp) return false;
 	
 	fseek(fp, 0, SEEK_END);
-	auto fsz = ftell(fp);
+	fsz = ftell(fp);
 	fseek(fp, 0, SEEK_SET);
 	
 	ROM.resize(fsz);

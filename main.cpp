@@ -31,6 +31,7 @@
 #include "ibmpc.h"
 #include "psx.h"
 #include "casio_pv1k.h"
+#include "jag.h"
 
 void try_kirq();
 
@@ -267,6 +268,21 @@ void imgui_run()
 					{
 						delete sys;
 						sys = new a52;
+						if( ! sys->loadROM(f) ) 
+						{
+							printf("unable to load ROM\n");
+							exit(1);
+						}
+						else newinstance = true;
+					}
+				}
+				if( ImGui::MenuItem("Jaguar") )
+				{
+					std::string f = getOpenFile();
+					if( !f.empty() )
+					{
+						delete sys;
+						sys = new jaguar;
 						if( ! sys->loadROM(f) ) 
 						{
 							printf("unable to load ROM\n");

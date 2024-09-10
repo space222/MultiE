@@ -551,9 +551,8 @@ u32 psx::read(u32 addr, int size)
 	{
 		return sized_read(exp1.data(), addr-0x1f000000u, size);
 	}
-	
-	//printf("read $%X, %ibits\n", addr, size);
 
+	
 	
 	if( addr == 0x1F801810 ) return gpuread();
 	if( addr == 0x1F801814 ) return gpustat; // ^= 1u<<31;
