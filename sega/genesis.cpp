@@ -182,8 +182,8 @@ u32 genesis::read(u32 addr, int size)
 		return __builtin_bswap16(*(u16*)&ZRAM[addr&0x1fff]);
 	}
 	
-	// Chaotix on 32X needs to see bit 6 set, but wasn't happening
-	if( addr == 0xA10000 ) return 0xc1; //(pal ? 0xc0 : 0x80);
+	// Chaotix on 32X needs to see bit 6 set, everything else requires unset to detect NTSC
+	if( addr == 0xA10000 ) return 0x81; //(pal ? 0xc0 : 0x80);
 	if( addr == 0xA1000C ) return 0;
 	
 	if( addr == 0xA10008 ) return pad1_ctrl;
@@ -331,6 +331,8 @@ void genesis::run_frame()
 			if( (vreg[1]&BIT(5))  ) { cpu.pending_irq = 6; spu.irq_line = 1; }
 			vdp_stat |= 8;
 			fb_ctrl |= 0x8000;
+			fb_ctrl &= ~1;
+			fb_ctrl |= (fb_ctrl_fsnext&1);
 		}
 		if( line == 224 ) { spu.irq_line = 0; }
 	}

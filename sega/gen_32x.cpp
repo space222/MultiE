@@ -157,14 +157,14 @@ u32 genesis::read32x(u32 addr, int size)
 		return __builtin_bswap16(*(u16*)&fb32x[(((fb_ctrl&1)^1)*128*1024) + (addr-0x860000)]);
 	}
 	
-	printf("32X-68k:%X: read%i <$%X\n", cpu.pc-2 , size, addr);
-	
-	
 	if( addr == 0xA15180 ) { return bmpmode; }
 	if( addr == 0xA1518A ) { return fb_ctrl; }
-	if( addr >= 0xA15120 && addr < 0xA15130 ) return sized_read(comms, addr-0xA15120, size);
+	if( addr >= 0xA15120 && addr < 0xA15130 ) return __builtin_bswap16(*(u16*)&comms[addr&0xf]);
+
+	printf("32X-68k:%X: read%i <$%X\n", cpu.pc-2 , size, addr);
+
 	
-	return 0;
+	return 0xfc;
 }
 
 void genesis::write32x(u32 addr, u32 val, int size)
@@ -191,7 +191,7 @@ void genesis::write32x(u32 addr, u32 val, int size)
 	if( addr == 0xA15186 ) { autofill_addr = val<<1; return; }
 	if( addr == 0xA15188 )
 	{
-		printf("32X-68k: auto fill @$%X, %i words\n", autofill_addr, autofill_len);
+		//printf("32X-68k: auto fill @$%X, %i words\n", autofill_addr, autofill_len);
 		for(u32 i = 0; i < autofill_len; ++i, autofill_addr+=2) 
 		{
 			*(u16*)&fb32x[(((fb_ctrl&1)^1)*128*1024) + autofill_addr] = __builtin_bswap16(u16(autofill_val));

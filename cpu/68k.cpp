@@ -2882,6 +2882,7 @@ void m68k::init()
 {
 	for(u32 opc = 0; opc < 0x10000; ++opc)
 	{
+		opcodes[opc] = nullptr;
 		for(u32 i = 0; i < sizeof(map)/sizeof(opcode); ++i)
 		{
 			if( (opc&map[i].mask) == map[i].res )
@@ -2900,8 +2901,10 @@ void m68k::step()
 	
 	if( sr.b.IPL < pending_irq ) 
 	{
-		m68k_trap(*this, EXC_LEVEL_1 + (pending_irq-1)*4, false);
-		//printf("68K: IRQ %i\n", pending_irq);
+		u32 trapaddr = EXC_LEVEL_1 + (pending_irq-1)*4;
+		if( autovector ) trapaddr = autovector;
+		m68k_trap(*this, trapaddr, false);
+		//printf("68K: IRQ %i, to $%X\n", pending_irq, pc);
 		sr.b.IPL = pending_irq;
 		pending_irq = 0;
 		intack();
@@ -2962,7 +2965,8 @@ void m68k::step()
 	}*/
 	if( ! opcodes[opc] )
 	{
-		printf("GEN:%X: undef opcode = $%X\n", pc-2, opc);
+		printf("68K:%X: undef opcode = $%X\n", pc-2, opc);
+		exit(1);
 	} else {
 		opcodes[opc](*this, opc);
 	}

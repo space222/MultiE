@@ -31,7 +31,7 @@
 #include "ibmpc.h"
 #include "psx.h"
 #include "casio_pv1k.h"
-#include "jag.h"
+//#include "jag.h"
 
 void try_kirq();
 
@@ -276,7 +276,7 @@ void imgui_run()
 						else newinstance = true;
 					}
 				}
-				if( ImGui::MenuItem("Jaguar") )
+				/*if( ImGui::MenuItem("Jaguar") )
 				{
 					std::string f = getOpenFile();
 					if( !f.empty() )
@@ -290,7 +290,7 @@ void imgui_run()
 						}
 						else newinstance = true;
 					}
-				}
+				}*/
 				ImGui::EndMenu();
 			}
 			if( ImGui::BeginMenu("Commodore") )

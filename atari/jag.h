@@ -27,6 +27,8 @@ public:
 	u8 gram[0x1000];
 	bool memcon_written;
 	u16 MEMCON1, MEMCON2;
+	u16 IRQ_EN, IRQ_STAT;
+	u16 VMODE;
 };
 
 

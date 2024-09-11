@@ -61,6 +61,8 @@ struct m68k
 	u32 icycles;
 	u64 stamp;
 	bool halted;
+	
+	u32 autovector; // added for Jaguar. uses level 2 IRQ, but not addr 0x68
 };
 
 

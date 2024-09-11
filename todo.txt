@@ -127,3 +127,17 @@ Status: Everything I have shows a title screen, but only Super Cobra is playable
 
 
 
+Atari Jaguar Todo List
+-------------------------
+1. Almost everything (already have a 68k).
+2. After some number of vint irqs, sets a border color and never does anything else. Figure out why.
+
+
+
+
+
+
+
+
+
+
