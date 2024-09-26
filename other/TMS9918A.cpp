@@ -17,6 +17,37 @@ void TMS9918A::draw_scanline(u32 line)
 	u8 M2 = (vdp_regs[1]&8);
 	u8 M1 = (vdp_regs[1]&0x10);
 	
+	u8 spr[256];
+	memset(spr, 0, 256);
+	if( !M1 )
+	{
+		u16 sprtab = (vdp_regs[5])*0x80;
+		u32 size = (vdp_regs[1]&2)?16:8;
+		u32 mul = (vdp_regs[1]&1)?2:1;
+		u32 num = 0;
+		for(u32 i = 0; i < 32 && num < 4; ++i)
+		{
+			u8 Y = vram[sprtab + i*4];
+			if( Y == 0xD0 ) break;
+			Y += 1;
+			if( line < Y || line >= Y + size*mul ) continue;
+			num += 1;
+			
+			int X = vram[sprtab + i*4 + 1];
+			if( vram[sprtab + i*4 + 3] & BIT(4) ) X -= 32;
+			u16 sprpat = (vdp_regs[6])*0x800;
+			sprpat += (vram[sprtab + i*4 + 2] + (((line-Y)/mul)>7 ? 1 : 0)) * 8;
+			for(u32 sx = 0; sx < size*mul; ++sx, ++X)
+			{
+				if( X < 0 ) continue;
+				u8 d = vram[sprpat + ((sx>7 && size*mul>8)?16:0) + ((line-Y)&7)];
+				d >>= 7^(sx&7);
+				d &= 1;
+				if( !spr[X] ) spr[X] = d ? (vram[sprtab + i*4 + 3]&0xf) : 0;
+			}
+		}	
+	}
+	
 	for(u32 X = 0; X < 256; ++X)
 	{
 		if( 0 ) //X < 8 && (vdp_regs[0]&BIT(5)) )
@@ -51,7 +82,8 @@ void TMS9918A::draw_scanline(u32 line)
 			d &= 1;
 			p = (d ? (vram[(vdp_regs[3]*0x40) + (nt>>3)]>>4) : (vram[(vdp_regs[3]*0x40) + (nt>>3)]&0xf));
 		}
-		u32 c = tms9918a_pal[p];
+		
+		u32 c = tms9918a_pal[spr[x] ? spr[x] : p];
 		FL[X] = c<<8;
 	}
 	return;
@@ -67,7 +99,7 @@ void TMS9918A::ctrl(u8 v)
 		if( vdp_cd == 2 ) 
 		{
 			vdp_regs[v&7] = vdp_addr;
-			printf("VDP Reg %i = $%X\n", v&7, vdp_regs[v&7]);
+			//printf("VDP Reg %i = $%X\n", v&7, vdp_regs[v&7]);
 		} else if( vdp_cd == 3 ) {
 			//rdbuf = cram[vdp_addr&0x1f];
 		} else if( vdp_cd == 1 || vdp_cd == 0 ) {
