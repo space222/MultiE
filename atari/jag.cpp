@@ -60,7 +60,7 @@ void jaguar::write(u32 addr, u32 val, int size)
 			VMODE = val;
 			return;
 		}
-		printf("JAG: write%i $%X = $%X\n", size, addr, val);
+		//printf("JAG: write%i $%X = $%X\n", size, addr, val);
 		return;
 	}
 	
@@ -84,17 +84,21 @@ u32 jaguar::read(u32 addr, int size)
 	
 	if( addr >= 0xE00000 )
 	{
+		if( addr >= 0xF00000 ) { printf("jag: IO read $%X\n", addr); return -1; }
+		//if( addr == 0xF03000 ) return __builtin_bswap16(0x03D0);
+		//if( addr == 0xF03002 ) return __builtin_bswap16(0xDEAD);
 		if( addr >= 0xF03000 && addr < 0xF04000 ) return __builtin_bswap16(*(u16*)&gram[addr&0xfff]);
 		if( addr == 0xF0223A ) return 1; // blitter stat reg
 		if( addr == 0xF000E0 ) return IRQ_STAT;
 		if( addr == 0xF00028 ) return VMODE;
 		if( addr == 0xF02114 ) return 0;
 		if( addr == 0xF02116 ) return 0;
-		if( addr >= 0xF00000 ) { printf("jag: IO read $%X\n", addr); return -1; }
+		//if( addr >= 0xF00000 ) { printf("jag: IO read $%X\n", addr); return -1; }
 		return __builtin_bswap16(*(u16*)&bootrom[addr&0x1ffff]);
 	}
 	if( addr >= 0x800000 )
 	{
+		printf("JAG: ROM read%i $%X\n", size, addr);
 		addr -= 0x800000;
 		if( addr < ROM.size() ) return __builtin_bswap16(*(u16*)&ROM[addr]);
 		return 0;

@@ -31,7 +31,8 @@
 #include "ibmpc.h"
 #include "psx.h"
 #include "casio_pv1k.h"
-//#include "jag.h"
+#include "jag.h"
+#include "colecovision.h"
 
 void try_kirq();
 
@@ -276,7 +277,7 @@ void imgui_run()
 						else newinstance = true;
 					}
 				}
-				/*if( ImGui::MenuItem("Jaguar") )
+				if( ImGui::MenuItem("Jaguar") )
 				{
 					std::string f = getOpenFile();
 					if( !f.empty() )
@@ -290,7 +291,7 @@ void imgui_run()
 						}
 						else newinstance = true;
 					}
-				}*/
+				}
 				ImGui::EndMenu();
 			}
 			if( ImGui::BeginMenu("Commodore") )
@@ -442,15 +443,31 @@ void imgui_run()
 				}
 				ImGui::EndMenu();
 			}
-			if( ImGui::BeginMenu("Casio") ) 
+			if( ImGui::BeginMenu("Other") ) 
 			{
-				if( ImGui::MenuItem("PV-1000") )
+				if( ImGui::MenuItem("Casio PV-1000") )
 				{
 					std::string f = getOpenFile();
 					if( !f.empty() )
 					{
 						delete sys;
 						sys = new pv1k;
+						if( ! sys->loadROM(f) ) 
+						{
+							printf("unable to load ROM\n");
+							exit(1);
+						}
+						else newinstance = true;
+						crt_scale = 2;
+					}				
+				}
+				if( ImGui::MenuItem("ColecoVision") )
+				{
+					std::string f = getOpenFile();
+					if( !f.empty() )
+					{
+						delete sys;
+						sys = new colecovision;
 						if( ! sys->loadROM(f) ) 
 						{
 							printf("unable to load ROM\n");

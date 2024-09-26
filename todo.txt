@@ -47,6 +47,7 @@ Notes: Zelda doesn't care, but Metroid depends on MMC1 shift register reset doin
 GB Todo List
 ---------------
 1. sound
+2. GBC
 
 
 
@@ -90,7 +91,6 @@ Notes:	CD is still awful and audio (both DA&XA) is not supported.
 	Currently sending out spurious SPU IRQs every vblank to satisfy MGS and Legend of Legaia
 	MDEC has some wrong colors and shifts, but PS1 is the first system in MultiE to have midrun bpp changes.
 		After adding a separate 24bit framebuffer, the MDEC results are atleast non-puke.
-		PS1 now switches between full-vram-view for 16bit and a separate 24bit framebuffer. 
 		Most games will don't show any MDEC output, but the ones that do work enough to make
 		me think the issue isn't the decoder itself. I'm leaving that alone for now.
 
@@ -102,14 +102,17 @@ Sega SMS Todo List
 2. Have another look at PSG noise channel, probably not working
 3. Wrong tiles in 3dcity.sms (just sometimes? UB or forgot to initialize something?)
 4. cart ram + debug badapple + support other vram nt layouts
+Status: Only supporting one vram layout that most things seem to use.
 
 
 
 Genesis Todo List
 --------------------
-1. Start 32X
-2. shadow/highlight
-3. fm chip timers + dac channel
+1. shadow/highlight
+2. fm chip timers + dac channel
+3. Fix region stuff for the version register
+Status: Most things run minus YM2612 sound. Only a few graphics bugs.
+	Did the SH2 for the 32X, but nowhere near working yet.
 
 
 

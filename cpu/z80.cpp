@@ -47,8 +47,14 @@ u64 z80::step()
 	prefix = icycles = 0;
 	R = (R&0x80)|((R+1)&0x7f);
 	
-	if( iff1 && irq_line && !intr_blocked )
+	if( nmi_line )
 	{
+		push(pc);
+		pc = 0x66;
+		nmi_line = 0;
+		iff1 = 0;
+		halted = false;
+	} else if( iff1 && irq_line && !intr_blocked ) {
 		push(pc);
 		pc = 0x38;
 		//irq_line = 0;
@@ -937,7 +943,15 @@ u64 z80::step_ed()
 		break;
 		
 	case 0xA2:
-	case 0xB2: printf("INI(R) unimpl.\n"); exit(1); break; //todo
+	case 0xB2: // ini/inir //flags todo
+		temp = in(BC);
+		write(HL, temp);
+		B--;
+		setHL(HL+1);
+		if( opc == 0xB2 && B ) pc -= 2;	
+		F.b.Z = (B==0)?1:0;
+		F.b.N = 0;
+		break;
 		
 	case 0xA3:
 	case 0xB3: //outi/otir

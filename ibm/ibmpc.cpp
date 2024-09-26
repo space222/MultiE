@@ -132,6 +132,7 @@ void ibmpc::reset()
 {
 	cpu.reset();
 	//ROM[0xFfffe - (0x100000 - ROM.size())] = 0xFC;
+	for(u32 i = 0; i < RAM.size(); ++i) RAM[i] = 0;
 	
 	vga.index3CE = vga.index3D4 = vga.index3C4 = 0;
 	vga.index3C0 = -1;

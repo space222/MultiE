@@ -26,6 +26,7 @@ struct z80
 	z80_flags fl;
 	u16 pc, sp;
 	u8 irq_line, iff1, iff2, R, Ibase;
+	u8 nmi_line;
 	bool halted, intr_blocked;
 	u8 prefix;
 	u64 icycles;
