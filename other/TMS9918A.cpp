@@ -40,6 +40,7 @@ void TMS9918A::draw_scanline(u32 line)
 			for(u32 sx = 0; sx < size*mul; ++sx, ++X)
 			{
 				if( X < 0 ) continue;
+				if( X >= 256 ) break;
 				u8 d = vram[sprpat + ((sx>7 && size*mul>8)?16:0) + ((line-Y)&7)];
 				d >>= 7^(sx&7);
 				d &= 1;

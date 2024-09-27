@@ -26,6 +26,7 @@ public:
 	
 	u32 sample_cycles;
 	u64 stamp, last_target;
+	u8 input_select;
 	
 	TMS9918A vdp;
 	

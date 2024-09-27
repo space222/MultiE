@@ -41,9 +41,55 @@ u8 colecovision::cv_in(u16 p)
 	if( p == 0xfc )
 	{
 		auto keys = SDL_GetKeyboardState(nullptr);
-		u8 v = 0xff;
-		if( keys[SDL_SCANCODE_S] ) v ^= 1;
-		return v;	
+		if( input_select == 0x80 )
+		{
+			u8 v = 0xff;
+			if( keys[SDL_SCANCODE_KP_7] ) return v ^ 2;
+			if( keys[SDL_SCANCODE_KP_8] ) return v ^ 8;
+			if( keys[SDL_SCANCODE_KP_9] ) return v ^ 3;
+			if( keys[SDL_SCANCODE_KP_4] ) return v ^ 0xd;
+			if( keys[SDL_SCANCODE_KP_5] ) return v ^ 0xc;
+			if( keys[SDL_SCANCODE_KP_6] ) return v ^ 1;
+			if( keys[SDL_SCANCODE_KP_1] ) return v ^ 0xA;
+			if( keys[SDL_SCANCODE_KP_2] ) return v ^ 0xe;
+			if( keys[SDL_SCANCODE_KP_3] ) return v ^ 4;
+			if( keys[SDL_SCANCODE_KP_0] ) return v ^ 9;
+			if( keys[SDL_SCANCODE_KP_PERIOD] ) return v ^ 5;
+			if( keys[SDL_SCANCODE_KP_ENTER] ) return v ^ 6;
+			return v;
+		}
+		/* bit 0 = 6
+		   bit 1 = 1
+		   bit 2 = 9
+		   bit 3 = 2
+		   bit 4 = ??
+		   bit 5 = ??
+		   bit 6 = right fire button
+		   bit 7 = ??
+		   bit 0+1 = 3
+		   bit 0+2 = 0
+		   bit 0+3 = *
+		   bit 1+2 = #
+		   bit 2+3 = 5
+		   bit 1+3 = 7
+		   bit 0+2+3 = 4
+		   bit 1+2+3 = 8
+		 */
+		if( input_select == 0xc0 )
+		{
+			u8 v = 0xff;
+			if( keys[SDL_SCANCODE_UP] ) v ^= 1;
+			if( keys[SDL_SCANCODE_RIGHT] ) v ^= 2;
+			if( keys[SDL_SCANCODE_DOWN] ) v ^= 4;
+			if( keys[SDL_SCANCODE_LEFT] ) v ^= 8;
+			if( keys[SDL_SCANCODE_Z] ) v ^= 0x10;
+			if( keys[SDL_SCANCODE_X] ) v ^= 0x20;
+			if( keys[SDL_SCANCODE_C] ) v ^= 0x40;
+			if( keys[SDL_SCANCODE_V] ) v ^= 0x80;
+			return v;
+			// appears only bit 6 is used, for left fire button
+		}
+		return 0xff;
 	}
 	if( p == 0xff ) { return 0xff; }
 	
@@ -54,6 +100,7 @@ u8 colecovision::cv_in(u16 p)
 void colecovision::cv_out(u16 p, u8 v)
 {
 	p &= 0xff;
+	if( p == 0x80 || p == 0xc0 ) { input_select = p; return; }
 	if( p == 0xff ) { psg.out(v); return; }
 	if( p == 0xbf )
 	{
@@ -80,6 +127,7 @@ void colecovision::reset()
 	cpu.irq_line = cpu.nmi_line = 0;
 	sample_cycles = stamp = last_target = 0;
 	vdp.reset();
+	input_select = 0x80;
 }
 
 void colecovision::run_frame()
