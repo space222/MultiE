@@ -30,6 +30,7 @@ void SMS::vdp_ctrl(u8 val)
 		if( vdp_cd == 2 ) 
 		{
 			vdp_regs[val&0xf] = vdp_addr;
+			//printf("vdp reg %i = $%X\n", val&0xf, vdp_addr&0xff);
 		} else if( vdp_cd == 3 ) {
 			rdbuf = cram[vdp_addr&0x1f];
 		} else if( vdp_cd == 1 || vdp_cd == 0 ) {
@@ -248,7 +249,8 @@ void SMS::vdp_scanline(u32 line)
 		int tile_x = x / 8;
 		int tile_y = y / 8;
 		
-		u16 map_addr = 0x3800 + (tile_y*32 + tile_x)*2;
+		const u16 map_base = ((vdp_regs[2]>>1)&7)*0x800 ; // 0x3800
+		u16 map_addr = map_base + (tile_y*32 + tile_x)*2;
 		u32 t_lo = vram[map_addr];
 		u32 t_hi = vram[map_addr + 1];
 		u32 tnum = ((t_hi<<8)&0x100) + t_lo;
