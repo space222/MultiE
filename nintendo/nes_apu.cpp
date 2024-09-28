@@ -325,7 +325,7 @@ void nes::apu_clock()
 			sdl_samples.clear();
 		}
 		*/
-		float sm = (Settings::mute ? 0 : ((total / 40.f)*2 - 1));
+		float sm = ((total / 40.f)*2 - 1);
 		audio_add(sm, sm);
 	}
 }

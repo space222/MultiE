@@ -145,7 +145,7 @@ void colecovision::run_frame()
 			if( sample_cycles >= 81 )
 			{
 				sample_cycles -= 81;
-				float sm = Settings::mute ? 0 : ((snd/60.f)*2 - 1);
+				float sm = ((snd/60.f)*2 - 1);
 				audio_add(sm,sm);
 			}
 		}

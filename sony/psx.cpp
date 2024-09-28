@@ -309,7 +309,7 @@ void psx::run_frame()
 			{
 				tick_spu();
 				spu_cycles -= 768;
-				float sm = (Settings::mute ? 0 : spu_out);
+				float sm = spu_out;
 				audio_add(sm, sm);
 				/*spu_samples.push_back(Settings::mute ? 0 : spu_out); // (spu_ctrl&0xc000)? spu_out : 0 );
 				if( spu_samples.size() >= 735 )

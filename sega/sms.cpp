@@ -175,7 +175,7 @@ void SMS::run_frame()
 			if( snd_cycles >= 81 )
 			{
 				snd_cycles -= 81;
-				float sm = Settings::mute ? 0 : ((snd/60.f)*2 - 1);
+				float sm = ((snd/60.f)*2 - 1);
 				audio_add(sm,sm);
 			}
 		}

@@ -62,7 +62,7 @@ std::atomic<int> sample_rd(1), sample_wr(2);
 void audio_add(float L, float R)
 {
 	while( sample_wr == sample_rd ) std::this_thread::yield();
-	sample_buf[sample_wr++] = (L+R)/2;
+	sample_buf[sample_wr++] = Settings::mute ? 0 : ((L+R)/2);
 	sample_wr = sample_wr % sbuflen;
 }
 
