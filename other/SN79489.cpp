@@ -13,7 +13,7 @@ void SN79489::run()
 			cnt[i] = 0;
 			p[i] ^= 1;
 		}
-		if( p[i] & 1 ) total += vol[i];
+		if( (p[i] & 1) || (tone[i]==1) ) total += vol[i];
 	}
 	
 	cnt[3]+=1;

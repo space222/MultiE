@@ -23,6 +23,7 @@ public:
 		bankreg[2] = 1;
 		bankreg[3] = 2;
 		for(int i = 0; i < 16; ++i) vdp_regs[i] = 0;
+		memset(vram, 0, 0x4000);
 		stamp = snd_cycles = last_target = 0;
 		PSG.reset();
 		samples.clear();

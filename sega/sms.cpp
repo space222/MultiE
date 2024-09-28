@@ -305,16 +305,17 @@ void SMS::eval_sprites(u32 line)
 {
 	num_sprites = 0;
 	if( line == 0 ) return;
-
+	const u16 sprbase = ((vdp_regs[5]>>1)&0x3F)<<8;
+	
 	for(u32 i = 0; i < 64; ++i)
 	{
-		u32 Y = vram[0x3F00 + i] + 1;
-		if( !MODE224 && Y == 208 ) break;
+		u32 Y = vram[sprbase + i] + 1;
+		if( !MODE224 && Y == 209 ) break;
 		u32 h = (vdp_regs[1]&2) ? 16 : 8;
 		if( line >= Y && (Y+h) > line )
 		{
 			sprite_buf[num_sprites*2] = i;
-			sprite_buf[num_sprites*2 + 1] = vram[0x3F80 + i*2];
+			sprite_buf[num_sprites*2 + 1] = vram[sprbase + 0x80 + i*2];
 			num_sprites++;
 			if( num_sprites == 8 ) break;
 		}
