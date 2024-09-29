@@ -277,21 +277,6 @@ void imgui_run()
 						else newinstance = true;
 					}
 				}
-				if( ImGui::MenuItem("Jaguar") )
-				{
-					std::string f = getOpenFile();
-					if( !f.empty() )
-					{
-						delete sys;
-						sys = new jaguar;
-						if( ! sys->loadROM(f) ) 
-						{
-							printf("unable to load ROM\n");
-							exit(1);
-						}
-						else newinstance = true;
-					}
-				}
 				ImGui::EndMenu();
 			}
 			if( ImGui::BeginMenu("Commodore") )
