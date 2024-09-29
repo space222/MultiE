@@ -33,7 +33,7 @@
 #include "casio_pv1k.h"
 #include "jag.h"
 #include "colecovision.h"
-
+#include "msx.h"
 void try_kirq();
 
 namespace fs = std::filesystem;
@@ -468,6 +468,22 @@ void imgui_run()
 					{
 						delete sys;
 						sys = new colecovision;
+						if( ! sys->loadROM(f) ) 
+						{
+							printf("unable to load ROM\n");
+							exit(1);
+						}
+						else newinstance = true;
+						crt_scale = 2;
+					}				
+				}
+				if( ImGui::MenuItem("MSX") )
+				{
+					std::string f = getOpenFile();
+					if( !f.empty() )
+					{
+						delete sys;
+						sys = new msx;
 						if( ! sys->loadROM(f) ) 
 						{
 							printf("unable to load ROM\n");

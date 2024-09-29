@@ -49,6 +49,22 @@ void TMS9918A::draw_scanline(u32 line)
 		}	
 	}
 	
+	if( M1 )
+	{
+		for(u32 X = 0; X < 240; ++X)
+		{
+			u16 map_addr = ((vdp_regs[2]&0xf)*0x400) + ((line/8)*40 + (X/6));
+			u8 nt = vram[map_addr];	
+			u16 tile_addr = ((vdp_regs[4]&7)*0x800) + (nt*8 + (line&7));
+			u8 d = vram[tile_addr];
+			d >>= 7^(X%6);
+			d &= 1;
+			u8 p = d ? (vdp_regs[7]>>4) : (vdp_regs[7]&0xf);
+			fbuf[line*240 + X] = tms9918a_pal[p]<<8;
+		}	
+		return;
+	}
+	
 	for(u32 X = 0; X < 256; ++X)
 	{
 		if( 0 ) //X < 8 && (vdp_regs[0]&BIT(5)) )

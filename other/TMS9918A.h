@@ -7,7 +7,7 @@ class TMS9918A
 {
 public:
 	TMS9918A() : fbuf(256*192) { reset(); }
-	u32 fb_width();
+	u32 fb_width() { return (vdp_regs[1]&0x10) ? 240 : 256; }
 	u32 fb_height() { return 192; }
 	void draw_scanline(u32 line);
 	u8* framebuffer() { return (u8*)fbuf.data(); }
