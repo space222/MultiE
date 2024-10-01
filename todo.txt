@@ -100,7 +100,7 @@ Sega SMS Todo List
 ---------------------
 1. Line interrupt
 2. Wrong tiles in 3dcity.sms (just sometimes? UB or forgot to initialize something?)
-3. cart ram + debug badapple + support other vram nt layouts
+3. cart ram + support other vram nt layouts
 Status: Bad Apple still has some garbage tiles. 
 	Possibly bad tiles elsewhere, UB or (more likely) missed an initialization somewhere.
 	Most things (that I've tried) are playable.
@@ -131,6 +131,13 @@ Status: Everything I have shows a title screen, but only Super Cobra is playable
 
 
 
+Microsoft MSX1
+-----------------
+1. Ability to paste from host clipboard into basic.
+2. AY-3-8910 noise and envelope.
+3. TMS9918A implement multi-color mode and find carts that use the different sprite/zoom settings
+4. Joystick fire buttons. Easy to implement, just haven't bothered looking for carts that use them.
+Status: BASIC is usable and Pac-Mac is playable with some sound.
 
 
 

@@ -1,0 +1,8 @@
+The file format used for MSX Cassette tapes here is loosely based on the C64 tape file, but
+even simpler.
+
+All values little endian. File starts with a 64bit number of entries. Rest of file
+is that number of entries long. Each entry is a pair of 64bit number of cycles since
+last write to port AA (or same via AB) and a byte with the value of AA.5 in bit 7
+(because on reading it'll go in psg reg 14,bit7).
+
