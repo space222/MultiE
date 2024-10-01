@@ -162,6 +162,9 @@ int main(int argc, char** args)
 			ImGui_ImplSDL2_ProcessEvent(&e);
 			switch(e.type)
 			{
+			case SDL_CLIPBOARDUPDATE:
+				//printf("huh? <%s>\n", SDL_GetClipboardText());
+				break;
 			case SDL_KEYDOWN:
 				if( sys ) sys->key_down(e.key.keysym.scancode);
 				if( e.key.keysym.scancode == SDL_SCANCODE_X )

@@ -27,6 +27,12 @@ public:
 			casrd = true;
 			caspos = 0;
 		}
+		if( sc == SDL_SCANCODE_F10 )
+		{
+			char* str = SDL_GetClipboardText();
+			paste = str;
+			SDL_free(str);
+		}
 	}
 	
 	u32 fb_width() override { return vdp.fb_width(); }
@@ -60,5 +66,9 @@ public:
 	std::vector< std::pair<u64, u8> > tap;
 	bool casrd;
 	u32 caspos;
+	
+	std::string paste;
+	u32 pastepos;
+	bool shifted;
 };
 

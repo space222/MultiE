@@ -133,11 +133,14 @@ Status: Everything I have shows a title screen, but only Super Cobra is playable
 
 Microsoft MSX1
 -----------------
-1. Ability to paste from host clipboard into basic.
-2. AY-3-8910 noise and envelope.
-3. TMS9918A implement multi-color mode and find carts that use the different sprite/zoom settings
-4. Joystick fire buttons. Easy to implement, just haven't bothered looking for carts that use them.
+1. AY-3-8910 noise and envelope.
+2. TMS9918A implement multi-color mode and find carts that use the different sprite/zoom settings
+3. Joystick fire buttons. Easy to implement, just haven't bothered looking for carts that use them.
 Status: BASIC is usable and Pac-Mac is playable with some sound.
+Sometimes repeated printing writes to the screen more than once. This can be seen by doing a 10 print .. 20 goto 10
+Use F10 to paste the clipboard into BASIC, F11 sets the cassette into read mode, F12 into write mode.
+Going into write mode will clear the current tape data. Writing always starts fresh.
+"out.tap" is read upon creating a new MSX console instance, and written out upon destruction.
 
 
 
