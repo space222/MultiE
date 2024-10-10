@@ -8,6 +8,7 @@
 #define se8to32(a) ((s32)(s8)(a))
 #define se16to32(a) ((s32)(s16)(a))
 
+#define EXC_LINE_A  0x28
 #define EXC_ILLEGAL 0x10
 #define EXC_DIVZERO 0x14
 #define EXC_CHK     0x18
@@ -2774,7 +2775,14 @@ void LSd_reg(m68k& cpu, u16 opc)
 	return;
 }
 
+void line_a(m68k& cpu, u16 opc)
+{
+	//printf("68k:%X: line A opc = $%X\n", cpu.pc, opc);
+	m68k_trap(cpu, EXC_LINE_A, true);
+}
+
 opcode map[] = {
+	{ 0xf000, 0xA000, line_a },
 	{ 0xffff, 0b0000'0000'0011'1100, ori_to_ccr },
 	{ 0xffff, 0b0000'0000'0111'1100, ori_to_sr },
 	{ 0xff00, 0x0000, ori },
@@ -2966,7 +2974,8 @@ void m68k::step()
 	if( ! opcodes[opc] )
 	{
 		printf("68K:%X: undef opcode = $%X\n", pc-2, opc);
-		exit(1);
+		//exit(1);
+		m68k_trap(*this, EXC_ILLEGAL, true);
 	} else {
 		opcodes[opc](*this, opc);
 	}

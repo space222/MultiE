@@ -6,6 +6,7 @@
 #include "68k.h"
 #include "SN79489.h"
 #include "SH2.h"
+#include "ym3438.h"
 
 class genesis : public console
 {
@@ -48,6 +49,15 @@ public:
 	u32 vdp_width;
 	u8 vdp_cd;
 	u8 sprbuf[320];
+	
+	void fm_write(u32, u8);
+	u8 fm_read();
+	void fm_run();
+	float fm_out;
+	int fm_total;
+	int fm_count;
+	u64 fm_stamp;
+	ym3438_t synth;
 	
 	u32 pcycle, pcycle2;
 	u16 key1, key2, key3;

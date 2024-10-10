@@ -1,5 +1,6 @@
 #include <cstdlib>
 #include <cstdio>
+#include <algorithm>
 #include "Settings.h"
 #include "genesis.h"
 extern console* sys;
@@ -56,6 +57,12 @@ void genesis::write(u32 addr, u32 val, int size)
 	if( addr >= 0xA00000 && addr < 0xA02000 )
 	{
 		ZRAM[addr&0x1fff] = val;
+		return;
+	}
+	
+	if( addr >= 0xA04000 && addr < 0xA05000 )
+	{
+		fm_write(addr, val);
 		return;
 	}
 	
@@ -182,6 +189,11 @@ u32 genesis::read(u32 addr, int size)
 		return __builtin_bswap16(*(u16*)&ZRAM[addr&0x1fff]);
 	}
 	
+	if( addr >= 0xA04000 && addr < 0xA05000 )
+	{
+		return fm_read();
+	}
+	
 	// Chaotix on 32X needs to see bit 6 set, everything else requires unset to detect NTSC
 	if( addr == 0xA10000 ) return 0x81; //(pal ? 0xc0 : 0x80);
 	if( addr == 0xA1000C ) return 0;
@@ -230,7 +242,8 @@ u32 genesis::read(u32 addr, int size)
 void genesis::z80_write(u16 addr, u8 val)
 {
 	if( addr < 0x4000 ) { ZRAM[addr&0x1fff] = val; return; }
-	if( addr < 0x6000 ) return; //{ printf("FM: Write $%X = $%X\n", addr, val); return; } //todo: fm.write(addr&1, val);
+	if( addr < 0x6000 ) { fm_write(addr, val); return; }
+	//{ printf("FM: Write $%X = $%X\n", addr, val); return; } //todo: fm.write(addr&3, val);
 	if( addr == 0x6000 )
 	{ // bank reg
 		z80_bank &= 0xFF8000;
@@ -253,7 +266,7 @@ u8 genesis::z80_read(u16 addr)
 {
 	//printf("z80 read $%X\n",addr);
 	if( addr < 0x4000 ) return ZRAM[addr&0x1fff];
-	if( addr < 0x5000 ) { return 0; }//todo: return fm.status
+	if( addr < 0x5000 ) { return fm_read(); }//todo: return fm.status
 	if( addr == 0x6000 )
 	{ // bank reg. looks like reading resets?
 		//z80_bank = 0;
@@ -300,6 +313,7 @@ void genesis::run_frame()
 				spu_stamp = stamp;
 			}
 			// run the psg
+			fm_run();
 			while( psg_stamp*15 < stamp )
 			{
 				psg_stamp += 1;
@@ -309,6 +323,11 @@ void genesis::run_frame()
 				{
 					sample_cycles -= 81;
 					float sm = ((t/60.f)*2 - 1);
+					float fm = fm_out/float(fm_count);
+					sm = (sm/5.f) + fm; //(fm*2 - 1);
+					fm_count = fm_total = fm_out = 0;
+					
+					sm = std::clamp(sm, -1.f, 1.f);
 					audio_add(sm,sm);
 				}
 			}
@@ -411,6 +430,13 @@ void genesis::reset()
 	z80_reset = 0x100;
 	z80_busreq = 0x100;
 	psg_stamp = 0;
+	
+	OPN2_Reset(&synth);
+	OPN2_SetChipType(3);
+	fm_stamp = 0;
+	fm_count = 0;
+	fm_total = 0;
+	fm_out = 0;
 	
 	ADEN = bank9 = RES = bmpmode = fb_ctrl = 0;
 	RV = 0;

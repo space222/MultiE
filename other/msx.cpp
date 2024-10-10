@@ -104,10 +104,11 @@ u8 msx::in(u16 p)
 		u8 val = vdp.vdp_ctrl_stat;
 		vdp.vdp_ctrl_stat &= ~0x80;
 		cpu.irq_line = 0;
-		return val; 
+		return val;
 	}
 	if( p == 0x98 )
 	{
+		vdp.vdp_ctrl_latch = false;
 		u8 val = vdp.rdbuf;
 		vdp.rdbuf = vdp.vram[vdp.vdp_addr&0x3fff];
 		vdp.vdp_addr+=1;	
@@ -259,6 +260,7 @@ void msx::reset()
 	caspos = 0;
 	pastepos = 0;
 	shifted = false;
+	pfr = 4;
 }
 
 bool msx::loadROM(const std::string fname) 
@@ -325,7 +327,7 @@ void msx::run_frame()
 			vdp.draw_scanline(line);
 		} else if( line == 192 ) {
 			vdp.vdp_ctrl_stat |= 0x80;
-			if( vdp.vdp_regs[1] & BIT(5) )
+			if( (vdp.vdp_regs[1] & BIT(5)) )
 			{
 				cpu.irq_line = 1;			
 			}
@@ -334,20 +336,25 @@ void msx::run_frame()
 	
 	if( !paste.empty() )
 	{
-		pastepos += 1;
-		if( pastepos >= paste.size() )
+		pfr -= 1;
+		if( pfr == 0 )
 		{
-			pastepos = 0;
-			paste.clear();
-		} else if( paste[pastepos] == paste[pastepos-1] ) {
-			// if two characters in a row are the same
-			// the key is never released.
-			// so insert a dummy non-printable at the previous character
-			// there'll be a frame without a new keypress, but not a big deal
-			// this probably has a corner case at end of input, but most of the time
-			// that should be something like a visible character + new line
-			paste[pastepos-1] = 1;
-			pastepos-=1;
+			pastepos += 1;
+			if( pastepos >= paste.size() )
+			{
+				pastepos = 0;
+				paste.clear();
+			} else if( paste[pastepos] == paste[pastepos-1] ) {
+				// if two characters in a row are the same
+				// the key is never released.
+				// so insert a dummy non-printable at the previous character
+				// there'll be a frame without a new keypress, but not a big deal
+				// this probably has a corner case at end of input, but most of the time
+				// that should be something like a visible character + new line
+				paste[pastepos-1] = 1;
+				pastepos-=1;
+			}
+			pfr = 4;
 		}
 	}
 }

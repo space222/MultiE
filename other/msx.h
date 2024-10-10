@@ -70,5 +70,6 @@ public:
 	std::string paste;
 	u32 pastepos;
 	bool shifted;
+	u32 pfr;
 };
 
