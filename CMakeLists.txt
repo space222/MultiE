@@ -5,7 +5,7 @@ project(test)
 find_package(SDL2)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
-set(CMAKE_CXX_FLAGS "-O3 -march=native -Wall -Wpedantic -Wextra -Wshadow")
+set(CMAKE_CXX_FLAGS "-g -march=native -Wall -Wpedantic -Wextra -Wshadow")
 set(CMAKE_CPP_COMPILER clang++)
 
 add_executable(test main.cpp imgui/backends/imgui_impl_sdl2.cpp progopt.cpp commodore/c64.cpp commodore/TAPFile.cpp 
@@ -18,7 +18,7 @@ Scheduler.cpp sony/psx_gpu.cpp sony/psx_cd.cpp imgui/imgui.cpp imgui/imgui_draw.
 imgui/imgui_widgets.cpp other/SN79489.cpp sega/genesis.cpp sega/gen_vdp.cpp sega/gen_snd.cpp 
 other/casio_pv1k.cpp sega/gen_pad.cpp Settings.cpp cpu/SH2.cpp sega/gen_32x.cpp atari/jag.cpp
 coleco/colecovision.cpp other/TMS9918A.cpp other/msx.cpp other/AY-3-8910.cpp
-other/macplus.cpp
+other/macplus.cpp nintendo/nes_fds.cpp
 )
 
 target_include_directories(test PUBLIC . ./imgui ./include ./sony ./other ./coleco

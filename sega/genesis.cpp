@@ -195,7 +195,7 @@ u32 genesis::read(u32 addr, int size)
 	}
 	
 	// Chaotix on 32X needs to see bit 6 set, everything else requires unset to detect NTSC
-	if( addr == 0xA10000 ) return 0x81; //(pal ? 0xc0 : 0x80);
+	if( addr == 0xA10000 ) return 0xc1; //(pal ? 0xc0 : 0x80);
 	if( addr == 0xA1000C ) return 0;
 	
 	if( addr == 0xA10008 ) return pad1_ctrl;

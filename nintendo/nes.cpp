@@ -74,12 +74,19 @@ void nes::write(u16 addr, u8 val)
 		apu_write(addr, val);
 		return;
 	}
-	if( addr >= 0x6000 && addr < 0x8000 )
+	if( isFDS && addr < 0x5000 )
 	{
-		if( SRAM.size() ) SRAM[addr&0x1fff] = val;
+		fds_reg_write(addr, val);
+		return;
+	}	
+	if( addr >= 0x6000 && addr < (isFDS ? 0xE000 : 0x8000) )
+	{
+		if( !SRAM.size() ) return;
+		if( SRAM.size() <= 0x2000 ) SRAM[addr&0x1fff] = val;
+		else SRAM[addr-0x6000] = val;
 		return;
 	}
-	if( addr >= 0x8000 ) 
+	if( addr >= 0x8000 && !isFDS ) 
 	{
 		mapper_write(this, addr, val);
 		return;
@@ -89,9 +96,13 @@ void nes::write(u16 addr, u8 val)
 
 u8 nes::read(u16 addr)
 {
-	if( addr >= 0x8000 )
+	if( addr >= 0x8000 && !isFDS )
 	{
 		return prgbanks[(addr>>13)&3][addr&0x1fff];	
+	}
+	if( addr >= 0xE000 && isFDS )
+	{
+		return fds_bios[addr&0x1fff];
 	}
 	if( addr < 0x2000 ) return RAM[addr&0x7ff];
 	if( addr < 0x4000 ) return ppu_read(addr&7);
@@ -115,10 +126,15 @@ u8 nes::read(u16 addr)
 		return 0x40|res;
 	}
 	if( addr == 0x4017 ) return 0x40;
-	if( addr >= 0x6000 && addr < 0x8000 )
+	if( isFDS && addr < 0x5000 )
 	{
-		if( SRAM.size() ) return SRAM[addr&0x1fff];
-		return 0xff;
+		return fds_reg_read(addr);
+	}
+	if( addr >= 0x6000 && addr < (isFDS ? 0xE000 : 0x8000) )
+	{
+		if( !SRAM.size() ) return 0xff;
+		if( SRAM.size() <= 0x2000 ) return SRAM[addr&0x1fff];
+		return SRAM[addr-0x6000];
 	}
 	//printf("R$%04X\n", addr);
 	return 0xff;
@@ -130,10 +146,48 @@ bool nes::loadROM(std::string fname)
 	if( ! fp ) return false;
 	
 	[[maybe_unused]] int unu = fread(header, 1, 16, fp);
-
+	
+	// check for Famicon Disk System. Handled separately from mappers
+	if( (header[0] == 'F' && header[1] == 'D' && header[2] == 'S')
+		|| strncmp((const char*)(header+2), "NINTENDO", 8) == 0 )
+	{
+		isFDS = true;
+		mapper = 0;
+		mapper_setup(this);
+		
+		u32 offset = (header[0] == 'F' && header[1] == 'D' && header[2] == 'S')?16:0;
+		fseek(fp, 0, SEEK_END);
+		auto fsz = ftell(fp);
+		fseek(fp, offset, SEEK_SET);
+		floppy.resize(fsz);
+		if( fsz % 65500 ) fsz += fsz % 65500;
+		fds_sides = fsz/65500;
+		unu = fread(floppy.data(), 1, fsz, fp);
+		fclose(fp);
+		
+		FILE* fb = fopen("./bios/fds_bios.bin", "rb");
+		if( ! fb )
+		{
+			printf("unable to load fds_bios.bin\n");
+			return false;
+		}
+		unu = fread(fds_bios, 1, 8*1024, fb);
+		fclose(fb);
+		
+		chrram = true;
+		CHR.resize(8*1024);
+		for(u32 i = 0; i < 8; ++i) chrbanks[i] = &CHR[i*1024];
+		SRAM.resize(32*1024);		
+		nametable[0] = &ntram[0];
+		nametable[2] = nametable[0];
+		nametable[1] = nametable[3] = &ntram[1024];
+		return true;
+	}
+	
+	isFDS = false;
 	PRG.resize(header[4] * 16 * 1024);
 	unu = fread(PRG.data(), 1, header[4] * 16 * 1024, fp);
-	
+		
 	if( header[4] == 1 )
 	{
 		PRG.resize(32*1024);

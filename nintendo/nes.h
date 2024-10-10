@@ -81,6 +81,13 @@ public:
 	std::vector<u8> SRAM;
 	u8 OAM[0x100];
 	u8 RAM[0x800];
+	
+	bool isFDS;
+	u8 fds_bios[8*1024];
+	u32 fds_sides;
+	std::vector<u8> floppy;
+	void fds_reg_write(u16, u8);
+	u8 fds_reg_read(u16);
 };
 
 
