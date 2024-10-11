@@ -23,6 +23,11 @@ void nes::run_frame()
 		ppu_dot();
 		ppu_dot();
 		ppu_dot();
+		if( isFDS ) 
+		{	
+			fds_clock();
+			cpu.irq_assert = (fds_timer_irq || fds_disk_irq);
+		}
 	}
 	frame_complete = false;
 }
@@ -152,18 +157,25 @@ bool nes::loadROM(std::string fname)
 		|| strncmp((const char*)(header+2), "NINTENDO", 8) == 0 )
 	{
 		isFDS = true;
+		in_gap = false;
+		fds_timer_irq = fds_disk_irq = false;
 		mapper = 0;
 		mapper_setup(this);
+		fds_state_clocks = 0;
+		fds_disk_stat = fds_ctrl = 0;
+		floppy_pos = 0;
 		
 		u32 offset = (header[0] == 'F' && header[1] == 'D' && header[2] == 'S')?16:0;
 		fseek(fp, 0, SEEK_END);
 		auto fsz = ftell(fp);
 		fseek(fp, offset, SEEK_SET);
-		floppy.resize(fsz);
-		if( fsz % 65500 ) fsz += fsz % 65500;
+		
+		std::vector<u8> file(fsz);
 		fds_sides = fsz/65500;
-		unu = fread(floppy.data(), 1, fsz, fp);
+		unu = fread(file.data(), 1, fsz, fp);
 		fclose(fp);
+		
+		load_floppy(file);
 		
 		FILE* fb = fopen("./bios/fds_bios.bin", "rb");
 		if( ! fb )
@@ -179,8 +191,8 @@ bool nes::loadROM(std::string fname)
 		for(u32 i = 0; i < 8; ++i) chrbanks[i] = &CHR[i*1024];
 		SRAM.resize(32*1024);		
 		nametable[0] = &ntram[0];
-		nametable[2] = nametable[0];
-		nametable[1] = nametable[3] = &ntram[1024];
+		nametable[1] = nametable[0];
+		nametable[2] = nametable[3] = &ntram[1024];
 		return true;
 	}
 	

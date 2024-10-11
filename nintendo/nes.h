@@ -82,12 +82,25 @@ public:
 	u8 OAM[0x100];
 	u8 RAM[0x800];
 	
-	bool isFDS;
+	// below is handled by nes_fds.cpp, other than loadROM in nes.cpp
+	bool isFDS, fds_timer_irq, fds_disk_irq;
+	bool in_gap, look_for_gap_end;
+	u16 fds_timer_reload;
+	u16 fds_timer;
+	u8 fds_timer_ctrl;
 	u8 fds_bios[8*1024];
+	u8 fds_io_en, fds_disk_stat, fds_rd, fds_wr;
+	u8 fds_ctrl;
+	u8 fds_ready;
+	u32 fds_state_clocks;
+	u32 fds_state;
 	u32 fds_sides;
 	std::vector<u8> floppy;
+	u32 floppy_pos;
 	void fds_reg_write(u16, u8);
 	u8 fds_reg_read(u16);
+	void load_floppy(std::vector<u8>&);
+	void fds_clock();
 };
 
 
