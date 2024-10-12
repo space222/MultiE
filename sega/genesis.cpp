@@ -195,7 +195,7 @@ u32 genesis::read(u32 addr, int size)
 	}
 	
 	// Chaotix on 32X needs to see bit 6 set, everything else requires unset to detect NTSC
-	if( addr == 0xA10000 ) return 0xc1; //(pal ? 0xc0 : 0x80);
+	if( addr == 0xA10000 ) return (pal ? BIT(6):0)|(domestic ?0:BIT(7)); //(pal ? 0xc0 : 0x80);
 	if( addr == 0xA1000C ) return 0;
 	
 	if( addr == 0xA10008 ) return pad1_ctrl;
@@ -498,16 +498,24 @@ bool genesis::loadROM(const std::string fname)
 	[[maybe_unused]] int unu = fread(ROM.data(), 1, fsz, fp);
 	fclose(fp);
 	
+	pal = domestic = false;
+	
 	if( ROM[0x1F0] == 'U' ||
 	    ROM[0x1F1] == 'U' ||
 	    ROM[0x1F2] == 'U' )
 	{
-		pal = false;
-	} else if( ROM[0x1F0] == 'J' || ROM[0x1F0] == 'E' ||
-	    	   ROM[0x1F1] == 'J' || ROM[0x1F1] == 'E' ||
-	   	   ROM[0x1F2] == 'J' || ROM[0x1F2] == 'E' )
+		pal = domestic = false;
+	} else if( ROM[0x1F0] == 'J' ||
+	    	   ROM[0x1F1] == 'J' ||
+	   	   ROM[0x1F2] == 'J' )
 	{
-		pal = true;
+		pal = false;
+		domestic = true;
+	} else if( ROM[0x1F0] == 'E' ||
+	    	   ROM[0x1F1] == 'E' ||
+	    	   ROM[0x1F2] == 'E' ) {
+	 	pal = true;
+	 	domestic = false;	    	   
 	}
 	
 	return true;

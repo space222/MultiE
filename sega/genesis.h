@@ -27,6 +27,7 @@ public:
 	void z80_write(u16, u8);
 	
 	bool pal;
+	bool domestic;
 	
 	z80 spu;
 	m68k cpu;
