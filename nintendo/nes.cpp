@@ -59,13 +59,9 @@ void nes::write(u16 addr, u8 val)
 		if( val & 1 )
 		{
 			pad_strobe = 1;
-			return;
+			pad1_index = pad2_index = 0;
 		} else {
-			if( pad_strobe )
-			{
-				pad_strobe = 0;
-				pad1_index = pad2_index = 0;
-			}
+			pad_strobe = 0;
 		}
 		return;
 	}
@@ -125,9 +121,9 @@ u8 nes::read(u16 addr)
 		case 2: if( K[SDL_SCANCODE_A] ) res = 1; break;
 		case 1: if( K[SDL_SCANCODE_X] ) res = 1; break;
 		case 0: if( K[SDL_SCANCODE_Z] ) res = 1; break;
-		default: break;
+		default: res = 1; break;
 		}
-		pad1_index++;
+		if( !pad_strobe ) pad1_index++;
 		return 0x40|res;
 	}
 	if( addr == 0x4017 ) return 0x40;
@@ -142,7 +138,7 @@ u8 nes::read(u16 addr)
 		return SRAM[addr-0x6000];
 	}
 	//printf("R$%04X\n", addr);
-	return 0xff;
+	return 0;
 }
 
 bool nes::loadROM(std::string fname)

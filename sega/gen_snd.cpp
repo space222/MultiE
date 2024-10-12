@@ -18,16 +18,14 @@ u8 genesis::fm_read()
 
 void genesis::fm_run()
 {
-	while( fm_stamp * 30 < stamp )
+	while( fm_stamp < stamp )
 	{
-		fm_stamp += 1;
+		fm_stamp += 36;
 		s16 buf[2];
 		OPN2_Clock(&synth, &buf[0]);
-		//buf[0] += buf[1];
-		//buf[0] /= 2;
-		fm_total += buf[0]; //(buf[0]<<6)>>6;
+		//fm_total += buf[0];
 		fm_count += 1;
-		fm_out += buf[0] / 64.f;
+		fm_out += (buf[0]+buf[1]) / 512.f;
 	}
 }
 
