@@ -107,9 +107,9 @@ Status: Bad Apple still has some garbage tiles.
 Genesis Todo List
 --------------------
 1. shadow/highlight
-2. Fix region stuff for the version register
+2. Fix region stuff for the version register (add gen_version variable, use https://segaretro.org/ROM_header#Regional_compatiblity)
 Status: YM2612 uses the Nuken OPN library... Poorly?
-	Only a few graphics bugs.
+	Only a few games with graphical bugs left, not including lack of shadow/highlight.
 	Did the SH2 for the 32X, but nowhere near working yet.
 
 

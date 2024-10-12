@@ -21,8 +21,10 @@ coleco/colecovision.cpp other/TMS9918A.cpp other/msx.cpp other/AY-3-8910.cpp
 other/macplus.cpp nintendo/nes_fds.cpp
 )
 
+add_library(ym3438 SHARED sega/ym3438.cpp)
+
 target_include_directories(test PUBLIC . ./imgui ./include ./sony ./other ./coleco
 	./cpu ./atari ./commodore ./sega ./ibm ./nintendo ./mattel ${SDL2_INCLUDE_DIRS} )
-target_link_libraries(test PRIVATE dl GL GLEW ${SDL2_LIBRARIES})
+target_link_libraries(test PRIVATE ym3438 dl GL GLEW ${SDL2_LIBRARIES})
 #${CMAKE_SOURCE_DIR}/libfmt.a 
 

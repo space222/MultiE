@@ -32,14 +32,6 @@ void genesis::fm_run()
 
 
 
-#include "ym3438.c"
-
-
-
-
-
-
-
 
 
 
