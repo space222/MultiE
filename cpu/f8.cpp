@@ -101,6 +101,18 @@ u64 f8::step()
 		F.b.S = ((A&0x80)?0:1);
 		F.b.C = F.b.O = 0;
 		return 4;
+	case 0x19: // add carry
+		if( F.b.C )
+		{
+			F.b.O = ((A==0x7f)?1:0);
+			F.b.C = ((A==0xff)?1:0);
+			A += 1;
+		} else {
+			F.b.O = F.b.C = 0;
+		}
+		F.b.Z = ((A==0)?1:0);
+		F.b.S = ((A&0x80)?0:1);	
+		return 4;
 	case 0x1A: // DI
 		F.b.I = 0;
 		return 8;
@@ -314,7 +326,33 @@ u64 f8::step()
 	case 0x87:
 		pc0 += (( F.v & (opc&7) ) ? ((s8)read(pc0)) : 1);
 		return 12 + (( F.v & (opc&7) ) ? 14 : 0);
-		
+	case 0x88:{ //add A, [dc0+]	
+		temp = read(dc0); dc0 += 1;
+		u16 res = A;
+		res += temp;
+		F.b.C = res>>8;
+		F.b.Z = ((res&0xff)==0 ? 1 : 0);
+		F.b.S = ((res&0x80) ? 0 : 1);
+		F.b.O = (((res^temp) & (res^A) & 0x80) ? 1 : 0);
+		A = res;
+		}return 4;
+	case 0x89:{ //add A, [dc0+] (BCD)
+		temp = read(dc0); dc0 += 1;
+		u16 normsum = A + temp;
+		u8 L = normsum & 0xf;
+		u8 H = normsum >> 4;
+		u8 ic = (A&0xf) + (temp&0xf);
+		if( !(ic&BIT(4)) )  L = (L&15) + 10;
+		if( !(normsum & BIT(8)) ) H = (H&15) + 10;
+		F.b.C = H>>4;
+		//printf("F8:$%X:add-bcd: $%X + $%X = ", pc0-1, u8(A), u8(temp));
+		u8 res = ((H&15)<<4)|(L&15);
+		//printf("$%X\n", res);
+		F.b.Z = (res==0 ? 1 : 0);
+		F.b.S = ((res&0x80)? 0 : 1);	
+		F.b.O = (((res^temp) & (res^A) & 0x80) ? 1 : 0);
+		A = res;
+		}return 8;
 	case 0x8A:
 		A &= read(dc0);
 		dc0 += 1;
@@ -346,11 +384,12 @@ u64 f8::step()
 		F.b.S = ((res&0x80) ? 0 : 1);
 		F.b.O = (((res^temp) & (res^(A^0xff)) & 0x80) ? 1 : 0);	
 		}return 10;
-
 	case 0x8E:
 		dc0 += s8(A);
 		return 10;
-		
+	case 0x8F:
+		pc0 += (((isar&7)!=7) ? s8(read(pc0)) : 1);
+		return ((isar&7)!=7) ? 10 : 8;
 	case 0x90:
 	case 0x91:
 	case 0x92:
