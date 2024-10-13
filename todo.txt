@@ -40,6 +40,7 @@ NES Todo List
 1. redo envelope and sweep, see if things get better
 2. Implement true per-dot rendering.
 3. More mappers? DMC/Frame IRQs?
+4. Implement PAL PPU and figure out why input doesn't work in Disk System games.
 Notes: Zelda doesn't care, but Metroid depends on MMC1 shift register reset doing reg0|=0xc, otherwise unimpl. opc = $44 at PC=$C02E
 
 
@@ -106,8 +107,8 @@ Status: Bad Apple still has some garbage tiles.
 
 Genesis Todo List
 --------------------
-1. shadow/highlight
-2. Fix region stuff for the version register (add gen_version variable, use https://segaretro.org/ROM_header#Regional_compatiblity)
+1. vdp line count interrupt
+2. shadow/highlight
 Status: YM2612 uses the Nuken OPN library... Poorly?
 	Only a few games with graphical bugs left, not including lack of shadow/highlight.
 	Did the SH2 for the 32X, but nowhere near working yet.
@@ -128,8 +129,8 @@ Status: Everything I have shows a title screen, but only Super Cobra is playable
 
 
 
-Microsoft MSX1
------------------
+Microsoft MSX1 Todo List
+---------------------------
 1. AY-3-8910 noise and envelope.
 2. TMS9918A implement multi-color mode and find carts that use the different sprite/zoom settings
 3. Joystick fire buttons. Easy to implement, just haven't bothered looking for carts that use them.
@@ -141,8 +142,12 @@ Going into write mode will clear the current tape data. Writing always starts fr
 
 
 
-
-
+Fairchild Channel F Todo List
+--------------------------------
+1. Controller input
+2. Better video. Figure out how the palette works.
+3. Sound
+Status: Things boot and display text and take console front-button-input.
 
 
 

@@ -35,6 +35,7 @@
 #include "colecovision.h"
 #include "msx.h"
 #include "macplus.h"
+#include "fc_chanf.h"
 void try_kirq();
 
 namespace fs = std::filesystem;
@@ -432,7 +433,27 @@ void imgui_run()
 				}
 				ImGui::EndMenu();
 			}
-			if( ImGui::BeginMenu("Other") ) 
+			if( ImGui::BeginMenu("Coleco") ) 
+			{
+				if( ImGui::MenuItem("ColecoVision") )
+				{
+					std::string f = getOpenFile();
+					if( !f.empty() )
+					{
+						delete sys;
+						sys = new colecovision;
+						if( ! sys->loadROM(f) ) 
+						{
+							printf("unable to load ROM\n");
+							exit(1);
+						}
+						else newinstance = true;
+						crt_scale = 2;
+					}				
+				}
+				ImGui::EndMenu();
+			}
+			if( ImGui::BeginMenu("Experimental") ) 
 			{
 				if( ImGui::MenuItem("Apple Mac Plus") )
 				{
@@ -466,22 +487,6 @@ void imgui_run()
 						crt_scale = 2;
 					}				
 				}
-				if( ImGui::MenuItem("ColecoVision") )
-				{
-					std::string f = getOpenFile();
-					if( !f.empty() )
-					{
-						delete sys;
-						sys = new colecovision;
-						if( ! sys->loadROM(f) ) 
-						{
-							printf("unable to load ROM\n");
-							exit(1);
-						}
-						else newinstance = true;
-						crt_scale = 2;
-					}				
-				}
 				if( ImGui::MenuItem("MSX") )
 				{
 					std::string f = getOpenFile();
@@ -496,6 +501,22 @@ void imgui_run()
 						}
 						else newinstance = true;
 						crt_scale = 2;
+					}				
+				}
+				if( ImGui::MenuItem("Fairchild Channel F") )
+				{
+					std::string f = getOpenFile();
+					if( !f.empty() )
+					{
+						delete sys;
+						sys = new fc_chanf;
+						if( ! sys->loadROM(f) ) 
+						{
+							printf("unable to load ROM\n");
+							exit(1);
+						}
+						else newinstance = true;
+						crt_scale = 4;
 					}				
 				}
 				ImGui::EndMenu();
