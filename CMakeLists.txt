@@ -9,8 +9,8 @@ set(CMAKE_CXX_FLAGS "-O3 -march=native -Wall -Wpedantic -Wextra -Wshadow")
 set(CMAKE_CPP_COMPILER clang++)
 
 add_executable(test main.cpp imgui/backends/imgui_impl_sdl2.cpp progopt.cpp commodore/c64.cpp commodore/TAPFile.cpp 
-atari/a26.cpp atari/a52.cpp atari/antic.cpp atari/tia.cpp cpu/6502.cpp nintendo/dmg.cpp
-cpu/sm83.cpp nintendo/nes.cpp nintendo/nes_ppu.cpp nintendo/nes_apu.cpp nintendo/nes_mappers.cpp nintendo/dmg_gfx.cpp 
+atari/a26.cpp atari/a52.cpp atari/antic.cpp atari/tia.cpp cpu/6502.cpp
+cpu/sm83.cpp nintendo/nes.cpp nintendo/nes_ppu.cpp nintendo/nes_apu.cpp nintendo/nes_mappers.cpp 
 mattel/intellivision.cpp cpu/cp1600.cpp cpu/z80.cpp ibm/ibmpc.cpp cpu/80286.cpp sony/psx_mdec.cpp sony/psx_timer.cpp
 ibm/ibmpc_fdc.cpp  imgui/backends/imgui_impl_sdlrenderer2.cpp ibm/ibmpc_pit.cpp ibm/ibmpc_pic.cpp ibm/ibmpc_vga.cpp 
 cpu/68k.cpp sony/psx_pad.cpp sony/psx_spu.cpp sega/sms.cpp sony/psx.cpp cpu/r3000.cpp cpu/r3000_gte.cpp 
