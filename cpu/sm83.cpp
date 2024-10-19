@@ -2,7 +2,8 @@
 #include <cstdlib>
 #include "itypes.h"
 #include "sm83.h"
-#include "dmg.h"
+//#include "dmg.h"
+#include "gbc.h"
 
 #define B(a) r.b[((a)^1)]
 #define W(a) r.w[(a)]
@@ -28,6 +29,7 @@ void sm83::reset()
 	PC = 0x100;
 	SP = 0xFFFE;
 	REG_A = 1;
+	REG_B = 0;
 	ime = false;
 	halted = false;
 	ime_delay = 0;
@@ -52,13 +54,13 @@ void sm83::set_reg(u8 p, u8 val)
 }
 
 extern console* sys;
-#define GB (*dynamic_cast<dmg*>(sys))
+#define GB (*dynamic_cast<gbc*>(sys))
 
 u64 sm83::step()
 {
-	u8 service = GB.IO[0xf] & GB.IO[0xff] & 0x1F;
+	u8 service = GB.io[0xf] & GB.io[0xff] & 0x1F;
 	
-	if( service )
+	if( service && !ime_delay )
 	{
 		if( halted ) 
 		{
@@ -73,7 +75,7 @@ u64 sm83::step()
 				int bit = (1 << i);
 				if( !(service & bit) ) continue;
 				//printf("service %X\n", bit);
-				GB.IO[0xf] &= ~bit;
+				GB.io[0xf] &= ~bit;
 				ime = false;
 				push(PC);
 				PC = 0x40|(i<<3);
@@ -88,8 +90,11 @@ u64 sm83::step()
 		ime_delay--;
 		if( ime_delay == 0 ) ime = true;
 	}
+	
+	if( halted ) { stamp += 4; return 4; }
 
 	u8 opc = read(PC++);
+	//printf("SM83:$%X: opc = $%X\n", PC-1, opc);
 	u64 extra = 0;
 	
 	switch( opc )

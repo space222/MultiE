@@ -23,7 +23,8 @@
 #include "a26.h"
 #include "a52.h"
 #include "c64.h"
-#include "dmg.h"
+//#include "dmg.h"
+#include "gbc.h"
 #include "nes.h"
 #include "sms.h"
 #include "genesis.h"
@@ -236,7 +237,7 @@ void resize_screen()
 	Screen = SDL_CreateTexture(MainRender, format, SDL_TEXTUREACCESS_STREAMING, sys->fb_width(), sys->fb_height());
 }
 
-std::string getOpenFile();
+std::string getOpenFile(const std::string&);
 
 void imgui_run()
 {
@@ -254,7 +255,7 @@ void imgui_run()
 			{
 				if( ImGui::MenuItem("2600") )
 				{
-					std::string f = getOpenFile();
+					std::string f = getOpenFile("Atari 2600");
 					if( !f.empty() )
 					{
 						delete sys;
@@ -269,7 +270,7 @@ void imgui_run()
 				}
 				if( ImGui::MenuItem("5200") )
 				{
-					std::string f = getOpenFile();
+					std::string f = getOpenFile("Atari 5200");
 					if( !f.empty() )
 					{
 						delete sys;
@@ -288,7 +289,7 @@ void imgui_run()
 			{
 				if( ImGui::MenuItem("C64 Tape") )
 				{
-					std::string f = getOpenFile();
+					std::string f = getOpenFile("C64");
 					if( !f.empty() )
 					{
 						delete sys;
@@ -308,11 +309,11 @@ void imgui_run()
 			{
 				if( ImGui::MenuItem("Gameboy") )
 				{
-					std::string f = getOpenFile();
+					std::string f = getOpenFile("Gameboy [Color]");
 					if( !f.empty() )
 					{
 						delete sys;
-						sys = new dmg;
+						sys = new gbc; // dmg;
 						if( ! sys->loadROM(f) ) 
 						{
 							printf("unable to load ROM\n");
@@ -323,7 +324,7 @@ void imgui_run()
 				}
 				if( ImGui::MenuItem("NES") )
 				{
-					std::string f = getOpenFile();
+					std::string f = getOpenFile("NES");
 					if( !f.empty() )
 					{
 						delete sys;
@@ -342,7 +343,7 @@ void imgui_run()
 			{
 				if( ImGui::MenuItem("IntelliVision") )
 				{
-					std::string f = getOpenFile();
+					std::string f = getOpenFile("IntelliVision");
 					if( !f.empty() )
 					{
 						delete sys;
@@ -361,7 +362,7 @@ void imgui_run()
 			{
 				if( ImGui::MenuItem("PC XT") )
 				{
-					std::string f = getOpenFile();
+					std::string f = getOpenFile("IBM PC BIOS");
 					if( !f.empty() )
 					{
 						delete sys;
@@ -381,7 +382,7 @@ void imgui_run()
 			{
 				if( ImGui::MenuItem("SMS") )
 				{
-					std::string f = getOpenFile();
+					std::string f = getOpenFile("Sega Master System");
 					if( !f.empty() )
 					{
 						delete sys;
@@ -397,7 +398,7 @@ void imgui_run()
 				}
 				if( ImGui::MenuItem("Genesis") )
 				{
-					std::string f = getOpenFile();
+					std::string f = getOpenFile("Sega Genesis");
 					if( !f.empty() )
 					{
 						delete sys;
@@ -417,7 +418,7 @@ void imgui_run()
 			{
 				if( ImGui::MenuItem("PSX") )
 				{
-					std::string f = getOpenFile();
+					std::string f = getOpenFile("PlayStation");
 					if( !f.empty() )
 					{
 						delete sys;
@@ -437,7 +438,7 @@ void imgui_run()
 			{
 				if( ImGui::MenuItem("ColecoVision") )
 				{
-					std::string f = getOpenFile();
+					std::string f = getOpenFile("ColecoVision");
 					if( !f.empty() )
 					{
 						delete sys;
@@ -457,7 +458,7 @@ void imgui_run()
 			{
 				if( ImGui::MenuItem("Apple Mac Plus") )
 				{
-					std::string f = getOpenFile();
+					std::string f = getOpenFile("Mac plus");
 					if( !f.empty() )
 					{
 						delete sys;
@@ -473,7 +474,7 @@ void imgui_run()
 				}
 				if( ImGui::MenuItem("Casio PV-1000") )
 				{
-					std::string f = getOpenFile();
+					std::string f = getOpenFile("Casio PV-1000");
 					if( !f.empty() )
 					{
 						delete sys;
@@ -489,7 +490,7 @@ void imgui_run()
 				}
 				if( ImGui::MenuItem("MSX") )
 				{
-					std::string f = getOpenFile();
+					std::string f = getOpenFile("Microsoft MSX");
 					if( !f.empty() )
 					{
 						delete sys;
@@ -505,7 +506,7 @@ void imgui_run()
 				}
 				if( ImGui::MenuItem("Fairchild Channel F") )
 				{
-					std::string f = getOpenFile();
+					std::string f = getOpenFile("Channel F");
 					if( !f.empty() )
 					{
 						delete sys;
@@ -516,7 +517,7 @@ void imgui_run()
 							exit(1);
 						}
 						else newinstance = true;
-						crt_scale = 4;
+						crt_scale = 5;
 					}				
 				}
 				ImGui::EndMenu();
@@ -561,7 +562,7 @@ void imgui_run()
 				{
 					if( ImGui::MenuItem(M[i].c_str()) )
 					{
-						sys->load_media(i, getOpenFile());
+						sys->load_media(i, getOpenFile("Load Media"));
 					}
 				}
 			}
@@ -642,11 +643,13 @@ std::string getOpenFile()
 
 #else
 
-std::string getOpenFile()
+std::string getOpenFile(const std::string& title)
 {	//todo: Windows support
 	char filename[1024];
 	filename[0] = 0;
-	FILE *f = popen("zenity --file-selection 2>/dev/null", "r"); //2>/dev/null prevents Gtk msg to stderr
+	std::string cmd = "zenity --title \"";
+	cmd += title + "\" --file-selection 2>/dev/null";
+	FILE *f = popen(cmd.c_str(), "r"); //2>/dev/null prevents Gtk msg to stderr
 	[[maybe_unused]] auto unu = fgets(filename, 1024, f);
 	int ret = pclose(f);
 	if( !f || ret!=0 )

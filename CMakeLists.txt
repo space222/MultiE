@@ -18,7 +18,7 @@ Scheduler.cpp sony/psx_gpu.cpp sony/psx_cd.cpp imgui/imgui.cpp imgui/imgui_draw.
 imgui/imgui_widgets.cpp other/SN79489.cpp sega/genesis.cpp sega/gen_vdp.cpp sega/gen_snd.cpp 
 other/casio_pv1k.cpp sega/gen_pad.cpp Settings.cpp cpu/SH2.cpp sega/gen_32x.cpp atari/jag.cpp
 coleco/colecovision.cpp other/TMS9918A.cpp other/msx.cpp other/AY-3-8910.cpp
-other/macplus.cpp nintendo/nes_fds.cpp cpu/f8.cpp other/fc_chanf.cpp
+other/macplus.cpp nintendo/nes_fds.cpp cpu/f8.cpp other/fc_chanf.cpp nintendo/gbc.cpp nintendo/gbc_apu.cpp
 )
 
 add_library(ym3438 SHARED sega/ym3438.cpp)
