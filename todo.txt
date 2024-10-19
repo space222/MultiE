@@ -47,8 +47,11 @@ Notes: Zelda doesn't care, but Metroid depends on MMC1 shift register reset doin
 
 GB Todo List
 ---------------
-1. sound
-2. GBC
+1. wave and noise sound channels, envelopes, square sweep, etc. lotta sound still to do
+2. Hblank DMA
+3. add setting for user to customize original gameboy palette.
+Status: new gb implementation that doesn't reuse my old ROMBro code, now including color
+	and some sound. Many playable games, including save support.
 
 
 
@@ -109,7 +112,7 @@ Genesis Todo List
 --------------------
 1. vdp line count interrupt
 2. shadow/highlight
-Status: YM2612 uses the Nuken OPN library... Poorly?
+Status: YM2612 uses the Nuken OPN library... Poorly? Fantastic Dizzy and UMK3 lack sound.
 	Only a few games with graphical bugs left, not including lack of shadow/highlight.
 	Did the SH2 for the 32X, but nowhere near working yet.
 
@@ -147,7 +150,7 @@ Fairchild Channel F Todo List
 1. Controller input
 2. Better video. Figure out how the palette works.
 3. Sound
-Status: Things boot and display text and take console front-button-input.
+Status: Things boot and display text and take console-front-button-input.
 
 
 
