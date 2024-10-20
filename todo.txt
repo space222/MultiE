@@ -49,7 +49,8 @@ GB Todo List
 ---------------
 1. wave and noise sound channels, envelopes, square sweep, etc. lotta sound still to do
 2. Hblank DMA
-3. add setting for user to customize original gameboy palette.
+3. gbc double speed mode
+4. add setting for user to customize original gameboy palette.
 Status: new gb implementation that doesn't reuse my old ROMBro code, now including color
 	and some sound. Many playable games, including save support.
 

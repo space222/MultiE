@@ -150,7 +150,7 @@ void gbc::io_write(u8 port, u8 v)
 				src &= ~0xf;
 				dst &= ~0xf;
 				u16 len = (v+1)<<4;
-				printf("dma $%X to $%X, $%X bytes\n", src, dst, len);
+				//printf("dma $%X to $%X, $%X bytes\n", src, dst, len);
 				for(u32 i = 0; i < len; ++i)
 				{
 					vram[(vram_bank*0x2000) + (dst&0x1fff)] = read(src);
@@ -191,7 +191,7 @@ u8 gbc::io_read(u8 port)
 	// LCD_STAT $41
 	case 0x41: return (io[0x41]&~7)|lcd_mode|(io[0x44]==io[0x45]?4:0);
 	case 0x44: return io[0x44];
-	case 0x04: return div>>8;
+	case 0x04: return div>>6;
 	
 	// NR52 main audio control
 	case 0x26: return (io[0x26]&0x80)|(chan[0].active?1:0)|(chan[1].active?2:0)|(chan[2].active?4:0)|(chan[3].active?8:0);
@@ -210,8 +210,8 @@ u8 gbc::io_read(u8 port)
 		}
 		if( port == 0x55 ) return 0xff;
 		if( port == 0x70 ) return io[0x70];
-		//if( port == 0x4F ) return 0xfe|vram_bank;
-		if( !(port >= 0x10 && port <= 0x40) ) printf("GB(C): IO Rd $%X\n", port);
+		if( port == 0x4F ) return 0xfe|vram_bank;
+		//if( !(port >= 0x10 && port <= 0x40) ) printf("GB(C): IO Rd $%X\n", port);
 	}
 	return io[port];
 }
@@ -283,7 +283,7 @@ void gbc::timer_inc(u64 c)
 {
 	for(u64 i = 0; i < c; ++i) apu_tick();
 	u16 divb4 = div;
-	div += c;
+	div += c>>2;
 	if( (divb4&BIT(12)) && !(div&BIT(12)) ) div_apu_tick();
 	if( TCTRL & 4 )
 	{
@@ -313,7 +313,7 @@ void gbc::write(u16 addr, u8 v)
 	if( addr >= 0xc000 ) { wram[addr&0xfff] = v; return; }
 	if( addr >= 0xa000 ) 
 	{
-		//if( mapper == 3 && eram_bank > 3 ) return;
+		if( mapper == 3 && eram_bank > 3 ) return;
 		if( mapper == 3 && mbc_ram_en != 10 ) return;
 		if( mapper == 2 )
 		{
@@ -344,7 +344,7 @@ u8 gbc::read(u16 addr)
 	if( addr >= 0xc000 ) return wram[addr&0xfff];
 	if( addr >= 0xa000 ) 
 	{ 
-		//if( mapper == 3 && eram_bank > 3 ) return 0; 
+		if( mapper == 3 && eram_bank > 3 ) return 0; 
 		if( mapper == 3 && mbc_ram_en != 10 ) return 0;
 		if( mapper == 2 )
 		{
@@ -426,8 +426,7 @@ void gbc::draw_scanline(u32 line)
 		u8 ey = line+scy;
 		u8 ex = px+scx;
 		
-		u8 tile = 0; //vram[ntaddr + (ey/8)*32 + (ex/8)];
-		//u16 taddr_base = 0; //(io[0x40]&BIT(4)) ? (0 + tile*16) : (0x1000 + (s8(tile)*16));
+		u8 tile = 0;
 		
 		if( (io[0x40]&BIT(5)) && win_started && px >= winx )
 		{
@@ -645,24 +644,28 @@ void gbc::draw_color_scanline(u32 line)
 		u8 attr = vram[0x2000 + ntaddr + (ey/8)*32 + (ex/8)]; 
 		u16 taddr_base = (io[0x40]&BIT(3)) ? (0 + tile*16) : (0x1000 + (s8(tile)*16));
 		
-		u8 b0 = vram[taddr_base + ((attr&BIT(3)) ? 0x2000 : 0) + ((ey&7)<<1)] >> (7-(ex&7));
+		u8 flipX = (attr&BIT(5)) ? 0 : 7;
+		if( attr & BIT(6) ) ey = (ey&7)^7;
+		
+		u8 b0 = vram[taddr_base + ((attr&BIT(3)) ? 0x2000 : 0) + ((ey&7)<<1)] >> (flipX^(ex&7));
 		b0 &= 1;
-		u8 b1 = vram[taddr_base + ((attr&BIT(3)) ? 0x2000 : 0) + ((ey&7)<<1) + 1] >> (7-(ex&7));
+		u8 b1 = vram[taddr_base + ((attr&BIT(3)) ? 0x2000 : 0) + ((ey&7)<<1) + 1] >> (flipX^(ex&7));
 		b1 &= 1;
 		b0 |= b1<<1;
+		if( b0 ) b0 |= ((attr&7)<<2);
 		
 		if( !(sprbuf[px]&0x80) && sprbuf[px] )
 		{
 			u16 c = *(u16*)&cobjpal[(sprbuf[px]&0x1f)<<1];
 			fbuf[line*160 + px] = color555to32(c);
 		} else if( b0 ) {
-			u16 c = *(u16*)&cbgpal[(((attr&7)<<2)|b0)<<1];
+			u16 c = *(u16*)&cbgpal[b0<<1];
 			fbuf[line*160 + px] = color555to32(c);
 		} else if( sprbuf[px]&3 ) {
 			u16 c = *(u16*)&cobjpal[(sprbuf[px]&0x1f)<<1];
 			fbuf[line*160 + px] = color555to32(c);
 		} else {
-			u16 c = *(u16*)&cbgpal[(((attr&7)<<2)|b0)<<1];
+			u16 c = *(u16*)&cbgpal[b0<<1];
 			fbuf[line*160 + px] = color555to32(c);
 		}
 	}
