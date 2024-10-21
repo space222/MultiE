@@ -143,6 +143,12 @@ void gbc::io_write(u8 port, u8 v)
 		}
 		if( port == 0x55 )
 		{
+			if( hdma_active && !(v&0x80) )
+			{
+				hdma_active = false;
+				io[0x55] = 0xff;
+				return;			
+			}
 			if( !(v&0x80) )
 			{
 				u16 src = (io[0x51]<<8)|io[0x52];
@@ -150,15 +156,19 @@ void gbc::io_write(u8 port, u8 v)
 				src &= ~0xf;
 				dst &= ~0xf;
 				u16 len = (v+1)<<4;
-				//printf("dma $%X to $%X, $%X bytes\n", src, dst, len);
+				printf("dma $%X to $%X, $%X bytes\n", src, dst, len);
 				for(u32 i = 0; i < len; ++i)
 				{
 					vram[(vram_bank*0x2000) + (dst&0x1fff)] = read(src);
 					dst += 1;
 					src += 1;
-				}			
+				}
+				io[0x55] = 0xff;		
+			} else {
+				hdma_active = true;
+				printf("HDMA active = $%X\n", v);
+				io[0x55] = v;
 			}
-		
 			return;
 		}
 	}
@@ -189,7 +199,7 @@ u8 gbc::io_read(u8 port)
 		return (io[0]&~15)|v;	
 		}
 	// LCD_STAT $41
-	case 0x41: return (io[0x41]&~7)|lcd_mode|(io[0x44]==io[0x45]?4:0);
+	case 0x41: return (io[0x41]&~7)|lcd_mode|(((io[0x40]&0x80)&&(io[0x44]==io[0x45]))?4:0);
 	case 0x44: return io[0x44];
 	case 0x04: return div>>6;
 	
@@ -208,7 +218,7 @@ u8 gbc::io_read(u8 port)
 		{
 			return cobjpal[io[0x6A]&0x3f];
 		}
-		if( port == 0x55 ) return 0xff;
+		if( port == 0x55 ) return io[0x55];//0xff;
 		if( port == 0x70 ) return io[0x70];
 		if( port == 0x4F ) return 0xfe|vram_bank;
 		//if( !(port >= 0x10 && port <= 0x40) ) printf("GB(C): IO Rd $%X\n", port);
@@ -225,6 +235,9 @@ void gbc::run_frame()
 	{
 		//lcd disabled
 		lcd_mode = 0;
+		io[0x44] = 0;
+		//io[0x41] = 0; // fixes the freeze in pokemon yellow intro, somehow... probably breaks other things
+		if( (io[0x41] & BIT(3)) ) io[0xf] |= 2;
 		target += (154*456);
 		while( cpu.stamp < target ) timer_inc(cpu.step());
 		last_target = target;
@@ -232,27 +245,47 @@ void gbc::run_frame()
 		return;
 	}
 
-
 	for(u32 line = 0; line < 144; ++line)
 	{
 		io[0x44] = line;
 		if( line == io[0x4A] ) win_started = true;
 		if( (io[0x41] & BIT(6)) && io[0x45]==io[0x44] ) io[0xf] |= 2;
 		
-		lcd_mode = 0;
-		if( (io[0x41] & BIT(3)) ) io[0xf] |= 2;
-		target += (176);
-		while( cpu.stamp < target ) timer_inc(cpu.step());
-		
 		lcd_mode = 2;
 		if( (io[0x41] & BIT(5)) ) io[0xf] |= 2;
 		target += (80);
 		while( cpu.stamp < target ) timer_inc(cpu.step());
 		
-		draw_scanline(line);
-			
 		lcd_mode = 3;
-		target += (200);
+		target += (160);
+		while( cpu.stamp < target ) timer_inc(cpu.step());
+		
+		draw_scanline(line);
+		
+		lcd_mode = 0;
+		if( (io[0x40]&0x80) && (io[0x41] & BIT(3)) ) io[0xf] |= 2;
+		target += (456-(160+80));
+		if( isGBC && hdma_active )
+		{
+			u16 src = (io[0x51]<<8)|io[0x52];
+			src &= ~0xf;
+			u16 dst = (io[0x53]<<8)|io[0x54];
+			dst &= 0x1ff0;
+			printf("HDMA $%X to $%X\n", src, dst);
+			for(u32 i = 0; i < 0x10; ++i)
+			{
+				vram[vram_bank*0x2000 + (dst+i)] = read(src+i);
+			}
+			src += 0x10;
+			dst += 0x10;
+			io[0x55] = 0x80|((io[0x55]-1)&0x7f);
+			if( io[0x55] == 0xff ) hdma_active = false;
+			io[0x51] = src>>8;
+			io[0x52] = src;
+			io[0x53] = dst>>8;
+			io[0x54] = dst;
+			target -= 8;
+		}
 		while( cpu.stamp < target ) timer_inc(cpu.step());
 		
 		if( win_started ) win_line += 1;
@@ -469,6 +502,7 @@ void gbc::reset()
 	cpu.ime = false;
 	io[0x50] = 0;
 	io[0x40] = 0x80;
+	io[0x41] = 0;
 	io[0xff] = io[0xf] = 0;
 	io[0] = 0xff;
 	
@@ -480,6 +514,8 @@ void gbc::reset()
 	timer_cycle_count = 0;
 	apu_cycles_to_sample = 0;
 	chan[0].active = chan[1].active = chan[2].active = chan[3].active = false;
+	hdma_active = false;
+	memset(io+0x30, 0, 0x10);
 }
 
 bool gbc::loadROM(const std::string fname)

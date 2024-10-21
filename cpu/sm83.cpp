@@ -30,6 +30,11 @@ void sm83::reset()
 	SP = 0xFFFE;
 	REG_A = 1;
 	REG_B = 0;
+	REG_C = 0x13;
+	REG_D = 0;
+	REG_E = 0xD8;
+	REG_H = 1;
+	REG_L = 0x4D;
 	ime = false;
 	halted = false;
 	ime_delay = 0;

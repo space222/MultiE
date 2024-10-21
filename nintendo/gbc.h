@@ -42,15 +42,18 @@ public:
 	void apu_write(u8,u8);
 	struct {
 		bool active;
-		u8 phase, length;
+		u16 phase, length;
 		u32 pcnt, period;
+		u8 env;
+		u16 envcnt;
 	} chan[4];
+	u16 noise_lfsr;
 	int apu_cycles_to_sample;
 	
 	sm83 cpu;
 	u8 io[0x100];
 	int mapper;
-	bool isGBC;
+	bool isGBC, hdma_active;
 	u8 cbgpal[64];
 	u8 cobjpal[64];
 	void draw_color_scanline(u32);
@@ -63,7 +66,7 @@ public:
 	u8 wram[16*4096];
 	u8 oam[160];
 	u8 hram[0x80];
-	u8 eram[32*1024];
+	u8 eram[128*1024];
 	
 	u32 fbuf[160*144];
 };
