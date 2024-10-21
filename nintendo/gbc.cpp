@@ -156,7 +156,7 @@ void gbc::io_write(u8 port, u8 v)
 				src &= ~0xf;
 				dst &= ~0xf;
 				u16 len = (v+1)<<4;
-				printf("dma $%X to $%X, $%X bytes\n", src, dst, len);
+				//printf("dma $%X to $%X, $%X bytes\n", src, dst, len);
 				for(u32 i = 0; i < len; ++i)
 				{
 					vram[(vram_bank*0x2000) + (dst&0x1fff)] = read(src);
@@ -166,7 +166,7 @@ void gbc::io_write(u8 port, u8 v)
 				io[0x55] = 0xff;		
 			} else {
 				hdma_active = true;
-				printf("HDMA active = $%X\n", v);
+				//printf("HDMA active = $%X\n", v);
 				io[0x55] = v;
 			}
 			return;
@@ -271,7 +271,7 @@ void gbc::run_frame()
 			src &= ~0xf;
 			u16 dst = (io[0x53]<<8)|io[0x54];
 			dst &= 0x1ff0;
-			printf("HDMA $%X to $%X\n", src, dst);
+			//printf("HDMA $%X to $%X\n", src, dst);
 			for(u32 i = 0; i < 0x10; ++i)
 			{
 				vram[vram_bank*0x2000 + (dst+i)] = read(src+i);
