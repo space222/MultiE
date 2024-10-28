@@ -47,13 +47,14 @@ Notes: Zelda doesn't care, but Metroid depends on MMC1 shift register reset doin
 
 GB Todo List
 ---------------
-1. wave and noise sound channels, envelopes, square sweep, etc. lotta sound still to do
-2. Hblank DMA
-3. gbc double speed mode
-4. add setting for user to customize original gameboy palette.
+1. square sweep, noise is less wrong than it was, but...
+2. gbc double speed mode
+3. add setting for user to customize original gameboy palette.
 Status: new gb implementation that doesn't reuse my old ROMBro code, now including color
 	and some sound. Many playable games, including save support.
-
+	pokemon yellow has a messed up intro. 
+	if hblank is too short the intro freezes for a few seconds, but that doesn't fix the first two screens
+	
 
 
 Intellivision Todo List

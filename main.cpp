@@ -23,7 +23,6 @@
 #include "a26.h"
 #include "a52.h"
 #include "c64.h"
-//#include "dmg.h"
 #include "gbc.h"
 #include "nes.h"
 #include "sms.h"
@@ -37,6 +36,7 @@
 #include "msx.h"
 #include "macplus.h"
 #include "fc_chanf.h"
+#include "gba.h"
 void try_kirq();
 
 namespace fs = std::filesystem;
@@ -320,6 +320,7 @@ void imgui_run()
 							exit(1);
 						}
 						else newinstance = true;
+						crt_scale = 3;
 					}
 				}
 				if( ImGui::MenuItem("NES") )
@@ -456,6 +457,22 @@ void imgui_run()
 			}
 			if( ImGui::BeginMenu("Experimental") ) 
 			{
+				if( ImGui::MenuItem("Nintendo GBA") )
+				{
+					std::string f = getOpenFile("GBA");
+					if( !f.empty() )
+					{
+						delete sys;
+						sys = new gba;
+						if( ! sys->loadROM(f) ) 
+						{
+							printf("unable to load ROM\n");
+							exit(1);
+						}
+						else newinstance = true;
+						crt_scale = 3;
+					}				
+				}
 				if( ImGui::MenuItem("Apple Mac Plus") )
 				{
 					std::string f = getOpenFile("Mac plus");
@@ -529,7 +546,6 @@ void imgui_run()
 			{
 				sys->reset();
 				resize_screen();
-				SDL_ClearQueuedAudio(audio_dev);
 			}			
 			
 			if( ImGui::MenuItem("Exit") ) exit(0);
@@ -539,7 +555,7 @@ void imgui_run()
 		{
 			if( ImGui::MenuItem("Pause", nullptr, &Paused) )
 			{
-				if( !Paused ) SDL_ClearQueuedAudio(audio_dev);
+				//if( !Paused ) SDL_ClearQueuedAudio(audio_dev);
 			}
 			ImGui::MenuItem("Mute", nullptr, &Settings::mute);
 			ImGui::Separator();
@@ -580,7 +596,7 @@ void imgui_run()
 			if( ImGui::MenuItem("7x") ) crt_scale = 7;
 			ImGui::EndMenu();
 		}
-		if( ImGui::BeginMenu("Settings") )
+		/*if( ImGui::BeginMenu("Settings") )
 		{
 			if( ImGui::BeginMenu("Atari") )
 			{
@@ -594,7 +610,7 @@ void imgui_run()
 			}
 		
 			ImGui::EndMenu();
-		}
+		}*/
 
 	ImGui::EndMainMenuBar();
 	
@@ -630,10 +646,35 @@ void console::setVsync(bool e)
 	dialog_msg = m;
 }
 */
+
+
+bool getKeyState(u32 key)
+{
+	if( !(key & BIT(31)) )
+	{
+		auto keys = SDL_GetKeyboardState(nullptr);
+		return keys[key];
+	}
+
+	//todo: unpack a bitfield that references joystick
+	// will need up to 4 sticks + however many buttons on xbox ctrlr
+	return false;
+}
+
+
+
+
+
+
+
+
+
+
+
 #ifdef _WIN32
 #include <Windows.h>
 
-std::string getOpenFile()
+std::string getOpenFile(const std::string& title)
 {
 
 

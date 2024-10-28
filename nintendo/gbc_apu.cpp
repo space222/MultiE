@@ -135,6 +135,7 @@ void gbc::apu_write(u8 p, u8 v)
 			chan[2].length = io[0x1B]*2;
 			chan[2].period = ((io[0x1E]&7)<<8)|(io[0x1D]);
 			chan[2].pcnt = chan[2].period = chan[2].period*4;
+			// chan 3 has different volume ctrl than the other's env
 		}	
 		break;
 	case 0x23: // chan 4 trigger, length en (no period bits)
@@ -163,7 +164,7 @@ void gbc::div_apu_tick()
 			if( chan[0].length >= 128 ) chan[0].active = false;
 		}
 		chan[0].envcnt += 1;
-		if( chan[0].envcnt >= (io[0x12]&7)*4 )
+		if( chan[0].envcnt >= (io[0x12]&7)*8 )
 		{
 			chan[0].envcnt = 0;
 			if( io[0x12] & BIT(3) )
@@ -182,7 +183,7 @@ void gbc::div_apu_tick()
 			if( chan[1].length >= 128 ) chan[1].active = false;
 		}
 		chan[1].envcnt += 1;
-		if( chan[1].envcnt >= (io[0x17]&7)*4 )
+		if( chan[1].envcnt >= (io[0x17]&7)*8 )
 		{
 			chan[1].envcnt = 0;
 			if( io[0x17] & BIT(3) )
@@ -209,7 +210,7 @@ void gbc::div_apu_tick()
 			if( chan[3].length >= 128 ) chan[3].active = false;
 		}
 		chan[3].envcnt += 1;
-		if( chan[3].envcnt >= (io[0x21]&7)*4 )
+		if( chan[3].envcnt >= (io[0x21]&7)*8 )
 		{
 			chan[3].envcnt = 0;
 			if( io[0x21] & BIT(3) )
