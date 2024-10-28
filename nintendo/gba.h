@@ -8,6 +8,7 @@ class gba : public console
 public:
 	u32 fb_width() override { return 240; }
 	u32 fb_height() override { return 160; }
+	u32 fb_bpp() override { return 16; }
 	u8* framebuffer() override { return (u8*)&fbuf[0]; }
 	
 	bool loadROM(const std::string) override;
