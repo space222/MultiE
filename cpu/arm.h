@@ -59,8 +59,10 @@ public:
 	virtual void swi();
 	
 	virtual bool isCond(u8)=0;
-	virtual void flushp() =0;	
+	virtual void flushp() =0;
 	u64 icycles;
+	
+	void dump_regs();
 };
 
 

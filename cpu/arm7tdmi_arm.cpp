@@ -5,7 +5,19 @@
 
 u32 arm::barrelshifter(u32 opc, bool setc)
 {
-	return 0;
+	//printf("barrelshifter!, opc = $%X\n", opc);
+	u32 Rm = r[opc&15];
+	const u32 shift_type = (opc>>5)&3;
+	const u32 shift_amount = ( (opc&BIT(4)) ? (r[(opc>>8)&15]&0xff) : ((opc>>7)&0x1f) );
+	
+	switch( shift_type )
+	{
+	case 0: Rm <<= shift_amount; break;
+	case 1: Rm >>= shift_amount; break;
+	case 2: Rm = s32(Rm) >> shift_amount; break;
+	case 3: Rm = std::rotr(Rm, shift_amount); break;	
+	}	
+	return Rm;
 }
 
 u32 arm::rotate_imm(u32 opc, bool setc)
@@ -16,6 +28,8 @@ u32 arm::rotate_imm(u32 opc, bool setc)
 
 void arm_swi(arm& cpu, u32 opc)
 {
+	printf("ARM SWI\n");
+	exit(1);
 }
 
 void arm_branch(arm& cpu, u32 opc)
@@ -37,6 +51,57 @@ void arm_branch(arm& cpu, u32 opc)
 
 void arm_block_data(arm& cpu, u32 opc)
 {
+	cpu.icycles += 1; //always at least 1I
+	u16 rlist = opc & 0xffff;
+	u32 num_regs = std::popcount(rlist);
+	u32 Rn = (opc >> 16) & 15;
+	u32 base = cpu.r[Rn];
+	u32 addr = base & ~3;
+	ARM_CYCLE ct = ARM_CYCLE::N;
+	s32 offset = ((opc & (1ul<<23)) ? 4 : -4);
+	
+	if( !(opc & (1ul<<23)) )
+	{
+		addr -= num_regs<<2;
+		opc ^= (1ul<<24);
+	}
+	
+	if( opc & BIT(20) )
+	{ //load
+		for(u32 i = 0; i < 16; ++i)
+		{
+			if( !(rlist & BIT(i)) ) continue;
+			if( (opc & BIT(24)) ) addr += 4;	
+			cpu.r[i] = cpu.read(addr, 32, ct);
+			ct = ARM_CYCLE::S;
+			if( !(opc & BIT(24)) ) addr += 4;
+		}
+		if( rlist & BIT(15) ) cpu.flushp();
+		if( (opc & (1ul<<21)) && !(rlist & (1ul<<Rn)) )
+		{
+			cpu.r[Rn] = base + offset*(std::popcount(rlist));
+			//printf("Final base = %X\n", addr);
+		}
+	} else {
+		int tc = 0;
+		for(u32 i = 0; i < 16; ++i)
+		{
+			if( !(rlist & BIT(i)) ) continue;
+			tc += 1;
+			if( (opc & BIT(24)) ) addr += 4;	
+			cpu.write(addr, cpu.r[i] + ((i==15)?4:0), 32, ct);
+			ct = ARM_CYCLE::S;
+			if( !(opc & BIT(24)) ) addr += 4;
+		}		
+		if( (opc & (1ul<<21)) )
+		{
+			cpu.r[Rn] = base + offset*(std::popcount(rlist));
+			//printf("Final base = %X\n", addr);
+		}
+	}
+	
+	cpu.next_cycle_type = ARM_CYCLE::N;
+	printf("Arm block data opc\n");
 }
 
 void arm_undef(arm&, u32)
@@ -80,10 +145,73 @@ void arm_bx(arm& cpu, u32 opc)
 
 void arm_mul(arm& cpu, u32 opc)
 {
+	u32 &Rd = cpu.r[(opc>>16)&15];
+	u32 Rm = cpu.r[opc&15];
+	u32 Rs = cpu.r[(opc>>8)&15];
+	u32 Rn = cpu.r[(opc>>12)&15];
+	Rd = Rm * Rs;
+	if( opc & BIT(21) ) 
+	{
+		Rd += Rn;
+		cpu.icycles += 1;
+	}
+	if( opc & BIT(20) )
+	{
+		cpu.cpsr.b.Z = ((Rd==0)?1:0);
+		cpu.cpsr.b.N = ((Rd&BIT(31))?1:0);	
+	}
+	if( (Rs&0xffFFff00) == 0 || (Rs&0xffFFff00) == 0xffFFff00 )
+	{
+		cpu.icycles += 1;
+	} else if( (Rs&0xffFF0000) == 0 || (Rs&0xffFF0000) == 0xffFF0000 ) {
+		cpu.icycles += 2;
+	} else if( (Rs&0xff000000) == 0 || (Rs&0xff000000) == 0xff000000 ) {
+		cpu.icycles += 3;
+	} else {
+		cpu.icycles += 4;
+	}
 }
 
 void arm_mul_long(arm& cpu, u32 opc)
 {
+	u32 RdLo = (opc>>12)&15;
+	u32 RdHi = (opc>>16)&15;
+	u32 Rs = (opc>>8)&15;
+	u32 Rm = opc&15;
+	u64 res = 0;
+	
+	if( opc & BIT(22) )
+	{ // signed
+		s64 a = s64(s32(cpu.r[Rm]));
+		a *= s64(s32(cpu.r[Rs]));
+		if( opc & BIT(21) )
+		{
+			s64 b = (u64(cpu.r[RdHi])<<32)|u64(cpu.r[RdLo]);
+			a += b;
+			cpu.r[RdHi] = a>>32;
+			cpu.r[RdLo] = a;
+		}
+		res = a;	
+	} else {
+		u64 a =  cpu.r[Rm];
+		a *= cpu.r[Rs];
+		if( opc & BIT(21) )
+		{
+			u64 b = (u64(cpu.r[RdHi])<<32)|u64(cpu.r[RdLo]);
+			a += b;
+			cpu.r[RdHi] = a>>32;
+			cpu.r[RdLo] = a;
+		}
+		res = a;
+	}
+	
+	if( opc & BIT(20) )
+	{
+		cpu.cpsr.b.Z = ((res==0)?1:0);
+		cpu.cpsr.b.N = ((res&BITL(63))?1:0);
+	}
+	
+	cpu.icycles += 4; //todo: better timing
 }
 
 void arm_single_swap(arm& cpu, u32 opc)
@@ -168,7 +296,7 @@ void arm_dproc_and(arm& cpu, u32 opc)
 	cpu.r[Rd] = cpu.r[Rn] & oper2;
 	if( Rd == 15 ) cpu.flushp();
 	
-	if( opc & BIT(22) )
+	if( opc & BIT(20) )
 	{
 		cpu.cpsr.b.Z = ((cpu.r[Rd]==0)?1:0);
 		cpu.cpsr.b.N = ((cpu.r[Rd]&BIT(31))?1:0);
@@ -183,7 +311,7 @@ void arm_dproc_eor(arm& cpu, u32 opc)
 	cpu.r[Rd] = cpu.r[Rn] ^ oper2;
 	if( Rd == 15 ) cpu.flushp();
 	
-	if( opc & BIT(22) )
+	if( opc & BIT(20) )
 	{
 		cpu.cpsr.b.Z = ((cpu.r[Rd]==0)?1:0);
 		cpu.cpsr.b.N = ((cpu.r[Rd]&BIT(31))?1:0);
@@ -198,7 +326,7 @@ void arm_dproc_orr(arm& cpu, u32 opc)
 	cpu.r[Rd] = cpu.r[Rn] | oper2;
 	if( Rd == 15 ) cpu.flushp();
 	
-	if( opc & BIT(22) )
+	if( opc & BIT(20) )
 	{
 		cpu.cpsr.b.Z = ((cpu.r[Rd]==0)?1:0);
 		cpu.cpsr.b.N = ((cpu.r[Rd]&BIT(31))?1:0);
@@ -212,7 +340,7 @@ void arm_dproc_mov(arm& cpu, u32 opc)
 	cpu.r[Rd] = oper2;
 	if( Rd == 15 ) cpu.flushp();
 	
-	if( opc & BIT(22) )
+	if( opc & BIT(20) )
 	{
 		cpu.cpsr.b.Z = ((cpu.r[Rd]==0)?1:0);
 		cpu.cpsr.b.N = ((cpu.r[Rd]&BIT(31))?1:0);
@@ -226,7 +354,7 @@ void arm_dproc_mvn(arm& cpu, u32 opc)
 	cpu.r[Rd] = ~oper2;
 	if( Rd == 15 ) cpu.flushp();
 	
-	if( opc & BIT(22) )
+	if( opc & BIT(20) )
 	{
 		cpu.cpsr.b.Z = ((cpu.r[Rd]==0)?1:0);
 		cpu.cpsr.b.N = ((cpu.r[Rd]&BIT(31))?1:0);
@@ -243,7 +371,7 @@ void arm_dproc_add(arm& cpu, u32 opc)
 	cpu.r[Rd] = res;
 	if( Rd == 15 ) cpu.flushp();
 	
-	if( opc & BIT(22) )
+	if( opc & BIT(20) )
 	{
 		cpu.cpsr.b.C = (res>>32);
 		cpu.cpsr.b.V = (((res^Rn)&(res^oper2)&BIT(31))?1:0);
@@ -263,7 +391,7 @@ void arm_dproc_adc(arm& cpu, u32 opc)
 	cpu.r[Rd] = res;
 	if( Rd == 15 ) cpu.flushp();
 	
-	if( opc & BIT(22) )
+	if( opc & BIT(20) )
 	{
 		cpu.cpsr.b.C = (res>>32);
 		cpu.cpsr.b.V = (((res^Rn)&(res^oper2)&BIT(31))?1:0);
@@ -274,22 +402,52 @@ void arm_dproc_adc(arm& cpu, u32 opc)
 
 void arm_dproc_sbc(arm& cpu, u32 opc)
 {
+	u32 oper2 = ~((opc&BIT(25)) ? cpu.rotate_imm(opc) : cpu.barrelshifter(opc) );
+	u32 Rn = cpu.r[(opc>>16)&15];
+	u32& Rd = cpu.r[(opc>>12)&15];
+	u64 res = Rn;
+	res += oper2;
+	res += cpu.cpsr.b.C;
+	
+	if( opc & BIT(20) )
+	{
+		cpu.cpsr.b.C = (res>>32);
+		cpu.cpsr.b.V = (((res^Rn)&(res^oper2)&BIT(31))?1:0);
+		cpu.cpsr.b.Z = ((u32(res)==0)?1:0);
+		cpu.cpsr.b.N = ((u32(res)&BIT(31))?1:0);
+	}
+	Rd = res;
 }
 
 void arm_dproc_rsc(arm& cpu, u32 opc)
 {
+	u32 oper2 = ((opc&BIT(25)) ? cpu.rotate_imm(opc) : cpu.barrelshifter(opc) );
+	u32 Rn = ~cpu.r[(opc>>16)&15];
+	u32& Rd = cpu.r[(opc>>12)&15];
+	u64 res = Rn;
+	res += oper2;
+	res += cpu.cpsr.b.C;
+	
+	if( opc & BIT(20) )
+	{
+		cpu.cpsr.b.C = (res>>32);
+		cpu.cpsr.b.V = (((res^Rn)&(res^oper2)&BIT(31))?1:0);
+		cpu.cpsr.b.Z = ((u32(res)==0)?1:0);
+		cpu.cpsr.b.N = ((u32(res)&BIT(31))?1:0);
+	}
+	Rd = res;
 }
 
 void arm_dproc_cmp(arm& cpu, u32 opc)
 {
 	u32 oper2 = ~((opc&BIT(25)) ? cpu.rotate_imm(opc) : cpu.barrelshifter(opc) );
 	u32 Rn = cpu.r[(opc>>16)&15];
-	u32 Rd = (opc>>12)&15;
+	//u32 Rd = (opc>>12)&15;
 	u64 res = Rn;
 	res += oper2;
 	res += 1;
 	
-	if( opc & BIT(22) )
+	if( opc & BIT(20) )
 	{
 		cpu.cpsr.b.C = (res>>32);
 		cpu.cpsr.b.V = (((res^Rn)&(res^oper2)&BIT(31))?1:0);
@@ -306,7 +464,7 @@ void arm_dproc_cmn(arm& cpu, u32 opc)
 	u64 res = Rn;
 	res += oper2;
 	
-	if( opc & BIT(22) )
+	if( opc & BIT(20) )
 	{
 		cpu.cpsr.b.C = (res>>32);
 		cpu.cpsr.b.V = (((res^Rn)&(res^oper2)&BIT(31))?1:0);
@@ -323,7 +481,7 @@ void arm_dproc_bic(arm& cpu, u32 opc)
 	cpu.r[Rd] = cpu.r[Rn] & ~oper2;
 	if( Rd == 15 ) cpu.flushp();
 	
-	if( opc & BIT(22) )
+	if( opc & BIT(20) )
 	{
 		cpu.cpsr.b.Z = ((cpu.r[Rd]==0)?1:0);
 		cpu.cpsr.b.N = ((cpu.r[Rd]&BIT(31))?1:0);
@@ -343,6 +501,21 @@ void arm_dproc_tst(arm& cpu, u32 opc)
 
 void arm_dproc_sub(arm& cpu, u32 opc)
 {
+	u32 oper2 = ~((opc&BIT(25)) ? cpu.rotate_imm(opc) : cpu.barrelshifter(opc) );
+	u32 Rn = cpu.r[(opc>>16)&15];
+	u32& Rd = cpu.r[(opc>>12)&15];
+	u64 res = Rn;
+	res += oper2;
+	res += 1;
+	
+	if( opc & BIT(20) )
+	{
+		cpu.cpsr.b.C = (res>>32);
+		cpu.cpsr.b.V = (((res^Rn)&(res^oper2)&BIT(31))?1:0);
+		cpu.cpsr.b.Z = ((u32(res)==0)?1:0);
+		cpu.cpsr.b.N = ((u32(res)&BIT(31))?1:0);
+	}
+	Rd = res;
 }
 
 void arm_dproc_rsb(arm& cpu, u32 opc)
@@ -351,6 +524,13 @@ void arm_dproc_rsb(arm& cpu, u32 opc)
 
 void arm_dproc_teq(arm& cpu, u32 opc)
 {
+	u32 oper2 = ((opc&BIT(25)) ? cpu.rotate_imm(opc) : cpu.barrelshifter(opc) );
+	u32 Rn = (opc>>16)&15;
+	u32 Rd = (opc>>12)&15;
+	u32 res = cpu.r[Rn] ^ oper2;
+	
+	cpu.cpsr.b.Z = ((res==0)?1:0);
+	cpu.cpsr.b.N = ((res&BIT(31))?1:0);
 }
 
 void arm_psr_imm(arm& cpu, u32 opc)
@@ -403,4 +583,8 @@ arm7_instr arm7tdmi::decode_arm(u32 opc)
 	return nullptr;
 }
 
+void arm::dump_regs()
+{
+	for(u32 i = 0; i < 16; ++i) printf("\tr[%i] = $%08X\n", i, r[i]);
+}
 

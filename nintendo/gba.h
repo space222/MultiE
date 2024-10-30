@@ -28,7 +28,7 @@ public:
 	u8 palette[1024];
 	u8 vram[96*1024];
 	
-	u32 fbuf[240*160];
+	u16 fbuf[240*160];
 };
 
 
