@@ -111,7 +111,7 @@ void copy_fb()
 	SDL_UnlockTexture(Screen);
 }
 
-//std::vector<SDL_GameController*> conts;
+std::vector<SDL_GameController*> conts;
 
 void imgui_run();
 
@@ -141,20 +141,19 @@ int main(int argc, char** args)
 	ImGui::CreateContext();
 	ImGuiIO& io = ImGui::GetIO();
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 	
 	ImGui_ImplSDL2_InitForSDLRenderer(MainWindow, MainRender);
 	ImGui_ImplSDLRenderer2_Init(MainRender);
 	
-	
-	/*for(int i = 0; i < SDL_NumJoysticks(); i++) 
+	for(int i = 0; i < SDL_NumJoysticks(); i++) 
 	{
         	if (SDL_IsGameController(i)) 
         	{
         		conts.push_back(SDL_GameControllerOpen(i));
         	}
 	}
-	*/
+	
 	cli_options = std::move(cli.options);
 	
 	SDL_Event e;
@@ -626,7 +625,7 @@ void imgui_run()
 	if( Screen && sys )
 	{
 		ImGui::SetNextWindowContentSize(ImVec2(sys->fb_scale_w()*crt_scale,sys->fb_scale_h()*crt_scale));
-		ImGui::Begin("CRT", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+		ImGui::Begin("CRT", nullptr, ImGuiWindowFlags_AlwaysAutoResize|ImGuiWindowFlags_NoNav);
 			ImGui::Image((void*)Screen, ImVec2(sys->fb_scale_w()*crt_scale,sys->fb_scale_h()*crt_scale));
 			//ImGui::Dummy(ImVec2(sys->fb_width()*crt_scale,sys->fb_height()*crt_scale));
 		ImGui::End();

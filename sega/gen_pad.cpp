@@ -1,4 +1,6 @@
+#include <SDL.h>
 #include "genesis.h"
+extern std::vector<SDL_GameController*> conts;
 
 
 u16 genesis::getpad1()
@@ -98,40 +100,39 @@ void genesis::pad_get_keys()
 		if( K[SDL_SCANCODE_RETURN] ) key2 ^= 0x20;
 	//}
 	
-	/*if( conts.size() > 1 )
+	if( conts.size() > 0 )
 	{
-		if(SDL_GameControllerGetButton(conts[1], SDL_GameControllerButton::SDL_CONTROLLER_BUTTON_DPAD_UP)
-			|| SDL_GameControllerGetAxis(conts[1], SDL_GameControllerAxis::SDL_CONTROLLER_AXIS_LEFTY) < -3000)
+		if(SDL_GameControllerGetButton(conts[0], SDL_GameControllerButton::SDL_CONTROLLER_BUTTON_DPAD_UP)
+			|| SDL_GameControllerGetAxis(conts[0], SDL_GameControllerAxis::SDL_CONTROLLER_AXIS_LEFTY) < -3000)
 		{
-			pad2_key1 ^= 1; pad2_key2 ^= 1; mp2 ^= 0x100;
+			pad2_key1 ^= 1; pad2_key2 ^= 1; //mp2 ^= 0x100;
 		}
-		if(SDL_GameControllerGetButton(conts[1], SDL_GameControllerButton::SDL_CONTROLLER_BUTTON_DPAD_DOWN)
-			|| SDL_GameControllerGetAxis(conts[1], SDL_GameControllerAxis::SDL_CONTROLLER_AXIS_LEFTY) > 3000)
+		if(SDL_GameControllerGetButton(conts[0], SDL_GameControllerButton::SDL_CONTROLLER_BUTTON_DPAD_DOWN)
+			|| SDL_GameControllerGetAxis(conts[0], SDL_GameControllerAxis::SDL_CONTROLLER_AXIS_LEFTY) > 3000)
 		{
-			pad2_key1 ^= 2; pad2_key2 ^= 2; mp2 ^= 0x200;
+			pad2_key1 ^= 2; pad2_key2 ^= 2; //mp2 ^= 0x200;
 		}
-		if(SDL_GameControllerGetButton(conts[1], SDL_GameControllerButton::SDL_CONTROLLER_BUTTON_DPAD_RIGHT)
-			|| SDL_GameControllerGetAxis(conts[1], SDL_GameControllerAxis::SDL_CONTROLLER_AXIS_LEFTX) > 3000)
+		if(SDL_GameControllerGetButton(conts[0], SDL_GameControllerButton::SDL_CONTROLLER_BUTTON_DPAD_RIGHT)
+			|| SDL_GameControllerGetAxis(conts[0], SDL_GameControllerAxis::SDL_CONTROLLER_AXIS_LEFTX) > 3000)
 		{
-			pad2_key1 ^= 8; mp2 ^= 0x400;
+			pad2_key1 ^= 8; //mp2 ^= 0x400;
 		}
-		if(SDL_GameControllerGetButton(conts[1], SDL_GameControllerButton::SDL_CONTROLLER_BUTTON_DPAD_LEFT)
-			|| SDL_GameControllerGetAxis(conts[1], SDL_GameControllerAxis::SDL_CONTROLLER_AXIS_LEFTX) < -3000)
+		if(SDL_GameControllerGetButton(conts[0], SDL_GameControllerButton::SDL_CONTROLLER_BUTTON_DPAD_LEFT)
+			|| SDL_GameControllerGetAxis(conts[0], SDL_GameControllerAxis::SDL_CONTROLLER_AXIS_LEFTX) < -3000)
 		{
-			pad2_key1 ^= 4; mp2 ^= 0x800;
+			pad2_key1 ^= 4; //mp2 ^= 0x800;
 		}
-		if(SDL_GameControllerGetButton(conts[1], SDL_GameControllerButton::SDL_CONTROLLER_BUTTON_START))
+		if(SDL_GameControllerGetButton(conts[0], SDL_GameControllerButton::SDL_CONTROLLER_BUTTON_START))
 		{
-			pad2_key2 ^= 0x20; mp1 ^= 0x80;
+			pad2_key2 ^= 0x20; //mp1 ^= 0x80;
 		}
-		if( SDL_GameControllerGetButton(conts[1], SDL_GameControllerButton::SDL_CONTROLLER_BUTTON_X) ) { pad2_key2 ^= 0x10; mp2 ^= 0x40; }
-		if( SDL_GameControllerGetButton(conts[1], SDL_GameControllerButton::SDL_CONTROLLER_BUTTON_A) ) { pad2_key1 ^= 0x10; mp2 ^= 0x10; }
-		if( SDL_GameControllerGetButton(conts[1], SDL_GameControllerButton::SDL_CONTROLLER_BUTTON_B) ) { pad2_key1 ^= 0x20; mp2 ^= 0x20; }
+		if( SDL_GameControllerGetButton(conts[0], SDL_GameControllerButton::SDL_CONTROLLER_BUTTON_X) ) { pad2_key2 ^= 0x10;} //mp2 ^= 0x40; }
+		if( SDL_GameControllerGetButton(conts[0], SDL_GameControllerButton::SDL_CONTROLLER_BUTTON_A) ) { pad2_key1 ^= 0x10;} //mp2 ^= 0x10; }
+		if( SDL_GameControllerGetButton(conts[0], SDL_GameControllerButton::SDL_CONTROLLER_BUTTON_B) ) { pad2_key1 ^= 0x20;} //mp2 ^= 0x20; }
 	
-		if( SDL_GameControllerGetButton(conts[1], SDL_GameControllerButton::SDL_CONTROLLER_BUTTON_LEFTSHOULDER) ) { pad2_key3 ^= 0x4; mp2 ^= 4; }
-		if( SDL_GameControllerGetButton(conts[1], SDL_GameControllerButton::SDL_CONTROLLER_BUTTON_Y) ) { pad2_key3 ^= 0x2; mp2 ^= 2; }
-		if( SDL_GameControllerGetButton(conts[1], SDL_GameControllerButton::SDL_CONTROLLER_BUTTON_RIGHTSHOULDER) ) { pad2_key3 ^= 0x1; mp2 ^= 1; }
+		if( SDL_GameControllerGetButton(conts[0], SDL_GameControllerButton::SDL_CONTROLLER_BUTTON_LEFTSHOULDER) ) { pad2_key3 ^= 0x4;}// mp2 ^= 4; }
+		if( SDL_GameControllerGetButton(conts[0], SDL_GameControllerButton::SDL_CONTROLLER_BUTTON_Y) ) { pad2_key3 ^= 0x2;}// mp2 ^= 2; }
+		if( SDL_GameControllerGetButton(conts[0], SDL_GameControllerButton::SDL_CONTROLLER_BUTTON_RIGHTSHOULDER) ) { pad2_key3 ^= 0x1;}// mp2 ^= 1; }
 	}
-	*/
 }
 

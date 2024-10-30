@@ -17,8 +17,9 @@ public:
 	
 	u32 read(u32, int, ARM_CYCLE);
 	void write(u32, u32, int, ARM_CYCLE);
-	
 	arm7tdmi cpu;
+	
+	u16 getKeys();
 	
 	std::vector<u8> ROM;
 	u8 bios[16*1024];

@@ -40,7 +40,7 @@ u32 gba::read(u32 addr, int size, ARM_CYCLE ct)
 	}
 	if( addr == 0x4000130u )
 	{
-		return 0x3ff;	
+		return getKeys();	
 	}
 	if( addr >= 0x0800'0000u )
 	{
@@ -120,7 +120,7 @@ void gba::write(u32 addr, u32 v, int size, ARM_CYCLE)
 void gba::reset()
 {
 	cpu.cpsr.v = 0;
-	cpu.cpsr.b.M = ARM_MODE_USER;
+	cpu.cpsr.b.M = ARM_MODE_SYSTEM;
 	cpu.cpsr.b.I = 1;
 	cpu.cpsr.b.F = 1;
 	cpu.r[15] = 0x0800'0000u;
@@ -144,7 +144,7 @@ void gba::run_frame()
 		for(u32 x = 0; x < 240; ++x)
 		{
 			fbuf[y*240+x] = *(u16*)&palette[vram[y*240+x]<<1];		
-		}	
+		}
 	}
 }
 
@@ -176,5 +176,21 @@ bool gba::loadROM(const std::string fname)
 	return true;	
 }
 
+u16 gba::getKeys()
+{
+	auto keys = SDL_GetKeyboardState(nullptr);
+	u16 val = 0x3ff;
+	if( keys[SDL_SCANCODE_Q] ) val ^= BIT(9);
+	if( keys[SDL_SCANCODE_W] ) val ^= BIT(8);
+	if( keys[SDL_SCANCODE_DOWN] ) val ^= BIT(7);
+	if( keys[SDL_SCANCODE_UP] ) val ^= BIT(6);
+	if( keys[SDL_SCANCODE_LEFT] ) val ^= BIT(5);
+	if( keys[SDL_SCANCODE_RIGHT] ) val ^= BIT(4);
+	if( keys[SDL_SCANCODE_S] ) val ^= BIT(3);
+	if( keys[SDL_SCANCODE_A] ) val ^= BIT(2);
+	if( keys[SDL_SCANCODE_X] ) val ^= BIT(1);
+	if( keys[SDL_SCANCODE_Z] ) val ^= BIT(0);
+	return val;
+}
 
 

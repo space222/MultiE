@@ -6,7 +6,7 @@
 u32 arm::barrelshifter(u32 opc, bool setc)
 {
 	//printf("barrelshifter!, opc = $%X\n", opc);
-	u32 Rm = r[opc&15];
+	u64 Rm = r[opc&15];
 	const u32 shift_type = (opc>>5)&3;
 	const u32 shift_amount = ( (opc&BIT(4)) ? (r[(opc>>8)&15]&0xff) : ((opc>>7)&0x1f) );
 	
@@ -460,7 +460,7 @@ void arm_dproc_cmn(arm& cpu, u32 opc)
 {
 	u32 oper2 = ((opc&BIT(25)) ? cpu.rotate_imm(opc) : cpu.barrelshifter(opc) );
 	u32 Rn = cpu.r[(opc>>16)&15];
-	u32 Rd = (opc>>12)&15;
+	//u32 Rd = (opc>>12)&15;
 	u64 res = Rn;
 	res += oper2;
 	
@@ -492,8 +492,8 @@ void arm_dproc_tst(arm& cpu, u32 opc)
 {
 	u32 oper2 = ((opc&BIT(25)) ? cpu.rotate_imm(opc) : cpu.barrelshifter(opc) );
 	u32 Rn = (opc>>16)&15;
-	u32 Rd = (opc>>12)&15;
-	u32 res = cpu.r[Rn] | oper2;
+	//u32 Rd = (opc>>12)&15;
+	u32 res = cpu.r[Rn] & oper2;
 	
 	cpu.cpsr.b.Z = ((res==0)?1:0);
 	cpu.cpsr.b.N = ((res&BIT(31))?1:0);

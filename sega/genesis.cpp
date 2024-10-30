@@ -199,7 +199,7 @@ u32 genesis::read(u32 addr, int size)
 	if( addr == 0xA1000C ) return 0;
 	
 	if( addr == 0xA10008 ) return pad1_ctrl;
-	if( addr == 0xA1000A ) return 0;
+	if( addr == 0xA1000A ) return pad2_ctrl;
 	if( addr == 0xA10002 )
 	{
 		return getpad1();
