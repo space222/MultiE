@@ -9,14 +9,61 @@ u32 arm::barrelshifter(u32 opc, bool setc)
 	u64 Rm = r[opc&15];
 	const u32 shift_type = (opc>>5)&3;
 	const u32 shift_amount = ( (opc&BIT(4)) ? (r[(opc>>8)&15]&0xff) : ((opc>>7)&0x1f) );
+	bool dospecial = !(opc & (BIT(25)|BIT(4)));
+	u32 oldC = cpsr.b.C;
+	u32 newC = oldC;
 	
 	switch( shift_type )
 	{
-	case 0: Rm <<= shift_amount; break;
-	case 1: Rm >>= shift_amount; break;
-	case 2: Rm = s32(Rm) >> shift_amount; break;
-	case 3: Rm = std::rotr(Rm, shift_amount); break;	
-	}	
+	case 0: // LSL
+		if( shift_amount ) 
+		{ 
+			Rm <<= shift_amount; 
+			newC = Rm>>32;
+		} else if( dospecial ) {
+			newC = oldC;
+		}
+		break;
+	case 1: // LSR
+		if( shift_amount )
+		{
+			Rm >>= shift_amount - 1;
+			newC = Rm&1;
+			Rm >>= 1;
+		} else if( dospecial ) {
+			Rm = 0;
+			newC = Rm>>31;
+		}
+		break;
+	case 2: // ASR
+		if( shift_amount )
+		{
+			Rm = s32(Rm) >> (shift_amount-1);
+			newC = Rm&1;
+			Rm = s32(Rm) >> 1;
+		} else if( dospecial ) {
+			if( Rm & BIT(31) )
+			{
+				Rm = 0xffffFFFF; newC = 1;
+			} else {
+				Rm = newC = 0;
+			}
+		}
+		break;
+	case 3: // ROR/RRX
+		if( shift_amount )
+		{
+			Rm = std::rotr(Rm, shift_amount);
+			newC = (Rm>>31);
+		} else if( dospecial ) {
+			newC = Rm & 1;
+			Rm >>= 1;
+			Rm |= (oldC<<31);
+		}
+		break;
+	}
+	
+	if( setc && (opc & BIT(20)) ) cpsr.b.C = newC;
 	return Rm;
 }
 
@@ -113,11 +160,11 @@ void arm_undef(arm&, u32)
 void arm_single_data(arm& cpu, u32 opc)
 {
 	cpu.icycles += 1;
-	u32 offs = ( (opc&BIT(25)) ? cpu.barrelshifter(opc&0xfff, false) : (opc&0xfff) );
+	u32 offs = ( (opc&BIT(25)) ? cpu.barrelshifter(opc&0xfff) : (opc&0xfff) );
 	u32 Rd = (opc>>12)&15;
 	u32 Rn = (opc>>16)&15;
 	u32 base = cpu.r[Rn];
-	if( opc & BIT(24) ) 
+	if( opc & BIT(24) )
 	{
 		base += (opc&BIT(23)) ? offs : -offs;
 		if( opc & BIT(21) ) cpu.r[Rn] = base;
@@ -130,7 +177,7 @@ void arm_single_data(arm& cpu, u32 opc)
 		cpu.r[Rd] = cpu.read(base, ((opc&BIT(22))?8:32), ARM_CYCLE::N);
 		if( Rd == 15 ) cpu.flushp();
 	} else {
-		cpu.write(base, cpu.r[Rd] + ((Rd==15)?4:0), 32, ARM_CYCLE::N);
+		cpu.write(base, cpu.r[Rd] + ((Rd==15)?4:0), ((opc&BIT(22))?8:32), ARM_CYCLE::N);
 		cpu.next_cycle_type = ARM_CYCLE::N;
 	}
 }
@@ -188,8 +235,6 @@ void arm_mul_long(arm& cpu, u32 opc)
 		{
 			s64 b = (u64(cpu.r[RdHi])<<32)|u64(cpu.r[RdLo]);
 			a += b;
-			cpu.r[RdHi] = a>>32;
-			cpu.r[RdLo] = a;
 		}
 		res = a;	
 	} else {
@@ -199,12 +244,13 @@ void arm_mul_long(arm& cpu, u32 opc)
 		{
 			u64 b = (u64(cpu.r[RdHi])<<32)|u64(cpu.r[RdLo]);
 			a += b;
-			cpu.r[RdHi] = a>>32;
-			cpu.r[RdLo] = a;
 		}
 		res = a;
 	}
 	
+	cpu.r[RdHi] = res>>32;
+	cpu.r[RdLo] = res;
+			
 	if( opc & BIT(20) )
 	{
 		cpu.cpsr.b.Z = ((res==0)?1:0);
@@ -338,10 +384,10 @@ void arm_dproc_mov(arm& cpu, u32 opc)
 	u32 oper2 = ((opc&BIT(25)) ? cpu.rotate_imm(opc) : cpu.barrelshifter(opc) );
 	u32 Rd = (opc>>12)&15;
 	cpu.r[Rd] = oper2;
-	if( Rd == 15 ) cpu.flushp();
-	
-	if( opc & BIT(20) )
+	if( Rd == 15 ) 
 	{
+		cpu.flushp();
+	} else if( opc & BIT(20) ) {
 		cpu.cpsr.b.Z = ((cpu.r[Rd]==0)?1:0);
 		cpu.cpsr.b.N = ((cpu.r[Rd]&BIT(31))?1:0);
 	}
