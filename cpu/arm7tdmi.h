@@ -5,7 +5,7 @@ class arm7tdmi : public arm
 {
 public:
 	arm7tdmi();
-	void reset() { flushp(); }
+	void reset() { r[15] += 8; }
 	u64 step();
 
 	void flushp() override;
@@ -16,6 +16,8 @@ public:
 	arm7_instr arm_funcs[0x1000];
 
 	u32 fetch, decode, exec;
+	
+	void do_fetch();
 	
 	bool isCond(u8);
 };

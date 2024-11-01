@@ -24,6 +24,8 @@ u16 dispstat = 0;
 
 u32 gba::read(u32 addr, int size, ARM_CYCLE ct)
 {
+	if( size == 16 ) addr &= ~1;
+	else if( size == 32 ) addr &= ~3;
 	if( addr <= 0x1000 )
 	{
 		printf("Attempt to read BIOS. dying for now\n");
@@ -33,7 +35,7 @@ u32 gba::read(u32 addr, int size, ARM_CYCLE ct)
 	}
 	if( addr == 0x0400'0004u )
 	{
-		printf("DISPSTAT Read\n");
+		//printf("DISPSTAT Read\n");
 		u16 r = dispstat;
 		dispstat ^= 1;
 		return r;
@@ -45,8 +47,9 @@ u32 gba::read(u32 addr, int size, ARM_CYCLE ct)
 	if( addr >= 0x0800'0000u )
 	{
 		cpu.icycles += 5;
-		addr &= 0x01ffFFFF;
-		return sized_read(ROM.data(), addr%ROM.size(), size);
+		u32 A = addr & 0x01ffFFFF;
+		if( A >= ROM.size() ) { printf("ROM area access beyond ROM size($%X) = $%X\n", int(ROM.size()), addr); exit(1); return 0; }
+		return sized_read(ROM.data(), A, size);
 	}
 	if( addr >= 0x0200'0000u && addr < 0x0300'0000 )
 	{
@@ -81,7 +84,8 @@ u32 gba::read(u32 addr, int size, ARM_CYCLE ct)
 
 void gba::write(u32 addr, u32 v, int size, ARM_CYCLE)
 {
-	printf("GBA: Write%i $%X = $%X\n", size, addr, v);
+	if( size == 16 ) addr &= ~1;
+	else if( size == 32 ) addr &= ~3;
 	if( addr >= 0x0600'0000 && addr < 0x0700'0000 )
 	{
 		cpu.icycles += ((size==32)?2:1);
@@ -114,6 +118,7 @@ void gba::write(u32 addr, u32 v, int size, ARM_CYCLE)
 		sized_write(iwram, addr, v, size);
 		return;
 	}
+	printf("GBA:$%X: Write%i $%X = $%X\n", cpu.r[15]-(cpu.cpsr.b.T?2:4), size, addr, v);
 }
 
 

@@ -44,7 +44,7 @@ public:
 	u32 r13_abt, r14_abt;
 	u32 r13_und, r14_und;
 	u32 r13_svc, r14_svc;
-	u32 spsr_svc, spsr_irq, spsr_fiq;
+	u32 spsr_svc, spsr_irq, spsr_fiq, spsr_abt;
 	
 	ARM_CYCLE next_cycle_type;	
 	bool flushed;
@@ -61,6 +61,9 @@ public:
 	virtual bool isCond(u8)=0;
 	virtual void flushp() =0;
 	u64 icycles;
+	
+	u32 getSPSR();
+	void setSPSR(u32);
 	
 	void dump_regs();
 };
