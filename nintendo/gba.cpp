@@ -1,3 +1,4 @@
+#include <iostream>
 #include <vector>
 #include <string>
 #include <cstdio>
@@ -5,146 +6,164 @@
 #include "gba.h"
 extern console* sys;
 const u32 cycles_per_frame = 280896;
+u32 dispstat = 0;
 
-static u32 sized_read(u8* data, u32 index, int size)
+void gba::write(u32 addr, u32 v, int size, ARM_CYCLE ct)
 {
-	if( size == 8 ) return data[index];
-	if( size == 16 ) return *(u16*)&data[index];
-	return *(u32*)&data[index];
-}
-
-static void sized_write(u8* data, u32 index, u32 v, int size)
-{
-	if( size == 8 ) { data[index] = v; return; }
-	if( size == 16 ) { *(u16*)&data[index] = v; return; }
-	*(u32*)&data[index] = v;
-}
-
-u16 dispstat = 0;
+	cpu.icycles += 1;
+	//printf("GBA: Write%i $%X = $%X\n", size, addr, v);
+	if( addr < 0x0200'0000 )
+	{
+		printf("$%X: Attempt to write BIOS\n", cpu.r[15]-(cpu.cpsr.b.T?4:8));
+		exit(1);
+	}
+	if( addr < 0x0300'0000 )
+	{
+		addr &= 0x3ffff;
+		if( size == 8 ) { ewram[addr] = v; return; }
+		if( size == 16 ) { *(u16*)&ewram[addr&~1] = v; return; }
+		*(u32*)&ewram[addr&~3] = v; return;	
+	}
+	if( addr < 0x0400'0000 )
+	{
+		addr &= 0x7fff;
+		if( size == 8 ) { iwram[addr] = v; return; }
+		if( size == 16 ) { *(u16*)&iwram[addr&~1] = v; return; }
+		*(u32*)&iwram[addr&~3] = v; return;	
+	}
+	if( addr < 0x0500'0000 )
+	{
+		printf("IO write $%X = $%X\n", addr, v);
+		return;	
+	}
+	if( addr < 0x0600'0000 )
+	{
+		addr &= 0x3ff;
+		if( size == 8 ) { v = (v<<8)|v; size = 16; }
+		if( size == 16 ) { *(u16*)&palette[addr&~1] = v; return; }
+		*(u32*)&palette[addr&~3] = v; return;	
+	}
+	if( addr < 0x0700'0000 )
+	{
+		addr &= 0x1ffff;
+		if( size == 8 ) { v = (v<<8)|v; size = 16; }
+		if( size == 16 ) { *(u16*)&vram[addr&~1] = v; return; }
+		*(u32*)&vram[addr&~3] = v; return;	
+	}
+	if( addr < 0x0700'0000 )
+	{
+		addr &= 0x3ff;
+		if( size == 8 ) { v = (v<<8)|v; size = 16; }
+		if( size == 16 ) { *(u16*)&oam[addr&~1] = v; return; }
+		*(u32*)&oam[addr&~3] = v; return;	
+	}
+} //end of write
 
 u32 gba::read(u32 addr, int size, ARM_CYCLE ct)
 {
-	if( size == 16 ) addr &= ~1;
-	else if( size == 32 ) addr &= ~3;
-	if( addr <= 0x1000 )
+	cpu.icycles += 1;
+	if( addr < 0x0800'0000 ) printf("GBA: Read $%X\n", addr);
+	if( addr < 0x0200'0000 )
 	{
-		printf("Attempt to read BIOS. dying for now\n");
-		cpu.dump_regs();
-		exit(1);
+		if( cpu.r[15] > 0x4008 ) return 0;
+		if( size == 8 ) return bios[addr];
+		if( size == 16 ) return *(u16*)&bios[addr&~1];
+		return *(u32*)&bios[addr&~3];
+	}
+	if( addr < 0x0300'0000 )
+	{
+		addr &= 0x3ffff;
+		if( size == 8 ) return ewram[addr];
+		if( size == 16 ) return *(u16*)&ewram[addr&~1];
+		return *(u32*)&ewram[addr&~3];
+	}
+	if( addr < 0x0400'0000 )
+	{
+		addr &= 0x7fff;
+		if( size == 8 ) return iwram[addr];
+		if( size == 16 ) return *(u16*)&iwram[addr&~1];
+		return *(u32*)&iwram[addr&~3];
+	}
+	if( addr < 0x0500'0000 )
+	{
+		if( addr == 0x0400'0130 ) return getKeys();
+		if( addr == 0x0400'0004 )
+		{
+			u32 r = dispstat;
+			dispstat ^= 1;
+			return r;
+		}
+		printf("IO Read $%X\n", addr);		
 		return 0;
 	}
-	if( addr == 0x0400'0004u )
+	if( addr < 0x0600'0000 )
 	{
-		//printf("DISPSTAT Read\n");
-		u16 r = dispstat;
-		dispstat ^= 1;
-		return r;
-	}
-	if( addr == 0x4000130u )
-	{
-		return getKeys();	
-	}
-	if( addr >= 0x0800'0000u )
-	{
-		cpu.icycles += 5;
-		u32 A = addr & 0x01ffFFFF;
-		if( A >= ROM.size() ) { printf("ROM area access beyond ROM size($%X) = $%X\n", int(ROM.size()), addr); exit(1); return 0; }
-		return sized_read(ROM.data(), A, size);
-	}
-	if( addr >= 0x0200'0000u && addr < 0x0300'0000 )
-	{
-		cpu.icycles += ((size==32) ? 6 : 3);
-		addr &= 0x3FFFF;
-		return sized_read(ewram, addr, size);
-	}
-	if( addr >= 0x0300'0000u && addr < 0x0400'0000 )
-	{
-		cpu.icycles += 1;
-		addr &= 0x7FFF;
-		return sized_read(iwram, addr, size);
-	}
-	printf("GBA: read%i <$%X\n", size, addr);
-	if( addr >= 0x0600'0000 && addr < 0x0700'0000 )
-	{
-		cpu.icycles += ((size==32)?2:1);
-		addr &= 0x3ffff;
-		if( size == 8 ) { return vram[addr]; }
-		if( size == 16 ) { return *(u16*)&vram[addr]; }
-		return *(u32*)&vram[addr];
-	}
-	if( addr >= 0x0500'0000 && addr < 0x0600'0000 )
-	{
-		cpu.icycles += ((size==32)?2:1);
 		addr &= 0x3ff;
-		return sized_read(palette, addr, size);
+		if( size == 8 ) return palette[addr];
+		if( size == 16 ) return *(u16*)&palette[addr&~1];
+		return *(u32*)&palette[addr&~3];
 	}
-	cpu.icycles += 1;
-	return 0;
-}
-
-void gba::write(u32 addr, u32 v, int size, ARM_CYCLE)
-{
-	if( size == 16 ) addr &= ~1;
-	else if( size == 32 ) addr &= ~3;
-	if( addr >= 0x0600'0000 && addr < 0x0700'0000 )
+	if( addr < 0x0700'0000 )
 	{
-		cpu.icycles += ((size==32)?2:1);
-		addr &= 0x3ffff;
-		if( size == 8 ) { v = (v<<8)|v; size = 16; }
-		if( size == 16 ) { *(u16*)&vram[addr] = v; }
-		else if( size == 32 ) { *(u32*)&vram[addr] = v; }
-		return;
+		addr &= 0x1ffff;
+		if( size == 8 ) return vram[addr];
+		if( size == 16 ) return *(u16*)&vram[addr&~1];
+		return *(u32*)&vram[addr&~3];
 	}
-	if( addr >= 0x0500'0000 && addr < 0x0600'0000 )
+	if( addr < 0x0800'0000 )
 	{
-		cpu.icycles += ((size==32)?2:1);
 		addr &= 0x3ff;
-		if( size == 8 ) { v = (v<<8)|v; size = 16; }
-		if( size == 16 ) { *(u16*)&palette[addr] = v; }
-		else if( size == 32 ) { *(u32*)&palette[addr] = v; }
-		return;
+		if( size == 8 ) return oam[addr];
+		if( size == 16 ) return *(u16*)&oam[addr&~1];
+		return *(u32*)&oam[addr&~3];	
 	}
-	if( addr >= 0x0200'0000u && addr < 0x0300'0000 )
+	if( addr < (0x0800'0000 + ROM.size()) )
 	{
-		cpu.icycles += ((size==32) ? 6 : 3);
-		addr &= 0x3FFFF;
-		sized_write(ewram, addr, v, size);
-		return;
+		addr -= 0x0800'0000;
+		if( size == 8 ) return ROM[addr];
+		if( size == 16) return *(u16*)&ROM[addr&~1];
+		return *(u32*)&ROM[addr&~3];
 	}
-	if( addr >= 0x0300'0000u && addr < 0x0400'0000 )
-	{
-		cpu.icycles += 1;
-		addr &= 0x7FFF;
-		sized_write(iwram, addr, v, size);
-		return;
-	}
-	printf("GBA:$%X: Write%i $%X = $%X\n", cpu.r[15]-(cpu.cpsr.b.T?2:4), size, addr, v);
+	
+	printf("GBA:$%X: Unimpl. read $%X\n", cpu.r[15]-(cpu.cpsr.b.T?4:8), addr);
+	exit(1);
 }
-
 
 void gba::reset()
 {
-	cpu.cpsr.v = 0;
-	cpu.cpsr.b.M = ARM_MODE_SYSTEM;
-	cpu.cpsr.b.I = 1;
-	cpu.cpsr.b.F = 1;
-	cpu.r[15] = 0x0800'0000u;
-	cpu.r[13] = 0x0300'7F00u;
 	cpu.read = [](u32 a, int s, ARM_CYCLE c) -> u32 { return dynamic_cast<gba*>(sys)->read(a,s,c); };
 	cpu.write=[](u32 a, u32 v, int s, ARM_CYCLE c) { dynamic_cast<gba*>(sys)->write(a,v,s,c); };
-
 	cpu.reset();
 }
 
 void gba::run_frame()
 {
-	u64 stamp = 0;
-	while( stamp < cycles_per_frame )
+	char c;
+	std::cout << "Debug action? ";
+	std::cin >> c;	
+	if( c == 'n' )
 	{
+		printf("lpc = $%X\n", cpu.r[15] - (cpu.cpsr.b.T?2:4));
 		stamp += cpu.step();
+		cpu.dump_regs();
+	} else if( c == 'p' ) {
+		int addr;
+		std::cin >> std::hex >> addr;
+		std::cout << cpu.read(addr, 32, ARM_CYCLE::X) << std::endl;
+	} else if( c == 'r' ) {
+		u32 addr;
+		std::cin >> std::hex >> addr;
+		while( cpu.r[15] != addr ) stamp += cpu.step();
+		cpu.dump_regs();
 	}
+		
+	if( stamp < cycles_per_frame ) return;
+	stamp -= cycles_per_frame;
+	
+	//while( stamp < cycles_per_frame ) stamp += cpu.step();
+	//stamp -= cycles_per_frame;
 	//memcpy(fbuf, vram, 240*160*2);
-	for(u32 y = 0; y < 160; ++y)
+	if(1) for(u32 y = 0; y < 160; ++y)
 	{
 		for(u32 x = 0; x < 240; ++x)
 		{
@@ -155,15 +174,16 @@ void gba::run_frame()
 
 bool gba::loadROM(const std::string fname)
 {
-	FILE* fbios = fopen("./bios/GBABIOS.BIN", "rb");
-	if( !fbios )
 	{
-		printf("Need gba.bios in the bios folder\n");
-		return false;
+		FILE* fbios = fopen("./bios/GBABIOS.BIN", "rb");
+		if( !fbios )
+		{
+			printf("Need gba.bios in the bios folder\n");
+			return false;
+		}
+		[[maybe_unused]] int unu = fread(bios, 1, 16*1024, fbios);
+		fclose(fbios);
 	}
-	[[maybe_unused]] int unu = fread(bios, 1, 16*1024, fbios);
-	fclose(fbios);
-	
 
 	FILE* fp = fopen(fname.c_str(), "rb");
 	if( !fp )
@@ -176,7 +196,7 @@ bool gba::loadROM(const std::string fname)
 	fseek(fp, 0, SEEK_SET);
 	
 	ROM.resize(fsz);
-	unu = fread(ROM.data(), 1, fsz, fp);
+	[[maybe_unused]] int unu = fread(ROM.data(), 1, fsz, fp);
 	fclose(fp);
 	return true;	
 }

@@ -20,6 +20,7 @@ public:
 	arm7tdmi cpu;
 	
 	u16 getKeys();
+	u64 stamp = 0;
 	
 	std::vector<u8> ROM;
 	u8 bios[16*1024];

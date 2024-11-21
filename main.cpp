@@ -37,6 +37,7 @@
 #include "macplus.h"
 #include "fc_chanf.h"
 #include "gba.h"
+#include "virtualboy.h"
 void try_kirq();
 
 namespace fs = std::filesystem;
@@ -456,6 +457,22 @@ void imgui_run()
 			}
 			if( ImGui::BeginMenu("Experimental") ) 
 			{
+				if( ImGui::MenuItem("Nintendo Virtualboy") )
+				{
+					std::string f = getOpenFile("Virtualboy");
+					if( !f.empty() )
+					{
+						delete sys;
+						sys = new virtualboy;
+						if( ! sys->loadROM(f) ) 
+						{
+							printf("unable to load ROM\n");
+							exit(1);
+						}
+						else newinstance = true;
+						crt_scale = 2;
+					}				
+				}
 				if( ImGui::MenuItem("Nintendo GBA") )
 				{
 					std::string f = getOpenFile("GBA");

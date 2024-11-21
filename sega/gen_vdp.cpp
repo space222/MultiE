@@ -176,6 +176,7 @@ void genesis::vdp_ctrl(u16 val)
 		//printf("VDP: regwrite = $%X\n", val);
 		u32 r = (val>>8)&0x1f;
 		vreg[r] = val;
+		if( r == 30 ) putchar(val); // KDebug print register
 		vdp_addr &= ~0x3fff;
 		vdp_cd &= ~3;
 		return;

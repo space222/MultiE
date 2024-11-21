@@ -52,9 +52,6 @@ public:
 	armwrite write;
 	armread read;
 	
-	u32 barrelshifter(u32, bool setc = true);
-	u32 rotate_imm(u32, bool setc = true);
-		
 	virtual void switch_to_mode(u32);
 	virtual void swi();
 	
@@ -63,6 +60,7 @@ public:
 	u64 icycles;
 	
 	u32 getSPSR();
+	void setCPSR(u32);
 	void setSPSR(u32);
 	
 	void dump_regs();
