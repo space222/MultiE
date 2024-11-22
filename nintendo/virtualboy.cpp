@@ -1,3 +1,4 @@
+#include <bit>
 #include "virtualboy.h"
 
 static u32 sized_read(u8* data, u32 addr, int sz)
@@ -10,15 +11,29 @@ static u32 sized_read(u8* data, u32 addr, int sz)
 static void sized_write(u8* data, u32 addr, u32 v, int sz)
 {
 	if( sz == 8 ) { data[addr] = v; }
-	else if( sz == 16 ) { *(u16*)&data[addr] = v; }
-	else { *(u32*)&data[addr] = v; }
+	else if( sz == 16 ) { *(u16*)&data[addr&~1] = v; }
+	else { *(u32*)&data[addr&~3] = v; }
 }
 
-static u16 dispstat = 0x40;
+void virtualboy::write_miscio(u32 addr, u32 v, int sz)
+{
+	printf("IO Write%i $%X = $%X\n", sz, addr, v);
+}
+
+u32 virtualboy::read_miscio(u32 addr, int sz)
+{
+	if( addr == 0x02000010 ) return 0xff;
+	if( addr == 0x02000014 ) return 0xff;
+	printf("IO Read%i <$%X\n", sz, addr);
+	return 0;
+}
+
+static u16 dispstat = 0x4c;
+static u16 rotit = 1;
 
 u32 virtualboy::read(u32 addr, int sz)
 {
-	addr &= 0x7FFFFFF;
+	addr &= 0x07FFFFFF;
 	if( addr >= 0x07000000 )
 	{
 		addr -= 0x07000000;
@@ -31,6 +46,7 @@ u32 virtualboy::read(u32 addr, int sz)
 		//exit(1);
 		return 0;
 	}
+	printf("vb: read%i <$%X\n", sz, addr);
 	if( addr >= 0x05000000 )
 	{
 		return sized_read(ram, addr&0xffff, sz);	
@@ -47,18 +63,21 @@ u32 virtualboy::read(u32 addr, int sz)
 		exit(1);
 		return 0;
 	}
+	if( addr >= 0x02000000 )
+	{
+		return read_miscio(addr, sz);	
+	}
 	
 	if( addr < 0x00040000 )
 	{
 		return sized_read(vram, addr, sz);
 	}
-	printf("vb: read%i <$%X\n", sz, addr);
 	if( addr == 0x5F820 ) 
 	{
-		dispstat ^= 0x3c;
+		dispstat ^= 0x80;
 		return 0x40|dispstat;
 	}
-	if( addr == 0x02000010 ) return 2;
+	if( addr == 0x5F840 ) return rotit = std::rotr(rotit, 1);
 	return 0;
 }
 
@@ -72,6 +91,7 @@ void virtualboy::write(u32 addr, u32 v, int sz)
 		//exit(1);
 		return;
 	}
+	printf("vb: write%i $%X = $%X\n", sz, addr, v);
 	if( addr >= 0x05000000 )
 	{
 		sized_write(ram, addr&0xffff, v, sz);
@@ -89,34 +109,45 @@ void virtualboy::write(u32 addr, u32 v, int sz)
 		exit(1);
 		return;
 	}
+	if( addr >= 0x02000000 )
+	{
+		write_miscio(addr, v, sz);
+		return;
+	}
 	
 	if( addr < 0x00040000 )
 	{
 		sized_write(vram, addr, v, sz);
 		return;
 	}
-	printf("vb: write%i $%X = $%X\n", sz, addr, v);
+	
 }
 
 void virtualboy::run_frame()
 {
+	dispstat ^= 0x3c;
+
 	u32 cycles_in_frame = 0;
-	while( cycles_in_frame < 500 ) //333333 )
+	while( cycles_in_frame < 50000 ) //333333 )
 	{
 		if( !cpu.halted ) cycles_in_frame += cpu.step();
-		else break;
-		//if( cpu.halted ) { printf("HLT\n"); exit(1); }
+		else { printf("HLT\n"); exit(1); }
 	}
 	
 	for(u32 x = 0; x < 384; ++x)
 	{
 		for(u32 y = 0; y < 224; y += 4)
 		{
-			u8 b = vram[0 + x*(224/4) + (y/4)];
-			fbuf[y*384 + x] = (b&3)<<30;
-			fbuf[(y+1)*384 + x] = (b&0xc)<<28;
-			fbuf[(y+2)*384 + x] = (b&0x30)<<26;
-			fbuf[(y+3)*384 + x] = (b&0xc0)<<24;
+			u8 L = vram[0 + ((dispstat&BIT(4))?0x8000:0) + x*(256/4) + (y/4)];
+			u8 R = vram[0x10000 + ((dispstat&BIT(4))?0x8000:0) + x*(256/4) + (y/4)];
+			fbuf[y*384 + x] = (L&3)<<30;
+			fbuf[(y+1)*384 + x] = (L&0xc)<<28;
+			fbuf[(y+2)*384 + x] = (L&0x30)<<26;
+			fbuf[(y+3)*384 + x] = (L&0xc0)<<24;
+			fbuf[y*384 + x] |= (R&3)<<14;
+			fbuf[(y+1)*384 + x] |= (R&0xc)<<12;
+			fbuf[(y+2)*384 + x] |= (R&0x30)<<10;
+			fbuf[(y+3)*384 + x] |= (R&0xc0)<<8;
 		}
 	}
 }
@@ -141,5 +172,6 @@ void virtualboy::reset()
 	cpu.read = [&](u32 addr, int sz) { return read(addr,sz); };
 	cpu.write= [&](u32 addr, u32 v, int sz) { write(addr,v,sz); };
 	cpu.reset();
+	for(u32 i = 0; i < 256*1024; ++i) vram[i] = 0;
 }
 

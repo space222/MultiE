@@ -55,14 +55,18 @@ void nvc::exec(u16 iw)
 		s64 res = s32(r[reg2]);
 		res *= s32(r[reg1]);
 		setsz(res);
-		setov(res != (s64)(s32)u32(res));	
+		setov(res != (s64)(s32)u32(res));
+		r[reg2] = res;
+		r[30] = res>>32;
 		} break;
 	case 0b001010:{
 		icyc = 13;
 		u64 res = r[reg2];
 		res *= r[reg1];
 		setsz(res);
-		setov(res != (u64)u32(res));	
+		setov(res != (u64)u32(res));
+		r[reg2] = res;
+		r[30] = res>>32;	
 		} break;
 	case 0b001001:
 		icyc = 38;
@@ -72,8 +76,8 @@ void nvc::exec(u16 iw)
 			r[30] = 0;
 		} else {
 			setov(false);
-			r[reg2] /= r[reg1];
-			r[30] = r[reg2] % r[reg1];
+			r[reg2] = s32(r[reg2]) / s32(r[reg1]);
+			r[30] = s32(r[reg2]) % s32(r[reg1]);
 		}
 		setsz(r[reg2]);
 		break;
@@ -116,16 +120,42 @@ void nvc::exec(u16 iw)
 	case 0b011010: halted = true; break;
 
 	// logical
+	case 0b000100: setcy(((u64(r[reg2])<<(r[reg1]&0x1f))>>32)&1); r[reg2] <<= (r[reg1]&0x1f); setsz(r[reg2]); setov(0); break;
 	case 0b010100: setcy(((u64(r[reg2])<<reg1)>>32)&1); r[reg2] <<= reg1; setsz(r[reg2]); setov(0); break;
-	case 0b010111: if( reg1 ) { setcy((r[reg2]>>(reg1-1))&1); r[reg2] = s32(r[reg2])>>reg1; } setsz(r[reg2]); break;
-	case 0b101101: r[reg2] &= read(pc,16); pc+=2; setsz(r[reg2]); setov(0); break;
-	case 0b101100: r[reg2] |= read(pc,16); pc+=2; setsz(r[reg2]); setov(0); break;
-	case 0b101110: r[reg2] ^= read(pc,16); pc+=2; setsz(r[reg2]); setov(0); break;
+	case 0b010111: if( reg1 ) { setcy((r[reg2]>>(reg1-1))&1); r[reg2] = s32(r[reg2])>>reg1; } setsz(r[reg2]); setov(0); break;
+	case 0b010101: if( reg1 ) { setcy((r[reg2]>>(reg1-1))&1); r[reg2] >>= reg1; } setsz(r[reg2]); setov(0); break;
+	case 0b101101: r[reg2] = r[reg1] & read(pc,16); pc+=2; setsz(r[reg2]); setov(0); break;
+	case 0b101100: r[reg2] = r[reg1] | read(pc,16); pc+=2; setsz(r[reg2]); setov(0); break;
+	case 0b101110: r[reg2] = r[reg1] ^ read(pc,16); pc+=2; setsz(r[reg2]); setov(0); break;
 	case 0b001101: r[reg2] &= r[reg1]; setsz(r[reg2]); setov(0); break;
 	case 0b001100: r[reg2] |= r[reg1]; setsz(r[reg2]); setov(0); break;
 	case 0b001110: r[reg2] ^= r[reg1]; setsz(r[reg2]); setov(0); break;
+	case 0b001111: r[reg2] = ~r[reg1]; setsz(r[reg2]); setov(0); break;
+	
+	// fp
+	case 0b111110: iw = read(pc, 16); pc += 2; exec_fp(reg2, reg1, iw); break;
 	
 	default: printf("NVC: Unimpl 6bit opcode $%X\n", iw>>10); exit(1);
+	}
+}
+
+void nvc::exec_fp(const u32 reg2, const u32 reg1, u16 iw)
+{
+	switch( iw >> 10 )
+	{
+	case 0b000100: f(reg2, f(reg2) + f(reg1)); setsz(r[reg2]); setov(0); setcy(PSW&2); break;
+	case 0b000101: f(reg2, f(reg2) - f(reg1)); setsz(r[reg2]); setov(0); setcy(PSW&2); break;
+	case 0b000110: f(reg2, f(reg2) * f(reg1)); setsz(r[reg2]); setov(0); setcy(PSW&2); break;
+	case 0b000111: f(reg2, f(reg2) / f(reg1)); setsz(r[reg2]); setov(0); setcy(PSW&2); break;
+	
+	case 0b000010: f(reg2, r[reg1]); setsz(r[reg2]); setov(0); setcy(PSW&2); break;
+	case 0b000011: r[reg2] = f(reg1); setsz(r[reg2]); setov(0); break;
+	
+	
+	case 0b001100: icyc = 9; r[reg2] = s32(r[reg2]) * (s32)((s16(r[reg1])<<15)>>15); break;
+	default:
+		printf("NVC: Unimpl fp instruction $%X\n", iw>>10);
+		exit(1);
 	}
 }
 
@@ -135,6 +165,7 @@ u64 nvc::step()
 	icyc = 1;
 	u16 iw = read(pc, 16);
 	printf("nvc: pc = $%X, iw = $%X\n", pc, iw);
+	//if( pc == 0x700004A ) exit(1);
 	if( pc == 0 ) exit(1);
 	pc += 2;
 	exec(iw);

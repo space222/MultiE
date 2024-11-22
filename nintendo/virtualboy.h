@@ -16,12 +16,14 @@ public:
 	u32 read(u32, int);
 	void write(u32, u32, int);
 	
+	u32 read_miscio(u32, int);
+	void write_miscio(u32, u32, int);
+	
 	nvc cpu;
 	
 	std::vector<u8> ROM;	
 	u8 ram[64*1024];
-	u8 vram[128*1024];
-	u8 vipfb[128*1024];
+	u8 vram[256*1024];
 	
 	u32 fbuf[384*224];
 };
