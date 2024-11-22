@@ -20,6 +20,7 @@ public:
 	void write_miscio(u32, u32, int);
 	
 	nvc cpu;
+	u16 INTPND, INTENB;
 	
 	std::vector<u8> ROM;	
 	u8 ram[64*1024];

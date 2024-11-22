@@ -23,6 +23,8 @@ public:
 	void exec(u16 opc);
 	void exec_fp(u32,u32,u16);
 	
+	void irq(u32,u16,u32);
+	
 	bool halted;
 	u32 pc;
 	u32 r[32];
@@ -53,9 +55,9 @@ public:
 	{
 		if( b )
 		{
-			PSW &= ~4;
-		} else {
 			PSW |= 4;
+		} else {
+			PSW &= ~4;
 		}
 	}
 	
@@ -63,9 +65,9 @@ public:
 	{
 		if( b )
 		{
-			PSW &= ~8;
-		} else {
 			PSW |= 8;
+		} else {
+			PSW &= ~8;
 		}
 	}
 	
@@ -76,7 +78,7 @@ public:
 		res += b;
 		setsz(res);
 		setov((res^a)&(res^b)&BIT(31));
-		setcy((res>>32)&1);	
+		setcy((res>>32)&1);
 		return res;
 	}
 	

@@ -67,11 +67,35 @@ u32 virtualboy::read(u32 addr, int sz)
 	{
 		return read_miscio(addr, sz);	
 	}
-	
-	if( addr < 0x00040000 )
+	if( addr >= 0x01000000 )
 	{
-		return sized_read(vram, addr, sz);
+		return 0; //todo: sound
 	}
+	
+	// under this line is all VIP
+	addr &= 0x7FFFF;
+	if( addr < 0x00040000 ) return sized_read(vram, addr, sz);
+	if( addr < 0x5F800 ) return 0; // unmapped space or unused mmio
+	if( addr >= 0x7E000 ) return sized_read(&vram[(addr-0x7E000) + 0x1E000], 0, sz);
+	if( addr >= 0x7C000 ) return sized_read(&vram[(addr-0x7C000) + 0x16000], 0, sz);
+	if( addr >= 0x7A000 ) return sized_read(&vram[(addr-0x7A000) + 0x0E000], 0, sz);
+	if( addr >= 0x78000 ) return sized_read(&vram[(addr-0x78000) + 0x06000], 0, sz);
+	
+	if( sz == 32 )
+	{
+		addr &= ~3;
+		u32 res = read(addr, 16);
+		res |= read(addr+2, 16)<<16;
+		return res;
+	}
+	if( sz == 8 )
+	{
+		u16 v = read(addr&~1, 16);
+		return v>>((addr&1)?8:0);	
+	}
+	
+	if( addr == 0x5F800 ) return INTPND;
+	if( addr == 0x5F802 ) return INTENB;
 	if( addr == 0x5F820 ) 
 	{
 		dispstat ^= 0x80;
@@ -114,11 +138,29 @@ void virtualboy::write(u32 addr, u32 v, int sz)
 		write_miscio(addr, v, sz);
 		return;
 	}
-	
-	if( addr < 0x00040000 )
+	if( addr >= 0x01000000 )
 	{
-		sized_write(vram, addr, v, sz);
+		return; //todo: snd
+	}
+	// under this line is all VIP
+	addr &= 0x7FFFF;
+	if( addr < 0x00040000 ) { sized_write(vram, addr, v, sz); return; }
+	if( addr < 0x5F800 ) return; // unmapped space or unused mmio
+	if( addr >= 0x7E000 ) { sized_write(&vram[(addr-0x7E000) + 0x1E000], 0, v, sz); return; }
+	if( addr >= 0x7C000 ) { sized_write(&vram[(addr-0x7C000) + 0x16000], 0, v, sz); return; }
+	if( addr >= 0x7A000 ) { sized_write(&vram[(addr-0x7A000) + 0x0E000], 0, v, sz); return; }
+	if( addr >= 0x78000 ) { sized_write(&vram[(addr-0x78000) + 0x06000], 0, v, sz); return; }
+	
+	if( addr == 0x5F804 )
+	{
+		printf("INTCLR = $%X\n", v);
+		INTPND &= ~v;
 		return;
+	}
+	if( addr == 0x5F802 )
+	{
+		printf("INTENB = $%X\n", v);
+		INTENB = v;
 	}
 	
 }
@@ -130,8 +172,11 @@ void virtualboy::run_frame()
 	u32 cycles_in_frame = 0;
 	while( cycles_in_frame < 50000 ) //333333 )
 	{
+		if( INTPND & INTENB ) cpu.irq(4, 0xFE40, 0xffffFE40);
+	
 		if( !cpu.halted ) cycles_in_frame += cpu.step();
-		else { printf("HLT\n"); exit(1); }
+		else break;
+		//else { printf("HLT\n"); exit(1); }
 	}
 	
 	for(u32 x = 0; x < 384; ++x)
@@ -150,6 +195,8 @@ void virtualboy::run_frame()
 			fbuf[(y+3)*384 + x] |= (R&0xc0)<<8;
 		}
 	}
+	
+	INTPND |= BIT(14)|6;
 }
 
 bool virtualboy::loadROM(const std::string fname)
@@ -172,6 +219,7 @@ void virtualboy::reset()
 	cpu.read = [&](u32 addr, int sz) { return read(addr,sz); };
 	cpu.write= [&](u32 addr, u32 v, int sz) { write(addr,v,sz); };
 	cpu.reset();
+	INTPND = INTENB = 0;
 	for(u32 i = 0; i < 256*1024; ++i) vram[i] = 0;
 }
 

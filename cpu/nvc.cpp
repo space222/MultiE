@@ -48,7 +48,10 @@ void nvc::exec(u16 iw)
 	case 0b000001: r[reg2] = add(r[reg2], r[reg1]); break;
 	case 0b101001: r[reg2] = add(r[reg1], (s32)s16(read(pc,16))); pc+=2; break;
 	case 0b010011: add(r[reg2], ~((reg1&0x10) ? (reg1|~0x1f) : reg1), 1); break;
-	case 0b000011: add(r[reg2], ~r[reg1], 1); break;
+	case 0b000011: 
+		add(r[reg2], ~r[reg1], 1); 
+		//printf("cmp r%i($%X), r%i($%X), psw=$%X\n", reg2, r[reg2], reg1, r[reg1], PSW&15);
+		break;
 	case 0b000010: r[reg2] = add(r[reg2], ~r[reg1], 1); break;
 	case 0b001000:{
 		icyc = 13;
@@ -118,6 +121,7 @@ void nvc::exec(u16 iw)
 		printf("relative blink to $%X\n", pc);
 		} break;
 	case 0b011010: halted = true; break;
+	case 0b011001: pc = sys[0]; PSW = sys[1]; break;
 
 	// logical
 	case 0b000100: setcy(((u64(r[reg2])<<(r[reg1]&0x1f))>>32)&1); r[reg2] <<= (r[reg1]&0x1f); setsz(r[reg2]); setov(0); break;
@@ -170,6 +174,27 @@ u64 nvc::step()
 	pc += 2;
 	exec(iw);
 	return icyc;
+}
+
+void nvc::irq(u32 level, u16 code, u32 vector)
+{
+	if( PSW & BIT(12) ) return;
+	u32 I = (PSW>>16)&15;
+	if( level < I ) return;
+
+	ECR = code;
+	sys[0] = pc;
+	sys[1] = PSW;
+	
+	PSW |= BIT(14)|BIT(12); // EP|ID
+	PSW &= ~BIT(13); // address trap enable cleared
+	level += 1;
+	level &= 0xf;
+	PSW &= ~0xf0000;
+	PSW |= level<<16;
+	halted = false;
+	
+	pc = vector;
 }
 
 void nvc::reset()
