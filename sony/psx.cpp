@@ -13,7 +13,7 @@
 extern console* sys;
 extern SDL_AudioDeviceID audio_dev;
 
-u32 sized_read(u8* data, u32 addr, int size)
+static u32 sized_read(u8* data, u32 addr, int size)
 {
 	u32 t = 0;
 	switch( size )
@@ -28,7 +28,7 @@ u32 sized_read(u8* data, u32 addr, int size)
 	return t;
 }
 
-void sized_write(u8* data, u32 addr, u32 val, int size)
+static void sized_write(u8* data, u32 addr, u32 val, int size)
 {
 	switch( size )
 	{
@@ -464,9 +464,27 @@ void psx::write(u32 addr, u32 val, int size)
 	
 	if( addr == 0x1F8010F4 )
 	{
+		if( size == 16 )
+		{
+			printf("16bit DICR write 10F4!\n");
+			exit(1);		
+		}
 		DICR = (DICR&(1u<<31)) | ((DICR&~val&0x7f000000u)) | (val&0xffFFff);
 		DICR &= ~(1u<<31);
 		DICR |= ( (DICR&(1u<<15)) || ((DICR&(1u<<23))&&(((DICR>>16)&(DICR>>24)&0x7f))) ) ? (1u<<31) : 0;
+		return;
+	}
+	
+	if( addr == 0x1F8010F6 )
+	{
+		u32 lo = DICR&0xffff;
+		val <<= 16;
+		DICR = (DICR&(1u<<31)) | ((DICR&~val&0x7f000000u)) | (val&0xffFFff);
+		DICR &= ~(1u<<31);
+		DICR |= ( (DICR&(1u<<15)) || ((DICR&(1u<<23))&&(((DICR>>16)&(DICR>>24)&0x7f))) ) ? (1u<<31) : 0;
+		DICR = (DICR&0xffff0000)|lo;
+		printf("16bit DICR write to 10F6 = $%X!\n", val);
+		//exit(1);
 		return;
 	}
 	
@@ -558,7 +576,7 @@ u32 psx::read(u32 addr, int size)
 	if( addr == 0x1F801814 ) return gpustat; // ^= 1u<<31;
 	
 	if( addr == 0x1F801070 ) return I_STAT;
-	if (addr == 0x1F801074 ) return I_MASK;
+	if( addr == 0x1F801074 ) return I_MASK;
 		
 	if( addr == 0x1F801100 ) return t0_val;
 	if( addr == 0x1F801110 ) return t1_val;
@@ -571,7 +589,8 @@ u32 psx::read(u32 addr, int size)
 	if( addr == 0x1F801128 ) return t2_target;
 	
 	if( addr == 0x1F8010F0 ) return DPCR;
-	if( addr == 0x1F8010F4 ) return DICR;
+	if( addr == 0x1F8010F4 ) return ( (size==16) ? DICR&0xffff : DICR );
+	if( addr == 0x1F8010F6 ) return DICR>>16;
 	
 	if( addr >= 0x1F801080 && addr < 0x1F8010F0 )
 	{
