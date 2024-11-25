@@ -17,18 +17,50 @@ static void sized_write(u8* data, u32 addr, u32 v, int sz)
 
 void virtualboy::write_miscio(u32 addr, u32 v, int sz)
 {
+	if( addr == 0x02000020 )
+	{
+		if( (v & 9) == 9 ) 
+		{
+			printf("Timer control write = $%X\n", v);
+			//exit(1);
+		}
+		return;
+	}
+	if( addr == 0x02000028 )
+	{
+		if( v & 4 )
+		{
+			auto keys = SDL_GetKeyboardState(nullptr);
+			padkeys = 2;
+			if( keys[SDL_SCANCODE_Z] ) padkeys ^= BIT(2);
+			if( keys[SDL_SCANCODE_X] ) padkeys ^= BIT(3);
+			if( keys[SDL_SCANCODE_RIGHT] ) padkeys ^= BIT(8);
+			if( keys[SDL_SCANCODE_LEFT] ) padkeys ^= BIT(9);
+			if( keys[SDL_SCANCODE_DOWN] ) padkeys ^= BIT(10);
+			if( keys[SDL_SCANCODE_UP] ) padkeys ^= BIT(11);
+			if( keys[SDL_SCANCODE_S] ) padkeys ^= BIT(12);
+			if( keys[SDL_SCANCODE_A] ) padkeys ^= BIT(13);
+		}
+		return;
+	}
 	printf("IO Write%i $%X = $%X\n", sz, addr, v);
 }
 
 u32 virtualboy::read_miscio(u32 addr, int sz)
 {
-	if( addr == 0x02000010 ) return 0xff;
-	if( addr == 0x02000014 ) return 0xff;
+	if( addr == 0x02000010 ) 
+	{
+		return padkeys&0xff;
+	}
+	if( addr == 0x02000014 ) 
+	{
+		return padkeys>>8;
+	}
+	if( addr == 0x02000028 ) return 0;
 	printf("IO Read%i <$%X\n", sz, addr);
 	return 0;
 }
 
-static u16 dispstat = 0x4c;
 static u16 rotit = 1;
 
 u32 virtualboy::read(u32 addr, int sz)
@@ -46,7 +78,6 @@ u32 virtualboy::read(u32 addr, int sz)
 		//exit(1);
 		return 0;
 	}
-	printf("vb: read%i <$%X\n", sz, addr);
 	if( addr >= 0x05000000 )
 	{
 		return sized_read(ram, addr&0xffff, sz);	
@@ -91,15 +122,16 @@ u32 virtualboy::read(u32 addr, int sz)
 	if( sz == 8 )
 	{
 		u16 v = read(addr&~1, 16);
-		return v>>((addr&1)?8:0);	
+		return (v>>((addr&1)?8:0)) & 0xff;
 	}
+	
+	printf("vb: read%i <$%X\n", sz, addr);
 	
 	if( addr == 0x5F800 ) return INTPND;
 	if( addr == 0x5F802 ) return INTENB;
 	if( addr == 0x5F820 ) 
 	{
-		dispstat ^= 0x80;
-		return 0x40|dispstat;
+		return 0x40|DPSTTS;
 	}
 	if( addr == 0x5F840 ) return rotit = std::rotr(rotit, 1);
 	return 0;
@@ -115,7 +147,6 @@ void virtualboy::write(u32 addr, u32 v, int sz)
 		//exit(1);
 		return;
 	}
-	printf("vb: write%i $%X = $%X\n", sz, addr, v);
 	if( addr >= 0x05000000 )
 	{
 		sized_write(ram, addr&0xffff, v, sz);
@@ -151,6 +182,8 @@ void virtualboy::write(u32 addr, u32 v, int sz)
 	if( addr >= 0x7A000 ) { sized_write(&vram[(addr-0x7A000) + 0x0E000], 0, v, sz); return; }
 	if( addr >= 0x78000 ) { sized_write(&vram[(addr-0x78000) + 0x06000], 0, v, sz); return; }
 	
+	printf("vb: write%i $%X = $%X\n", sz, addr, v);
+	
 	if( addr == 0x5F804 )
 	{
 		printf("INTCLR = $%X\n", v);
@@ -161,30 +194,75 @@ void virtualboy::write(u32 addr, u32 v, int sz)
 	{
 		printf("INTENB = $%X\n", v);
 		INTENB = v;
+		return;
 	}
 	
 }
 
+void virtualboy::step()
+{
+	if( INTPND & INTENB ) cpu.irq(4, 0xFE40, 0xffffFE40);
+	u64 cc = cpu.step();
+	stamp += cc;
+}
+
+#define FCLK 0x80
+#define FRAMESTART 0x10
+#define GAMESTART 8
+#define XPEND 0x4000
+#define LFBEND 2
+#define RFBEND 4
+#define DPBSY 0x3c
+#define L0BSY 2
+#define R0BSY 3
+
 void virtualboy::run_frame()
 {
-	dispstat ^= 0x3c;
-
-	u32 cycles_in_frame = 0;
-	while( cycles_in_frame < 50000 ) //333333 )
+	if(1) for(u32 i = 0; i < 0x6000; ++i)
 	{
-		if( INTPND & INTENB ) cpu.irq(4, 0xFE40, 0xffffFE40);
-	
-		if( !cpu.halted ) cycles_in_frame += cpu.step();
-		else break;
-		//else { printf("HLT\n"); exit(1); }
+		vram[0x0000 + i] = 0;
+		vram[0x8000 + i] = 0;
+		vram[0x10000 + i] = 0;
+		vram[0x18000 + i] = 0;
 	}
+
+	// 0 ms FCLK in DPSTTS goes high. 
+	INTPND |= FRAMESTART | GAMESTART;
+	DPSTTS |= FCLK;
+	while( stamp < last_target + 60000 ) step();
+	
+	INTPND |= XPEND; 
+	
+	// 3 ms The appropriate left frame buffer begins to display.
+	DPSTTS &= ~DPBSY;
+	DPSTTS |= BIT(L0BSY + which_buffer);
+	while( stamp < last_target + 160000 ) step();
+	// 8 ms The left frame buffer finishes displaying.
+	
+	INTPND |= LFBEND;
+	DPSTTS &= ~DPBSY;
+	while( stamp < last_target + 200000 ) step();
+	// 10 ms FCLK goes low. 
+	DPSTTS &= ~FCLK;
+	while( stamp < last_target + 260000 ) step();
+	// 13 ms The appropriate right frame buffer begins to display. 
+	DPSTTS &= ~DPBSY;
+	DPSTTS |= BIT(R0BSY + which_buffer);
+	while( stamp < last_target + 360000 ) step();
+	// 18 ms The right frame buffer finishes displaying. 
+	
+	INTPND |= RFBEND;
+	DPSTTS &= ~DPBSY;
+	while( stamp < last_target + 400000 ) step();
+	// 20 ms frame complete	
+	last_target += 400000;
 	
 	for(u32 x = 0; x < 384; ++x)
 	{
 		for(u32 y = 0; y < 224; y += 4)
 		{
-			u8 L = vram[0 + ((dispstat&BIT(4))?0x8000:0) + x*(256/4) + (y/4)];
-			u8 R = vram[0x10000 + ((dispstat&BIT(4))?0x8000:0) + x*(256/4) + (y/4)];
+			u8 L = vram[0 + ((which_buffer)?0x8000:0) + x*(256/4) + (y/4)];
+			u8 R = vram[0x10000 + ((which_buffer)?0x8000:0) + x*(256/4) + (y/4)];
 			fbuf[y*384 + x] = (L&3)<<30;
 			fbuf[(y+1)*384 + x] = (L&0xc)<<28;
 			fbuf[(y+2)*384 + x] = (L&0x30)<<26;
@@ -196,7 +274,7 @@ void virtualboy::run_frame()
 		}
 	}
 	
-	INTPND |= BIT(14)|6;
+	which_buffer ^= 2;
 }
 
 bool virtualboy::loadROM(const std::string fname)
@@ -219,7 +297,21 @@ void virtualboy::reset()
 	cpu.read = [&](u32 addr, int sz) { return read(addr,sz); };
 	cpu.write= [&](u32 addr, u32 v, int sz) { write(addr,v,sz); };
 	cpu.reset();
+	stamp = last_target = 0;
 	INTPND = INTENB = 0;
+	DPSTTS = 0;
+	which_buffer = 0;
 	for(u32 i = 0; i < 256*1024; ++i) vram[i] = 0;
+}
+
+virtualboy::~virtualboy()
+{
+	FILE* fp = fopen("vram.bin", "wb");
+	if( !fp ) return;
+	[[maybe_unused]] int u = fwrite(vram+0x6000, 1, 0x2000, fp);
+	u = fwrite(vram+0xE000, 1, 0x2000, fp);
+	u = fwrite(vram+0x16000,1, 0x2000, fp);
+	u = fwrite(vram+0x1E000,1, 0x2000, fp);
+	fclose(fp);
 }
 

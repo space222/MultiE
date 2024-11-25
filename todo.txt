@@ -7,6 +7,30 @@ Framework Todo List
 
 
 
+Virtual Boy Todo List
+------------------------
+1. Finish at least hw-read controller input and document default key bindings (vb controller has a lot of buttons for the time)
+2. Timer
+3. VIP "normal" background/sprite renderer
+4. Rewrite cpu cleaner.
+5. Sound?
+Questions: 
+Do FRAMESTART/LFBEND/RFBEND irqs correspond to 0ms/FCLK-hi,8ms/left finish,18ms/right finish?
+Are only 1 of DPBSY active at a time and only between (3, 8) and (13, 18) ms?
+Why is FCLK only high for left frame?
+If XPEN is clear (drawing disabled), does double buffering not happen? Which frame gets used, whichever was
+current when drawing was disabled?
+Notes:
+1 cpu cycle = 0.05 microseconds
+CPU probably still has issues otherwise polygon.vb would work.
+Once I implement the world render loop and have the basic "normal" backgrounds working,
+	hopefully more than a few games will be displaying *something*, or even be functional
+	once some sprite support is in. Almost nothing's working at the moment, whether that's
+	because almost everything uses the tile engine or I still have an awful bug somewhere
+	is yet to be seen.
+
+
+
 A2600 Todo List
 ------------------
 1. The other player sprite sizes/copies

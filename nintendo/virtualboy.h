@@ -5,6 +5,7 @@
 class virtualboy : public console
 {
 public:
+	~virtualboy();
 	u32 fb_width() override { return 384; }
 	u32 fb_height() override { return 224; }
 	u8* framebuffer() override { return(u8*)&fbuf[0]; }
@@ -13,6 +14,7 @@ public:
 	void run_frame() override;
 	bool loadROM(const std::string) override;
 
+	void step();
 	u32 read(u32, int);
 	void write(u32, u32, int);
 	
@@ -20,7 +22,9 @@ public:
 	void write_miscio(u32, u32, int);
 	
 	nvc cpu;
-	u16 INTPND, INTENB;
+	u64 stamp, last_target;
+	u16 INTPND, INTENB, DPSTTS, padkeys;
+	int which_buffer;
 	
 	std::vector<u8> ROM;	
 	u8 ram[64*1024];

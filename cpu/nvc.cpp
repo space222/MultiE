@@ -30,10 +30,10 @@ void nvc::exec(u16 iw)
 	case 0b101111: r[reg2] = r[reg1] + (read(pc, 16)<<16); pc += 2; break;
 	
 	// io
-	case 0b111000: r[reg2] = read(r[reg1] + s16(read(pc,16)), 8); pc+=2; break;
-	case 0b111001: r[reg2] = read(r[reg1] + s16(read(pc,16)), 16); pc+=2; break;
-	case 0b111011: r[reg2] = read(r[reg1] + s16(read(pc,16)), 32); pc+=2; break;
-	case 0b110000: r[reg2] = (s32)(s8)read(r[reg1] + s16(read(pc,16)), 8); pc+=2; break;
+	case 0b111000: r[reg2] = read(r[reg1] + s16(read(pc,16)), 8)&0xff;       pc+=2; break;
+	case 0b111001: r[reg2] = read(r[reg1] + s16(read(pc,16)), 16)&0xffff;    pc+=2; break;
+	case 0b111011: r[reg2] = read(r[reg1] + s16(read(pc,16)), 32);           pc+=2; break;
+	case 0b110000: r[reg2] = (s32)(s8)read(r[reg1] + s16(read(pc,16)), 8);   pc+=2; break;
 	case 0b110001: r[reg2] = (s32)(s16)read(r[reg1] + s16(read(pc,16)), 16); pc+=2; break;
 	case 0b110011: r[reg2] = read(r[reg1] + s16(read(pc,16)), 32); pc+=2; break;
 	case 0b110100:
@@ -48,10 +48,7 @@ void nvc::exec(u16 iw)
 	case 0b000001: r[reg2] = add(r[reg2], r[reg1]); break;
 	case 0b101001: r[reg2] = add(r[reg1], (s32)s16(read(pc,16))); pc+=2; break;
 	case 0b010011: add(r[reg2], ~((reg1&0x10) ? (reg1|~0x1f) : reg1), 1); break;
-	case 0b000011: 
-		add(r[reg2], ~r[reg1], 1); 
-		//printf("cmp r%i($%X), r%i($%X), psw=$%X\n", reg2, r[reg2], reg1, r[reg1], PSW&15);
-		break;
+	case 0b000011: add(r[reg2], ~r[reg1], 1); break;
 	case 0b000010: r[reg2] = add(r[reg2], ~r[reg1], 1); break;
 	case 0b001000:{
 		icyc = 13;
@@ -73,7 +70,7 @@ void nvc::exec(u16 iw)
 		} break;
 	case 0b001001:
 		icyc = 38;
-		if( r[reg2] == 0x80000000 && r[reg1] == 0xffffFFFFu )
+		if( r[reg2] == 0x80000000u && r[reg1] == 0xffffFFFFu )
 		{
 			setov(true);
 			r[30] = 0;
@@ -108,7 +105,7 @@ void nvc::exec(u16 iw)
 		u32 disp = (iw<<16)|read(pc, 16);
 		pc -= 2;
 		pc += disp;
-		printf("relative branch to $%X\n", pc);
+		//printf("relative branch to $%X\n", pc);
 		} break;
 	case 0b101011:{
 		icyc = 3;
@@ -118,13 +115,16 @@ void nvc::exec(u16 iw)
 		pc -= 2;
 		r[31] = pc + 4;
 		pc += disp;
-		printf("relative blink to $%X\n", pc);
+		//printf("relative blink to $%X\n", pc);
 		} break;
 	case 0b011010: halted = true; break;
 	case 0b011001: pc = sys[0]; PSW = sys[1]; break;
 
 	// logical
 	case 0b000100: setcy(((u64(r[reg2])<<(r[reg1]&0x1f))>>32)&1); r[reg2] <<= (r[reg1]&0x1f); setsz(r[reg2]); setov(0); break;
+	case 0b000111: setcy((s32(r[reg2])>>((r[reg1]&0x1f)-1))&1); r[reg2] = s32(r[reg2]) >> (r[reg1]&0x1f); setsz(r[reg2]); setov(0); break;
+	case 0b000101: setcy((s32(r[reg2])>>((r[reg1]&0x1f)-1))&1); r[reg2] >>= (r[reg1]&0x1f); setsz(r[reg2]); setov(0); break;
+	
 	case 0b010100: setcy(((u64(r[reg2])<<reg1)>>32)&1); r[reg2] <<= reg1; setsz(r[reg2]); setov(0); break;
 	case 0b010111: if( reg1 ) { setcy((r[reg2]>>(reg1-1))&1); r[reg2] = s32(r[reg2])>>reg1; } setsz(r[reg2]); setov(0); break;
 	case 0b010101: if( reg1 ) { setcy((r[reg2]>>(reg1-1))&1); r[reg2] >>= reg1; } setsz(r[reg2]); setov(0); break;
@@ -152,11 +152,11 @@ void nvc::exec_fp(const u32 reg2, const u32 reg1, u16 iw)
 	case 0b000110: f(reg2, f(reg2) * f(reg1)); setsz(r[reg2]); setov(0); setcy(PSW&2); break;
 	case 0b000111: f(reg2, f(reg2) / f(reg1)); setsz(r[reg2]); setov(0); setcy(PSW&2); break;
 	
-	case 0b000010: f(reg2, r[reg1]); setsz(r[reg2]); setov(0); setcy(PSW&2); break;
-	case 0b000011: r[reg2] = f(reg1); setsz(r[reg2]); setov(0); break;
+	case 0b000010: f(reg2, s32(r[reg1]) ); setsz(r[reg2]); setov(0); setcy(PSW&2); break;
+	case 0b000011: r[reg2] = s32( f(reg1) ); setsz(r[reg2]); setov(0); break;
 	
 	
-	case 0b001100: icyc = 9; r[reg2] = s32(r[reg2]) * (s32)((s16(r[reg1])<<15)>>15); break;
+	case 0b001100: icyc = 9; r[reg2] *= ((r[reg1]&0x10000)?(r[reg1]|~0x1ffff):(r[reg1]&0x1ffff)); break;
 	default:
 		printf("NVC: Unimpl fp instruction $%X\n", iw>>10);
 		exit(1);
@@ -166,10 +166,10 @@ void nvc::exec_fp(const u32 reg2, const u32 reg1, u16 iw)
 u64 nvc::step()
 {
 	r[0] = 0;
+	if( halted ) return 4;
 	icyc = 1;
 	u16 iw = read(pc, 16);
-	printf("nvc: pc = $%X, iw = $%X\n", pc, iw);
-	//if( pc == 0x700004A ) exit(1);
+	//printf("nvc: pc = $%X, iw = $%X\n", pc, iw);
 	if( pc == 0 ) exit(1);
 	pc += 2;
 	exec(iw);

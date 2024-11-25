@@ -78,7 +78,7 @@ public:
 		res += b;
 		setsz(res);
 		setov((res^a)&(res^b)&BIT(31));
-		setcy((res>>32)&1);
+		setcy(((res>>32)&1)^c);
 		return res;
 	}
 	
