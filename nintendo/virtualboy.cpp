@@ -319,16 +319,25 @@ void virtualboy::draw_normal_bg(u16* attr)
 {
 	u16* map =(u16*) &vram[0x20000 + 0x2000*(attr[0]&15)];
 	
-	int GX = attr[1] & 0x3ff;
-	int GP = attr[2] & 0x3ff;
-	int GY = attr[3];
+	int GX = s16((attr[1] & 0x3ff)<<6)>>6;
+	int GP = s16((attr[2] & 0x3ff)<<6)>>6;
+	int GY = s16(attr[3]);
 	
-	for(int y = 0; y < 224; ++y)
+	int MX = (s16(attr[4]<<3)>>3);
+	int MY = (s16(attr[6]<<3)>>3);
+	int MP = (s16(attr[5]<<1)>>1);
+	
+	int W = (s16(attr[7]<<3)>>3) + 1;
+	int H = s16(attr[8]) + 1;
+	
+	for(int y = 0; y < H; ++y)
 	{
-		for(int x = 0; x < 384; ++x)
+		for(int x = 0; x < W; ++x)
 		{
-			const int mapx = x/8;
-			const int mapy = y/8;
+			int X = (x + MX) & 511;
+			int Y = (y + MY) & 511;
+			const int mapx = X/8;
+			const int mapy = Y/8;
 			u16 map_entry = map[mapy*64 + mapx];
 			u16 JCA = map_entry & 0x7ff;
 			u16* td;
@@ -337,8 +346,8 @@ void virtualboy::draw_normal_bg(u16* attr)
 			else if( JCA < 1024+512 ) td =(u16*) &vram[0x16000 + JCA*16];
 			else td =(u16*) &vram[0x1E000 + JCA*16];
 			
-			u8 X = x&7;
-			u8 Y = y&7;
+			X = x&7;
+			Y = y&7;
 			if( map_entry & BIT(13) ) X ^= 7;
 			if( map_entry & BIT(12) ) Y ^= 7;
 			
@@ -375,8 +384,8 @@ void virtualboy::draw_sprite(u32 index)
 	else if( JCA < 1024+512 ) td =(u16*) &vram[0x16000 + JCA*16];
 	else td =(u16*) &vram[0x1E000 + JCA*16];
 	
-	int JP = attr[1] & 0x3ff;
-	int JX = attr[0] & 0x3ff;
+	int JP = (s16(attr[1] & 0x3ff)<<6)>>6;
+	int JX = (s16(attr[0] & 0x3ff)<<6)>>6;
 	int JY = attr[2] & 0xff;
 	
 	for(u32 y = 0; y < 8 && JY+y < 224; ++y)

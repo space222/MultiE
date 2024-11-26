@@ -27,6 +27,7 @@ After implementing "normal" backgrounds, most games display at least something.
 	things that sometimes display a full, clean screen worth of background that
 	I don't think the bg renderer is like, completely wrong or anything.
 	The sprite eval needs work; the selection of start and end indices for groups specifically.
+	Backgrounds can be reading completely different tiles for left/right due to src parallax. Needs refactor.
 
 
 
