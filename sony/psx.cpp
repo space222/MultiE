@@ -572,12 +572,16 @@ u32 psx::read(u32 addr, int size)
 
 	
 	
-	if( addr == 0x1F801810 ) return gpuread();
-	if( addr == 0x1F801814 ) return gpustat; // ^= 1u<<31;
+	if( addr == 0x1F801810 ) return ( size == 16 ) ? (gpuread()&0xffff) : (gpuread());
+	if( addr == 0x1F801812 ) { printf("16bit gpuread\n"); exit(1); }
+	if( addr == 0x1F801814 ) return ( size == 16 ) ? (gpustat&0xffff) : gpustat; // ^= 1u<<31;
+	if( addr == 0x1F801816 ) { printf("16bit gpustat\n"); exit(1); }
 	
 	if( addr == 0x1F801070 ) return I_STAT;
 	if( addr == 0x1F801074 ) return I_MASK;
 		
+	//printf("PSX: io read%i <$%X\n", size, addr);
+			
 	if( addr == 0x1F801100 ) return t0_val;
 	if( addr == 0x1F801110 ) return t1_val;
 	if( addr == 0x1F801120 ) return t2_val;
@@ -588,14 +592,17 @@ u32 psx::read(u32 addr, int size)
 	if( addr == 0x1F801118 ) return t1_target;
 	if( addr == 0x1F801128 ) return t2_target;
 	
-	if( addr == 0x1F8010F0 ) return DPCR;
-	if( addr == 0x1F8010F4 ) return ( (size==16) ? DICR&0xffff : DICR );
+	if( addr == 0x1F8010F0 ) return ( (size==16) ? (DPCR&0xffff) : DPCR );
+	if( addr == 0x1F8010F2 ) return DPCR>>16;
+	if( addr == 0x1F8010F4 ) return ( (size==16) ? (DICR&0xffff) : DICR );
 	if( addr == 0x1F8010F6 ) return DICR>>16;
 	
 	if( addr >= 0x1F801080 && addr < 0x1F8010F0 )
 	{
 		u32 chan = (addr>>4)&3;
 		addr >>= 2;
+		addr &= 3;
+		if( size != 32 ) { printf("16bit DMA read chan %i, reg %i\n", chan, addr); exit(1); }
 		switch(addr)
 		{
 		case 3: break;
@@ -615,6 +622,7 @@ u32 psx::read(u32 addr, int size)
 	
 	if( addr >= 0x1F801820 && addr <= 0x1F801828 )
 	{
+		if( size == 16 ) { printf("16bit mdec read $%X\n", addr); exit(1); }
 		return mdec_read(addr, size);
 	}
 	
@@ -660,8 +668,9 @@ u32 psx::read(u32 addr, int size)
 		return cd_ie;
 	}
 	
-
+	if( addr == 0x1F801014 && size == 32 ) return 0x200931E1;
 	
+	printf("PSX: unhandled io read%i <$%X\n", size, addr);	
 	return 0;
 }
 

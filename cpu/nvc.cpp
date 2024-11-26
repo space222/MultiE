@@ -1,5 +1,6 @@
 #include <cstdio>
 #include <cstdlib>
+#include <cmath>
 #include "nvc.h"
 
 void nvc::exec(u16 iw)
@@ -72,10 +73,10 @@ void nvc::exec(u16 iw)
 		icyc = 38;
 		if( r[reg2] == 0x80000000u && r[reg1] == 0xffffFFFFu )
 		{
-			setov(true);
+			setov(1);
 			r[30] = 0;
 		} else {
-			setov(false);
+			setov(0);
 			r[reg2] = s32(r[reg2]) / s32(r[reg1]);
 			r[30] = s32(r[reg2]) % s32(r[reg1]);
 		}
@@ -83,7 +84,7 @@ void nvc::exec(u16 iw)
 		break;
 	case 0b001011:
 		icyc = 36;
-		setov(false);
+		setov(0);
 		r[reg2] /= r[reg1];
 		r[30] = r[reg2] % r[reg1];
 		setsz(r[reg2]);
@@ -118,7 +119,7 @@ void nvc::exec(u16 iw)
 		//printf("relative blink to $%X\n", pc);
 		} break;
 	case 0b011010: halted = true; break;
-	case 0b011001: pc = sys[0]; PSW = sys[1]; break;
+	case 0b011001: pc = sys[0]; PSW = sys[1]; icyc = 10; break;
 
 	// logical
 	case 0b000100: setcy(((u64(r[reg2])<<(r[reg1]&0x1f))>>32)&1); r[reg2] <<= (r[reg1]&0x1f); setsz(r[reg2]); setov(0); break;
@@ -147,16 +148,21 @@ void nvc::exec_fp(const u32 reg2, const u32 reg1, u16 iw)
 {
 	switch( iw >> 10 )
 	{
+	case 0b000000: icyc = 8; { float temp = f(reg2) - f(reg1); u32 t = 0; memcpy(&t, &temp, 4); setsz(t); setcy(PSW&2); setov(0); break; }
+	
 	case 0b000100: f(reg2, f(reg2) + f(reg1)); setsz(r[reg2]); setov(0); setcy(PSW&2); break;
 	case 0b000101: f(reg2, f(reg2) - f(reg1)); setsz(r[reg2]); setov(0); setcy(PSW&2); break;
 	case 0b000110: f(reg2, f(reg2) * f(reg1)); setsz(r[reg2]); setov(0); setcy(PSW&2); break;
-	case 0b000111: f(reg2, f(reg2) / f(reg1)); setsz(r[reg2]); setov(0); setcy(PSW&2); break;
+	case 0b000111: f(reg2, f(reg2) / f(reg1)); setsz(r[reg2]); setov(0); setcy(PSW&2); icyc = 44; break;
 	
 	case 0b000010: f(reg2, s32(r[reg1]) ); setsz(r[reg2]); setov(0); setcy(PSW&2); break;
-	case 0b000011: r[reg2] = s32( f(reg1) ); setsz(r[reg2]); setov(0); break;
+	case 0b000011: r[reg2] = lround( f(reg1) ); setsz(r[reg2]); setov(0); break;
+	case 0b001011: r[reg2] = s32( f(reg1) ); setsz(r[reg2]); setov(0); break;
 	
 	
 	case 0b001100: icyc = 9; r[reg2] *= ((r[reg1]&0x10000)?(r[reg1]|~0x1ffff):(r[reg1]&0x1ffff)); break;
+	case 0b001000: icyc = 6; r[reg2] = (r[reg2]&0xFFFF0000) | ((r[reg2] << 8)&0xFF00) | ((r[reg2] >> 8)&0xFF); break;
+	case 0b001001: r[reg2] = (r[reg2]<<16)|(r[reg2]>>16); break;
 	default:
 		printf("NVC: Unimpl fp instruction $%X\n", iw>>10);
 		exit(1);
@@ -178,7 +184,7 @@ u64 nvc::step()
 
 void nvc::irq(u32 level, u16 code, u32 vector)
 {
-	if( PSW & BIT(12) ) return;
+	if( PSW & (BIT(12) | BIT(15) | BIT(14)) ) return;
 	u32 I = (PSW>>16)&15;
 	if( level < I ) return;
 

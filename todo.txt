@@ -11,9 +11,8 @@ Virtual Boy Todo List
 ------------------------
 1. Finish at least hw-read controller input and document default key bindings (vb controller has a lot of buttons for the time)
 2. Timer
-3. VIP "normal" background/sprite renderer
-4. Rewrite cpu cleaner.
-5. Sound?
+3. Rewrite cpu cleaner.
+4. Sound?
 Questions: 
 Do FRAMESTART/LFBEND/RFBEND irqs correspond to 0ms/FCLK-hi,8ms/left finish,18ms/right finish?
 Are only 1 of DPBSY active at a time and only between (3, 8) and (13, 18) ms?
@@ -23,11 +22,11 @@ current when drawing was disabled?
 Notes:
 1 cpu cycle = 0.05 microseconds
 CPU probably still has issues otherwise polygon.vb would work.
-Once I implement the world render loop and have the basic "normal" backgrounds working,
-	hopefully more than a few games will be displaying *something*, or even be functional
-	once some sprite support is in. Almost nothing's working at the moment, whether that's
-	because almost everything uses the tile engine or I still have an awful bug somewhere
-	is yet to be seen.
+After implementing "normal" backgrounds, most games display at least something.
+	Currently assuming cpu or timing issues for the garbled mess. There's enough
+	things that sometimes display a full, clean screen worth of background that
+	I don't think the bg renderer is like, completely wrong or anything.
+	The sprite eval needs work; the selection of start and end indices for groups specifically.
 
 
 
@@ -98,7 +97,7 @@ IBM PC Todo List
 
 Sony PS1 Todo List
 ---------------------
-1. CD rewrite?
+1. Integrate CD library to isolate remaining failures.
 2. Analog controllers, mouse
 3. Support more of the timer modes. better timing?
 4. SPU envelope and interpolation
@@ -106,17 +105,17 @@ Sony PS1 Todo List
 6. Better gpu?
 Status: Playable (as in they get to gameplay where a character can move): 
 		Mortal Kombat 2, Crash1&2, Ridge Racer (+Revolution via Caetla), CyberSled, Battle Arena Toshinden,
-		Spyro 1, Resident Evil 2, Metal Gear Solid, Final Fantasy 8, Duke Nukem: Time to Kill, Legend of Legaia
+		Spyro 1, Resident Evil 2, Metal Gear Solid, Final Fantasy 8, Duke Nukem: Time to Kill, THPS2&3
 	Puzzle Bobble 2 and Spyro 3 freeze eventually
 	FF7 ends up in loop past title screen
 	Croc only works loaded via EXE by Caetla, and only gets in game, past garbage title screen sometimes, but is playable when it works
 	Ridge Racer Type 4, wants a better Getloc CD response(?) while trying to MDEC it up.
 	Gran Turismo if it gets there at all reboots(?) into intro movie shortly after race-start loading screen
-	Tony Hawk's Pro Skater 2, boot failure
 	Twisted Metal 2, hits undef opcode, boot failure
 	Gran Turismo 2, managed to play it once, graphics messed up half way through, no longer works
 	NBA Hangtime, hits assertion "Line 636" after a few messed up screens of selecting garbled menu options
-Notes:	CD is still awful and audio (both DA&XA) is not supported.
+Notes:	Somehow never noticed that games do 16bit writes to the high portion of DICR ($10F6). Handling this makes THPS2&3 playable.
+	CD is still awful and audio (both DA&XA) is not supported.
 	Bunch of games only work if loaded by Caetla (whether via "Game start" or EXE select).
 	Currently sending out spurious SPU IRQs every vblank to satisfy MGS and Legend of Legaia
 	MDEC needs some work/rewrite.

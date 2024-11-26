@@ -21,9 +21,15 @@ public:
 	u32 read_miscio(u32, int);
 	void write_miscio(u32, u32, int);
 	
+	void draw_obj_group(u32);
+	void draw_sprite(u32);
+	void draw_normal_bg(u16* attr);
+	void set_fb_pixel(u32 lr, int x, int y, u32 p);
+	
 	nvc cpu;
 	u64 stamp, last_target;
 	u16 INTPND, INTENB, DPSTTS, padkeys;
+	u16 objctrl[4];
 	int which_buffer;
 	
 	std::vector<u8> ROM;	
