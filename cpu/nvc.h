@@ -30,6 +30,10 @@ public:
 	u32 r[32];
 	u32 sys[32];
 	
+	u16 imm16();
+	void set_sysreg(u32, u32);
+	u32 get_sysreg(u32);
+	
 	float f(u32 reg) 
 	{
 		float t = 0;

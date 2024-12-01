@@ -32,6 +32,8 @@ public:
 	u16 objctrl[4];
 	int which_buffer;
 	
+	u32 frame_divider;
+	
 	std::vector<u8> ROM;	
 	u8 ram[64*1024];
 	u8 vram[256*1024];
