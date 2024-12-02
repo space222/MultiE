@@ -35,13 +35,13 @@ public:
 	u16 objpal[4];
 	int which_buffer;
 	
-	/*u8 wavram[5*32];
+	u8 wavram[5*32];
 	u8 modram[32];
 	u8 channel[6][8];
 	u8 chanpos[6];
 	u32 chancycles[6];
 	u32 sample_cycles;
-	*/
+	
 	u32 frame_divider;
 	
 	std::vector<u8> ROM;	

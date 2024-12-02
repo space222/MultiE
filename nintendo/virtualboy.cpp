@@ -100,7 +100,7 @@ u32 virtualboy::read(u32 addr, int sz)
 	}
 	if( addr >= 0x01000000 )
 	{
-		return 0; //todo: sound
+		return 0; //sound reads undefined??
 	}
 	
 	// under this line is all VIP
@@ -198,7 +198,24 @@ void virtualboy::write(u32 addr, u32 v, int sz)
 	}
 	if( addr >= 0x01000000 )
 	{
-		return; //todo: snd
+		addr &= 0x7ff;
+		if( addr < 0x280 ) { wavram[addr>>2] = v; return; }
+		if( addr < 0x300 ) { modram[(addr-0x280)>>2] = v; return; }
+		if( addr < 0x400 ) return; // unused space
+		if( addr == 0x580 )
+		{	// the shut-sound-off port
+			if( v & 1 )
+			{
+				for(u32 i = 0; i < 6; ++i) channel[i][0] = 0;
+			}
+			return;
+		}
+		const u32 C = (addr>>6)&7;
+		const u32 R = (addr>>2)&15;
+		if( C > 5 || (R & 8) ) return;
+		channel[C][R] = v;
+		
+		return;
 	}
 	// under this line is all VIP
 	addr &= 0x7FFFF;
