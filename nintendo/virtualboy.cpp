@@ -410,6 +410,11 @@ void virtualboy::run_frame()
 		if( attr[0] & BIT(6) ) break;
 		if( (attr[0]&0xc000) == 0 ) continue;
 		const u32 BGM = ((attr[0]>>12)&3);
+		if( BGM == 2 ) 
+		{
+			draw_affine_bg(attr);
+			continue;
+		}
 		if( BGM == 3 ) 
 		{
 			//printf("world %i is sprites\n", world); 
@@ -422,8 +427,6 @@ void virtualboy::run_frame()
 			draw_normal_bg(attr);
 			continue;		
 		}
-		if( BGM == 1 ) continue;
-		draw_affine_bg(attr);
 	}
 }
 
