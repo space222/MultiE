@@ -307,6 +307,22 @@ void imgui_run()
 			}
 			if( ImGui::BeginMenu("Nintendo") )
 			{
+				if( ImGui::MenuItem("Virtual Boy") )
+				{
+					std::string f = getOpenFile("Virtual Boy");
+					if( !f.empty() )
+					{
+						delete sys;
+						sys = new virtualboy;
+						if( ! sys->loadROM(f) ) 
+						{
+							printf("unable to load ROM\n");
+							exit(1);
+						}
+						else newinstance = true;
+						crt_scale = 2;
+					}				
+				}
 				if( ImGui::MenuItem("Gameboy") )
 				{
 					std::string f = getOpenFile("Gameboy [Color]");
@@ -457,22 +473,6 @@ void imgui_run()
 			}
 			if( ImGui::BeginMenu("Experimental") ) 
 			{
-				if( ImGui::MenuItem("Nintendo Virtualboy") )
-				{
-					std::string f = getOpenFile("Virtualboy");
-					if( !f.empty() )
-					{
-						delete sys;
-						sys = new virtualboy;
-						if( ! sys->loadROM(f) ) 
-						{
-							printf("unable to load ROM\n");
-							exit(1);
-						}
-						else newinstance = true;
-						crt_scale = 2;
-					}				
-				}
 				if( ImGui::MenuItem("Nintendo GBA") )
 				{
 					std::string f = getOpenFile("GBA");

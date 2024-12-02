@@ -11,7 +11,7 @@ Virtual Boy Todo List
 ------------------------
 1. Finish at least hw-read controller input and document default key bindings (vb controller has a lot of buttons for the time)
 2. Timer
-3. Sound
+3. Sound: envelopes, noise channel, channel 5 sweep/modulation
 4. CPU Bitstring instructions
 5. World layers that use more than one background
 Questions: 
@@ -22,7 +22,7 @@ If XPEN is clear (drawing disabled), does double buffering not happen? Which fra
 current when drawing was disabled?
 Notes:
 1 cpu cycle = 0.05 microseconds
-
+Mario Tennis match setup screen differs between "some" and "all" garbage between runs.
 
 
 
