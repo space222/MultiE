@@ -5,7 +5,7 @@
 class virtualboy : public console
 {
 public:
-	virtualboy() {} // { setVsync(0); }
+	virtualboy() { setVsync(0); }
 	u32 fb_width() override { return 384; }
 	u32 fb_height() override { return 224; }
 	u8* framebuffer() override { return(u8*)&fbuf[0]; }
@@ -39,8 +39,11 @@ public:
 	u8 modram[32];
 	u8 channel[6][8];
 	u8 chanpos[6];
+	u8 chaninterval[6];
+	u32 chan_int_cycles[6];
 	u32 chancycles[6];
 	u32 sample_cycles;
+	void snd_clock(u64);
 	
 	u32 frame_divider;
 	

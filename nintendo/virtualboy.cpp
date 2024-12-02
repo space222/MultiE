@@ -199,7 +199,7 @@ void virtualboy::write(u32 addr, u32 v, int sz)
 	if( addr >= 0x01000000 )
 	{
 		addr &= 0x7ff;
-		if( addr < 0x280 ) { wavram[addr>>2] = v; return; }
+		if( addr < 0x280 ) { wavram[addr>>2] = v & 0x3F; return; }
 		if( addr < 0x300 ) { modram[(addr-0x280)>>2] = v; return; }
 		if( addr < 0x400 ) return; // unused space
 		if( addr == 0x580 )
@@ -214,7 +214,13 @@ void virtualboy::write(u32 addr, u32 v, int sz)
 		const u32 R = (addr>>2)&15;
 		if( C > 5 || (R & 8) ) return;
 		channel[C][R] = v;
-		
+		if( R == 0 )
+		{
+			chanpos[C] = 0;
+			chancycles[C] = 0;
+			chaninterval[C] = (v&0x1F)+1;
+			chan_int_cycles[C] = 0;
+		}
 		return;
 	}
 	// under this line is all VIP
@@ -299,6 +305,8 @@ void virtualboy::step()
 	if( INTPND & INTENB ) cpu.irq(4, 0xFE40, 0xffffFE40);
 	u64 cc = cpu.step();
 	stamp += cc;
+	
+	snd_clock(cc);
 }
 
 #define FCLK 0x80
@@ -313,12 +321,12 @@ void virtualboy::step()
 
 void virtualboy::run_frame()
 {
-	frame_divider += 1;
-	if( frame_divider >= 6 )
-	{
-		frame_divider = 0;
-		return;
-	}
+	//frame_divider += 1;
+	//if( frame_divider >= 6 )
+	//{
+	//	frame_divider = 0;
+	//	return;
+	//}
 
 	// 0 ms FCLK in DPSTTS goes high. 
 	INTPND |= FRAMESTART | GAMESTART;
@@ -669,4 +677,54 @@ void virtualboy::reset()
 	frame_divider = 0;
 	for(u32 i = 0; i < 256*1024; ++i) vram[i] = 0;
 }
+
+void virtualboy::snd_clock(u64 cc)
+{
+	// run the auto deactivation interval
+	for(u32 i = 0; i < 6; ++i)
+	{
+		if( !(channel[i][0]&0x80) || !(channel[i][0]&BIT(5)) ) continue;
+		chan_int_cycles[i] += cc;
+		if( chan_int_cycles[i] >= 77 )
+		{
+			chan_int_cycles[i] -= 77;
+			chaninterval[i] -= 1;
+			if( chaninterval[i] == 0 ) channel[i][0] = 0;
+		}
+	}
+	
+	// run the frequency timer and step wave ram position for channels 1-5
+	for(u32 i = 0; i < 5; ++i)
+	{
+		if( !(channel[i][0]&0x80) ) continue;
+		chancycles[i] += cc;
+		const u32 upper = (2048 - (((channel[i][3]&7)<<8)|channel[i][2])) * 4;
+		if( chancycles[i] >= upper )
+		{
+			chancycles[i] -= upper;
+			chanpos[i] += 1;
+			chanpos[i] &= 31;
+		}
+	}
+
+	// calculate the final sample if it's time (emulator uses 44.1KHz)
+	sample_cycles += cc;
+	if( sample_cycles >= 453 )
+	{
+		sample_cycles -= 453;
+		u32 L=0, R=0;
+		for(u32 i = 0; i < 5; ++i)
+		{
+			if( !(channel[i][0]&0x80) ) continue;
+			const u32 wav = channel[i][6] & 7;
+			if( wav > 4 ) continue;
+			L += wavram[wav*32 + chanpos[i]] * (channel[i][1]>>4);
+			R += wavram[wav*32 + chanpos[i]] * (channel[i][1]&15);
+		}
+		float LF = (L / float(0x7ff)) * 2 - 1;
+		float RF = (R / float(0x7ff)) * 2 - 1;
+		audio_add(LF, RF);
+	}
+}
+
 
