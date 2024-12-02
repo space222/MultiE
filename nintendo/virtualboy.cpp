@@ -100,7 +100,8 @@ u32 virtualboy::read(u32 addr, int sz)
 	}
 	if( addr >= 0x01000000 )
 	{
-		return 0; //todo: sound
+		addr &= 0x7ff;
+		return 0; //sound reads undefined?
 	}
 	
 	// under this line is all VIP
@@ -135,22 +136,20 @@ u32 virtualboy::read(u32 addr, int sz)
 	}
 	if( addr == 0x5F840 ) return rotit = std::rotr(rotit, 1);
 	
-	if( addr == 0x5F848 )
-	{
-		return objctrl[0];
-	}
-	if( addr == 0x5F84A )
-	{
-		return objctrl[1];
-	}
-	if( addr == 0x5F84C )
-	{
-		return objctrl[2];
-	}
-	if( addr == 0x5F84E )
-	{
-		return objctrl[3];
-	}
+	if( addr == 0x5F848 ) return objctrl[0];
+	if( addr == 0x5F84A ) return objctrl[1];
+	if( addr == 0x5F84C ) return objctrl[2];
+	if( addr == 0x5F84E ) return objctrl[3];
+	
+	if( addr == 0x5F860 ) return bgpal[0];
+	if( addr == 0x5F862 ) return bgpal[1];
+	if( addr == 0x5F864 ) return bgpal[2];
+	if( addr == 0x5F866 ) return bgpal[3];
+	if( addr == 0x5F868 ) return objpal[0];
+	if( addr == 0x5F86A ) return objpal[1];
+	if( addr == 0x5F86C ) return objpal[2];
+	if( addr == 0x5F86E ) return objpal[3];
+
 	if( addr == 0x5F844 ) return 2;
 	return 0;
 }
@@ -189,7 +188,33 @@ void virtualboy::write(u32 addr, u32 v, int sz)
 	}
 	if( addr >= 0x01000000 )
 	{
-		return; //todo: snd
+		addr &= 0x7ff;
+		if( addr < 0x280 )
+		{
+			addr >>= 2;
+			wavram[addr] = v;
+			return;
+		}
+		if( addr < 0x300 )
+		{
+			addr >>= 2;
+			modram[addr] = v;
+			return;
+		}
+		if( addr < 0x400 ) return; // some unused space
+		if( addr == 0x580 )
+		{
+			if( !(v&1) ) return;
+			// the stop-everything port
+			for(u32 i = 0; i < 6; ++i) channel[i][0] = 0;			
+			return;
+		}
+		const u32 chan = (addr>>6)&7;
+		if( chan > 5 ) return;
+		const u32 reg = (addr>>2)&15;
+		if( reg & 8 ) return;
+		channel[chan][reg] = v;
+		return;
 	}
 	// under this line is all VIP
 	addr &= 0x7FFFF;
@@ -256,7 +281,17 @@ void virtualboy::write(u32 addr, u32 v, int sz)
 		v &= (BIT(1)|BIT(8)|BIT(9)|BIT(10));
 		DPSTTS |= v;
 		return;
-	}	
+	}
+	
+	if( addr == 0x5F860 ) { bgpal[0] = v; return; }
+	if( addr == 0x5F862 ) { bgpal[1] = v; return; }
+	if( addr == 0x5F864 ) { bgpal[2] = v; return; }
+	if( addr == 0x5F866 ) { bgpal[3] = v; return; }
+	if( addr == 0x5F868 ) { objpal[0] = v; return; }
+	if( addr == 0x5F86A ) { objpal[1] = v; return; }
+	if( addr == 0x5F86C ) { objpal[2] = v; return; }
+	if( addr == 0x5F86E ) { objpal[3] = v; return; }
+
 }
 
 void virtualboy::step()
@@ -264,6 +299,36 @@ void virtualboy::step()
 	if( INTPND & INTENB ) cpu.irq(4, 0xFE40, 0xffffFE40);
 	u64 cc = cpu.step();
 	stamp += cc;
+	
+/*	for(u32 i = 0; i < 6; ++i)
+	{
+		if( !(channel[i][0] & BIT(7)) ) continue;
+		chancycles[i] += cc;
+		u32 upper = ((channel[i][3]&7)<<8)|channel[i][2];
+		upper *= ( (i==5) ? 40 : 4 );
+		if( chancycles[i] >= upper )
+		{
+			chancycles[i] -= upper;
+			chanpos[i] += 1;
+			chanpos[i] &= 31;			
+		}
+	}
+	
+	sample_cycles += cc;
+	if( sample_cycles >= 453 )
+	{
+		sample_cycles -= 453;
+		u16 L=0, R=0;
+		for(u32 i = 0; i < 6; ++i)
+		{
+			if( !(channel[i][0] & BIT(7)) ) continue;
+			if( (channel[i][6] & 7) > 5 ) continue;
+			const u32 wav = (channel[i][6] & 7) * 32;
+			L += wavram[wav + chanpos[i]] * ((channel[i][1]>>4)/15.f);
+			R += wavram[wav + chanpos[i]] * ((channel[i][1]&0xf)/15.f);
+		}
+		audio_add(L, R);
+	}*/
 }
 
 #define FCLK 0x80
@@ -344,19 +409,21 @@ void virtualboy::run_frame()
 		u16 *attr = (u16*)&vram[0x3D800 + world*0x20];
 		if( attr[0] & BIT(6) ) break;
 		if( (attr[0]&0xc000) == 0 ) continue;
-		if( ((attr[0]>>12)&3) == 3 ) 
-		{ 
+		const u32 BGM = ((attr[0]>>12)&3);
+		if( BGM == 3 ) 
+		{
 			//printf("world %i is sprites\n", world); 
 			draw_obj_group(objgroup); 
 			objgroup = (objgroup-1)&3; 
 			continue; 
 		}
-		if( ((attr[0]>>12)&3) == 0 )
-		{
+		if( BGM == 0 )
+		{ //todo: make h-bias worlds a bool param to draw_normal_bg
 			draw_normal_bg(attr);
 			continue;		
 		}
-		
+		if( BGM == 1 ) continue;
+		draw_affine_bg(attr);
 	}
 }
 
@@ -371,15 +438,10 @@ void virtualboy::draw_normal_bg(u16* attr)
 	int MX = (s16(attr[4]<<3)>>3);
 	int MY = (s16(attr[6]<<3)>>3);
 	int MP = (s16(attr[5]<<1)>>1);
-	if( MP != 0 )
-	{
-		printf("BG uses MP attribute\n");
-		exit(1);
-	}
-	printf("MX = %i, MY = %i, MP = %i\n", MX, MY, MP);
+	
 	int W = (s16(attr[7]<<3)>>3) + 1;
 	int H = s16(attr[8]) + 1;
-	printf("W = %i, H = %i, GX = %i\n", W, H, GX);
+	if( H < 8 ) H = 8;
 	
 	for(int y = 0; y < H; ++y)
 	{
@@ -387,11 +449,13 @@ void virtualboy::draw_normal_bg(u16* attr)
 		{	
 			if( attr[0] & 0x8000 )
 			{
-				int X = (x + MX - MP) & 511;
-				int Y = (y + MY - MP) & 511;
+				int X = (x + MX - MP);
+				int Y = (y + MY - MP);
 				const int mapx = X/8;
 				const int mapy = Y/8;
-			u16 map_entry =((X<0||X>=64||Y<0||Y>=64)&&(attr[0]&BIT(7))) ? *(u16*)&vram[0x20000+attr[10]*2] : map[mapy*64+mapx];
+				u16 map_entry =
+					((mapx<0||mapx>=64||mapy<0||mapy>=64)&&(attr[0]&BIT(7))) 
+					? *(u16*)&vram[0x20000+attr[10]*2] : map[(mapy&63)*64+(mapx&63)];
 				u16 JCA = map_entry & 0x7ff;
 				u16* td;
 				if( JCA < 512 ) td =(u16*) &vram[0x6000 + JCA*16];
@@ -405,15 +469,21 @@ void virtualboy::draw_normal_bg(u16* attr)
 				if( map_entry & BIT(12) ) Y ^= 7;
 				
 				u16 px = (td[Y]>>(X*2))&3;
-				if( px ) set_fb_pixel(0, (GX-GP)+x, GY+y, px);
+				if( px ) 
+				{
+					px = (bgpal[map_entry>>14]>>(px*2))&3;
+					set_fb_pixel(0, (GX-GP)+x, GY+y, px);
+				}
 			}
 			if( attr[0] & 0x4000 ) 
 			{
-				int X = (x + MX + MP) & 511;
-				int Y = (y + MY + MP) & 511;
+				int X = (x + MX + MP);
+				int Y = (y + MY + MP);
 				const int mapx = X/8;
 				const int mapy = Y/8;
-			u16 map_entry =((X<0||X>=64||Y<0||Y>=64)&&(attr[0]&BIT(7))) ? *(u16*)&vram[0x20000+attr[10]*2] : map[mapy*64+mapx];
+				u16 map_entry =
+					((mapx<0||mapx>=64||mapy<0||mapy>=64)&&(attr[0]&BIT(7)))
+					? *(u16*)&vram[0x20000+attr[10]*2] : map[(mapy&63)*64+(mapx&63)];
 				u16 JCA = map_entry & 0x7ff;
 				u16* td;
 				if( JCA < 512 ) td =(u16*) &vram[0x6000 + JCA*16];
@@ -427,11 +497,119 @@ void virtualboy::draw_normal_bg(u16* attr)
 				if( map_entry & BIT(12) ) Y ^= 7;
 				
 				u16 px = (td[Y]>>(X*2))&3;
-				if( px ) set_fb_pixel(1, (GX+GP)+x, GY+y, px);
+				if( px ) 
+				{
+					px = (bgpal[map_entry>>14]>>(px*2))&3;
+					set_fb_pixel(1, (GX+GP)+x, GY+y, px);
+				}
 			}			
 		}
 	}
 }
+
+void virtualboy::draw_affine_bg(u16* attr)
+{
+	u16* map =(u16*) &vram[0x20000 + 0x2000*(attr[0]&15)];
+	
+	int GX = s16(attr[1]<<6)>>6;
+	int GP = s16(attr[2]<<6)>>6;
+	int GY = s16(attr[3]);
+	int W = (attr[7] & 0x3ff) + 1;  // W different for affine
+	int H = s16(attr[8]) + 1;
+	
+	u32 paramoffs = attr[9]*2;
+	s16* param = (s16*) &vram[0x20000 + paramoffs];
+	
+	for(int y = 0; y < H; ++y)
+	{
+		float MX = param[0] / 8.f;
+		float MY = param[2] / 8.f;
+		float DX = param[3] / 512.f;
+		float DY = param[4] / 512.f;
+		int MP = param[1];
+				
+		paramoffs += 16;
+		paramoffs &= 0x1fff0;
+		param = (s16*) &vram[0x20000 + paramoffs];
+		
+		for(int x = 0; x < W; ++x)
+		{	
+			if( attr[0] & 0x8000 )
+			{
+				int X = 0;
+				int Y = 0;
+				if( MP < 0 )
+				{
+					X = MX + DX*(x-MP);
+					Y = MY + DY*(x-MP);
+				} else {
+					X = MX + DX*x;
+					Y = MY + DY*x;
+				}
+				const int mapx = X/8;
+				const int mapy = Y/8;
+				u16 map_entry =
+					((mapx<0||mapx>=64||mapy<0||mapy>=64)&&(attr[0]&BIT(7))) 
+					? *(u16*)&vram[0x20000+attr[10]*2] : map[(mapy&63)*64+(mapx&63)];
+				u16 JCA = map_entry & 0x7ff;
+				u16* td;
+				if( JCA < 512 ) td =(u16*) &vram[0x6000 + JCA*16];
+				else if( JCA < 1024 ) td =(u16*) &vram[0xE000 + (JCA-512)*16];
+				else if( JCA < 1024+512 ) td =(u16*) &vram[0x16000 + (JCA-1024)*16];
+				else td =(u16*) &vram[0x1E000 + (JCA-(1024+512))*16];
+				
+				X &= 7;
+				Y &= 7;
+				if( map_entry & BIT(13) ) X ^= 7;
+				if( map_entry & BIT(12) ) Y ^= 7;
+				
+				u16 px = (td[Y]>>(X*2))&3;
+				if( px ) 
+				{
+					px = (bgpal[map_entry>>14]>>(px*2))&3;
+					set_fb_pixel(0, (GX-GP)+x, GY+y, px);
+				}
+			}
+			if( attr[0] & 0x4000 ) 
+			{
+				int X = 0;
+				int Y = 0;
+				if( MP >= 0 )
+				{
+					X = MX + DX*(x-MP);
+					Y = MY + DY*(x-MP);
+				} else {
+					X = MX + DX*x;
+					Y = MY + DY*x;
+				}
+				const int mapx = X/8;
+				const int mapy = Y/8;
+				u16 map_entry =
+					((mapx<0||mapx>=64||mapy<0||mapy>=64)&&(attr[0]&BIT(7))) 
+					? *(u16*)&vram[0x20000+attr[10]*2] : map[(mapy&63)*64+(mapx&63)];
+				u16 JCA = map_entry & 0x7ff;
+				u16* td;
+				if( JCA < 512 ) td =(u16*) &vram[0x6000 + JCA*16];
+				else if( JCA < 1024 ) td =(u16*) &vram[0xE000 + (JCA-512)*16];
+				else if( JCA < 1024+512 ) td =(u16*) &vram[0x16000 + (JCA-1024)*16];
+				else td =(u16*) &vram[0x1E000 + (JCA-(1024+512))*16];
+				
+				X &= 7;
+				Y &= 7;
+				if( map_entry & BIT(13) ) X ^= 7;
+				if( map_entry & BIT(12) ) Y ^= 7;
+				
+				u16 px = (td[Y]>>(X*2))&3;
+				if( px ) 
+				{
+					px = (bgpal[map_entry>>14]>>(px*2))&3;
+					set_fb_pixel(1, (GX+GP)+x, GY+y, px);
+				}
+			}			
+		}
+	}
+}
+
 
 void virtualboy::draw_obj_group(u32 group)
 {
@@ -464,21 +642,21 @@ void virtualboy::draw_sprite(u32 index)
 	
 	for(u32 y = 0; y < 8 && JY+y < 224; ++y)
 	{
-		const u8 Y = ( ( attr[3] & BIT(12) ) ? (y^7) : y );
-		const u16 v = td[Y];
+		const u16 v = td[( ( attr[3] & BIT(12) ) ? (y^7) : y )];
 		
 		for(u32 x = 0; x < 8; ++x)
 		{
 			const u8 X = ( (attr[3] & BIT(13)) ? (x^7) : x );
 			const u32 px = (v >> (X*2))&3;
 			if( !px ) continue;
+			u32 pal = (objpal[attr[3]>>14] >> (px*2))&3;
 			if( attr[1]&0x8000 )
 			{ // left
-				set_fb_pixel(0, (JX-JP)+x, JY+y, px);			
+				set_fb_pixel(0, (JX-JP)+x, JY+y, pal);			
 			}
 			if( attr[1]&0x4000 )
 			{ // right
-				set_fb_pixel(1, (JX+JP)+x, JY+y, px);	
+				set_fb_pixel(1, (JX+JP)+x, JY+y, pal);	
 			}
 		}		
 	}
@@ -517,18 +695,12 @@ void virtualboy::reset()
 	INTPND = INTENB = 0;
 	DPSTTS = 0;
 	which_buffer = 0;
-	frame_divider = 0;
+	frame_divider = sample_cycles = 0;
+	for(u32 i = 0; i < 6; ++i) { chancycles[i] = 0; channel[i][0] = 0; }
 	for(u32 i = 0; i < 256*1024; ++i) vram[i] = 0;
 }
 
 virtualboy::~virtualboy()
 {
-	FILE* fp = fopen("vram.bin", "wb");
-	if( !fp ) return;
-	[[maybe_unused]] int u = fwrite(vram+0x6000, 1, 0x2000, fp);
-	u = fwrite(vram+0xE000, 1, 0x2000, fp);
-	u = fwrite(vram+0x16000,1, 0x2000, fp);
-	u = fwrite(vram+0x1E000,1, 0x2000, fp);
-	fclose(fp);
 }
 

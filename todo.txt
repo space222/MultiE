@@ -11,8 +11,9 @@ Virtual Boy Todo List
 ------------------------
 1. Finish at least hw-read controller input and document default key bindings (vb controller has a lot of buttons for the time)
 2. Timer
-3. Rewrite cpu cleaner.
-4. Sound?
+3. Sound
+4. CPU Bitstring instructions
+5. World layers that use more than one background
 Questions: 
 Do FRAMESTART/LFBEND/RFBEND irqs correspond to 0ms/FCLK-hi,8ms/left finish,18ms/right finish?
 Are only 1 of DPBSY active at a time and only between (3, 8) and (13, 18) ms?
@@ -21,13 +22,7 @@ If XPEN is clear (drawing disabled), does double buffering not happen? Which fra
 current when drawing was disabled?
 Notes:
 1 cpu cycle = 0.05 microseconds
-CPU probably still has issues otherwise polygon.vb would work.
-After implementing "normal" backgrounds, most games display at least something.
-	Currently assuming cpu or timing issues for the garbled mess. There's enough
-	things that sometimes display a full, clean screen worth of background that
-	I don't think the bg renderer is like, completely wrong or anything.
-	The sprite eval needs work; the selection of start and end indices for groups specifically.
-	Backgrounds can be reading completely different tiles for left/right due to src parallax. Needs refactor.
+
 
 
 
