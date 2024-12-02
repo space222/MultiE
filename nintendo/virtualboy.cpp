@@ -68,6 +68,7 @@ u32 virtualboy::read(u32 addr, int sz)
 	addr &= 0x07FFFFFF;
 	if( addr >= 0x07000000 )
 	{
+		cpu.icyc += 1;
 		addr -= 0x07000000;
 		if( addr >= ROM.size() ) addr %= ROM.size();
 		return sized_read(ROM.data(), addr, sz);
@@ -80,6 +81,7 @@ u32 virtualboy::read(u32 addr, int sz)
 	}
 	if( addr >= 0x05000000 )
 	{
+		cpu.icyc += 1;
 		return sized_read(ram, addr&0xffff, sz);	
 	}
 	if( addr >= 0x04000000 )
@@ -96,6 +98,7 @@ u32 virtualboy::read(u32 addr, int sz)
 	}
 	if( addr >= 0x02000000 )
 	{
+		cpu.icyc += 1;
 		return read_miscio(addr, sz);	
 	}
 	if( addr >= 0x01000000 )
@@ -105,12 +108,12 @@ u32 virtualboy::read(u32 addr, int sz)
 	
 	// under this line is all VIP
 	addr &= 0x7FFFF;
-	if( addr < 0x00040000 ) return sized_read(vram, addr, sz);
+	if( addr < 0x00040000 ) { cpu.icyc += 1; return sized_read(vram, addr, sz); }
 	if( addr < 0x5F800 ) return 0; // unmapped space or unused mmio
-	if( addr >= 0x7E000 ) return sized_read(&vram[0x1E000], (addr-0x7E000), sz);
-	if( addr >= 0x7C000 ) return sized_read(&vram[0x16000], (addr-0x7C000), sz);
-	if( addr >= 0x7A000 ) return sized_read(&vram[0x0E000], (addr-0x7A000), sz);
-	if( addr >= 0x78000 ) return sized_read(&vram[0x06000], (addr-0x78000), sz);
+	if( addr >= 0x7E000 ) { cpu.icyc += 1; return sized_read(&vram[0x1E000], (addr-0x7E000), sz); }
+	if( addr >= 0x7C000 ) { cpu.icyc += 1; return sized_read(&vram[0x16000], (addr-0x7C000), sz); }
+	if( addr >= 0x7A000 ) { cpu.icyc += 1; return sized_read(&vram[0x0E000], (addr-0x7A000), sz); }
+	if( addr >= 0x78000 ) { cpu.icyc += 1; return sized_read(&vram[0x06000], (addr-0x78000), sz); }
 	
 	if( sz == 32 )
 	{
@@ -125,6 +128,7 @@ u32 virtualboy::read(u32 addr, int sz)
 		return (v>>((addr&1)?8:0)) & 0xff;
 	}
 	
+	cpu.icyc += 1;
 	printf("vb: read%i <$%X\n", sz, addr);
 	
 	if( addr == 0x5F800 ) return INTPND;
@@ -176,6 +180,7 @@ void virtualboy::write(u32 addr, u32 v, int sz)
 	}
 	if( addr >= 0x05000000 )
 	{
+		cpu.icyc += 1;
 		sized_write(ram, addr&0xffff, v, sz);
 		return;
 	}
@@ -225,14 +230,12 @@ void virtualboy::write(u32 addr, u32 v, int sz)
 	}
 	// under this line is all VIP
 	addr &= 0x7FFFF;
-	if( addr < 0x00040000 ) { sized_write(vram, addr, v, sz); return; }
+	if( addr < 0x00040000 ) { cpu.icyc += 1; sized_write(vram, addr, v, sz); return; }
 	if( addr < 0x5F800 ) return; // unmapped space or unused mmio
-	if( addr >= 0x7E000 ) { sized_write(&vram[0x1E000], (addr-0x7E000), v, sz); return; }
-	if( addr >= 0x7C000 ) { sized_write(&vram[0x16000], (addr-0x7C000), v, sz); return; }
-	if( addr >= 0x7A000 ) { sized_write(&vram[0x0E000], (addr-0x7A000), v, sz); return; }
-	if( addr >= 0x78000 ) { sized_write(&vram[0x06000], (addr-0x78000), v, sz); return; }
-	
-	printf("vb: write%i $%X = $%X\n", sz, addr, v);
+	if( addr >= 0x7E000 ) { cpu.icyc += 1; sized_write(&vram[0x1E000], (addr-0x7E000), v, sz); return; }
+	if( addr >= 0x7C000 ) { cpu.icyc += 1; sized_write(&vram[0x16000], (addr-0x7C000), v, sz); return; }
+	if( addr >= 0x7A000 ) { cpu.icyc += 1; sized_write(&vram[0x0E000], (addr-0x7A000), v, sz); return; }
+	if( addr >= 0x78000 ) { cpu.icyc += 1; sized_write(&vram[0x06000], (addr-0x78000), v, sz); return; }
 	
 	if( sz == 32 )
 	{
@@ -242,16 +245,26 @@ void virtualboy::write(u32 addr, u32 v, int sz)
 		return;
 	}
 	
+	cpu.icyc += 1;
+		
 	if( addr == 0x5F804 )
 	{
-		printf("INTCLR = $%X\n", v);
 		INTPND &= ~v;
 		return;
 	}
+
 	if( addr == 0x5F802 )
 	{
-		printf("INTENB = $%X\n", v);
 		INTENB = v;
+		return;
+	}
+	if( addr == 0x5F82E )
+	{
+		if( v & 0xf ) 
+		{
+			printf("FRMCYC = $%X\n", v&0xf);
+		//	exit(1);
+		}
 		return;
 	}
 	
@@ -298,6 +311,8 @@ void virtualboy::write(u32 addr, u32 v, int sz)
 		DPSTTS |= v;
 		return;
 	}	
+	
+	printf("vb: write%i $%X = $%X\n", sz, addr, v);
 }
 
 void virtualboy::step()
@@ -321,13 +336,7 @@ void virtualboy::step()
 
 void virtualboy::run_frame()
 {
-	//frame_divider += 1;
-	//if( frame_divider >= 6 )
-	//{
-	//	frame_divider = 0;
-	//	return;
-	//}
-
+	
 	// 0 ms FCLK in DPSTTS goes high. 
 	INTPND |= FRAMESTART | GAMESTART;
 	DPSTTS |= FCLK;
@@ -716,13 +725,13 @@ void virtualboy::snd_clock(u64 cc)
 		for(u32 i = 0; i < 5; ++i)
 		{
 			if( !(channel[i][0]&0x80) ) continue;
-			const u32 wav = channel[i][6] & 7;
+			const u32 wav = channel[i][6] & 15; // 7; // bottom 4 instead of bottom 3 from STS
 			if( wav > 4 ) continue;
 			L += wavram[wav*32 + chanpos[i]] * (channel[i][1]>>4);
 			R += wavram[wav*32 + chanpos[i]] * (channel[i][1]&15);
 		}
-		float LF = (L / float(0x7ff)) * 2 - 1;
-		float RF = (R / float(0x7ff)) * 2 - 1;
+		float LF = (L / float(0xfff)) * 2 - 1;
+		float RF = (R / float(0xfff)) * 2 - 1;
 		audio_add(LF, RF);
 	}
 }

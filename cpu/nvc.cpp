@@ -69,6 +69,7 @@ void nvc::exec(u16 iw)
 		break;		
 	case 0x06: // jmp reg1
 		pc = r[reg1] & ~1;
+		icyc = 3;
 		break;
 	case 0x07: // SAR r2, r1
 		temp = r[reg1]&0x1f;
@@ -89,6 +90,7 @@ void nvc::exec(u16 iw)
 		r[reg2] = A;
 		setsz(r[reg2]);
 		setov(A != (s64)s32(r[reg2]));
+		icyc = 13;
 		}break;
 	case 0x09: // DIV (signed)  //todo: div-zero exception
 		if( r[reg2] == 0x80000000u && r[reg1] == 0xffffFFFFu )
@@ -101,6 +103,7 @@ void nvc::exec(u16 iw)
 			r[reg2] = s32(r[reg2]) / s32(r[reg1]);
 		}
 		setsz(r[reg2]);
+		icyc = 38;
 		break;
 	case 0x0A:{ // MULU (unsigned)
 		u64 A = r[reg2];
@@ -109,12 +112,14 @@ void nvc::exec(u16 iw)
 		r[reg2] = A;
 		setsz(r[reg2]);
 		setov(A != u64(r[reg2]));
+		icyc = 13;
 		}break;	
 	case 0x0B: // DIVU (unsigned) //todo: div-zero exception
 		r[30] = r[reg2] % r[reg1];
 		r[reg2] /= r[reg1];
 		setsz(r[reg2]);
-		setov(0);	
+		setov(0);
+		icyc = 36;
 		break;
 	case 0x0C: // OR r2, r1
 		r[reg2] |= r[reg1]; 
@@ -172,6 +177,7 @@ void nvc::exec(u16 iw)
 		break;
 	case 0x16: // CLI
 		PSW &= ~BIT(12);
+		icyc = 12;
 		break;
 	case 0x17: // SAR r2, imm5
 		if( sa )
@@ -193,6 +199,7 @@ void nvc::exec(u16 iw)
 			pc =  sys[0];
 			PSW = sys[1];
 		}
+		icyc = 10;
 		break;
 	case 0x1A: // HALT
 		halted = true;
@@ -200,12 +207,15 @@ void nvc::exec(u16 iw)
 	
 	case 0x1C: // LDSR sr1, r2
 		set_sysreg(reg1, r[reg2]);
+		icyc = 8;
 		break;
 	case 0x1D: // STSR r2, sr1
 		r[reg2] = get_sysreg(reg1);
+		icyc = 8;
 		break;
 	case 0x1E: // SEI
 		PSW |= BIT(12);
+		icyc = 12;
 		break;
 		
 	case 0x28: // MOVEA r2, r1, simm16
@@ -219,6 +229,7 @@ void nvc::exec(u16 iw)
 		if( iw & BIT(9) ) iw |= ~0x3ff;
 		temp = ((iw<<16)|imm16()) & ~1;
 		pc += temp - 4;
+		icyc = 3;
 		break;
 	case 0x2B: // JAL rel26
 		r[31] = pc + 2;
@@ -226,6 +237,7 @@ void nvc::exec(u16 iw)
 		if( iw & BIT(9) ) iw |= ~0x3ff;
 		temp = ((iw<<16)|imm16()) & ~1;
 		pc += temp - 4;
+		icyc = 3;
 		break;
 	case 0x2C: // ORI
 		r[reg2] = r[reg1] | imm16();
@@ -294,14 +306,14 @@ void nvc::exec_fp(const u32 reg2, const u32 reg1, u16 iw)
 	{
 	case 0b000000: icyc = 8; { float temp = f(reg2) - f(reg1); u32 t = 0; memcpy(&t, &temp, 4); setsz(t); setcy(PSW&2); setov(0); break; }
 	
-	case 0b000100: f(reg2, f(reg2) + f(reg1)); setsz(r[reg2]); setov(0); setcy(PSW&2); break;
-	case 0b000101: f(reg2, f(reg2) - f(reg1)); setsz(r[reg2]); setov(0); setcy(PSW&2); break;
-	case 0b000110: f(reg2, f(reg2) * f(reg1)); setsz(r[reg2]); setov(0); setcy(PSW&2); break;
-	case 0b000111: f(reg2, f(reg2) / f(reg1)); setsz(r[reg2]); setov(0); setcy(PSW&2); icyc = 44; break;
+	case 0b000100: icyc = 15; f(reg2, f(reg2) + f(reg1)); setsz(r[reg2]); setov(0); setcy(PSW&2); break;
+	case 0b000101: icyc = 15; f(reg2, f(reg2) - f(reg1)); setsz(r[reg2]); setov(0); setcy(PSW&2); break;
+	case 0b000110: icyc = 15; f(reg2, f(reg2) * f(reg1)); setsz(r[reg2]); setov(0); setcy(PSW&2); break;
+	case 0b000111: icyc = 15; f(reg2, f(reg2) / f(reg1)); setsz(r[reg2]); setov(0); setcy(PSW&2); icyc = 44; break;
 	
-	case 0b000010: f(reg2, s32(r[reg1]) ); setsz(r[reg2]); setov(0); setcy(PSW&2); break;
-	case 0b000011: r[reg2] = lround( f(reg1) ); setsz(r[reg2]); setov(0); break;
-	case 0b001011: r[reg2] = s32( f(reg1) ); setsz(r[reg2]); setov(0); break;
+	case 0b000010: icyc = 10; f(reg2, s32(r[reg1]) ); setsz(r[reg2]); setov(0); setcy(PSW&2); break;
+	case 0b000011: icyc = 10; r[reg2] = lround( f(reg1) ); setsz(r[reg2]); setov(0); break;
+	case 0b001011: icyc = 12; r[reg2] = s32( f(reg1) ); setsz(r[reg2]); setov(0); break;
 	
 	
 	case 0b001100: icyc = 9; r[reg2] *= ((r[reg1]&0x10000)?(r[reg1]|~0x1ffff):(r[reg1]&0x1ffff)); break;
