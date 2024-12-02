@@ -100,8 +100,7 @@ u32 virtualboy::read(u32 addr, int sz)
 	}
 	if( addr >= 0x01000000 )
 	{
-		addr &= 0x7ff;
-		return 0; //sound reads undefined?
+		return 0; //todo: sound
 	}
 	
 	// under this line is all VIP
@@ -136,10 +135,23 @@ u32 virtualboy::read(u32 addr, int sz)
 	}
 	if( addr == 0x5F840 ) return rotit = std::rotr(rotit, 1);
 	
-	if( addr == 0x5F848 ) return objctrl[0];
-	if( addr == 0x5F84A ) return objctrl[1];
-	if( addr == 0x5F84C ) return objctrl[2];
-	if( addr == 0x5F84E ) return objctrl[3];
+	if( addr == 0x5F848 )
+	{
+		return objctrl[0];
+	}
+	if( addr == 0x5F84A )
+	{
+		return objctrl[1];
+	}
+	if( addr == 0x5F84C )
+	{
+		return objctrl[2];
+	}
+	if( addr == 0x5F84E )
+	{
+		return objctrl[3];
+	}
+	if( addr == 0x5F844 ) return 2;
 	
 	if( addr == 0x5F860 ) return bgpal[0];
 	if( addr == 0x5F862 ) return bgpal[1];
@@ -149,8 +161,6 @@ u32 virtualboy::read(u32 addr, int sz)
 	if( addr == 0x5F86A ) return objpal[1];
 	if( addr == 0x5F86C ) return objpal[2];
 	if( addr == 0x5F86E ) return objpal[3];
-
-	if( addr == 0x5F844 ) return 2;
 	return 0;
 }
 
@@ -188,33 +198,7 @@ void virtualboy::write(u32 addr, u32 v, int sz)
 	}
 	if( addr >= 0x01000000 )
 	{
-		addr &= 0x7ff;
-		if( addr < 0x280 )
-		{
-			addr >>= 2;
-			wavram[addr] = v;
-			return;
-		}
-		if( addr < 0x300 )
-		{
-			addr >>= 2;
-			modram[addr] = v;
-			return;
-		}
-		if( addr < 0x400 ) return; // some unused space
-		if( addr == 0x580 )
-		{
-			if( !(v&1) ) return;
-			// the stop-everything port
-			for(u32 i = 0; i < 6; ++i) channel[i][0] = 0;			
-			return;
-		}
-		const u32 chan = (addr>>6)&7;
-		if( chan > 5 ) return;
-		const u32 reg = (addr>>2)&15;
-		if( reg & 8 ) return;
-		channel[chan][reg] = v;
-		return;
+		return; //todo: snd
 	}
 	// under this line is all VIP
 	addr &= 0x7FFFF;
@@ -268,6 +252,15 @@ void virtualboy::write(u32 addr, u32 v, int sz)
 		objctrl[3] = v;
 		return;
 	}
+	
+	if( addr == 0x5F860 ) { bgpal[0] = v; return; }
+	if( addr == 0x5F862 ) { bgpal[1] = v; return; }
+	if( addr == 0x5F864 ) { bgpal[2] = v; return; }
+	if( addr == 0x5F866 ) { bgpal[3] = v; return; }
+	if( addr == 0x5F868 ) { objpal[0] = v; return; }
+	if( addr == 0x5F86A ) { objpal[1] = v; return; }
+	if( addr == 0x5F86C ) { objpal[2] = v; return; }
+	if( addr == 0x5F86E ) { objpal[3] = v; return; }
 
 	if( addr == 0x5F822 )
 	{
@@ -281,17 +274,7 @@ void virtualboy::write(u32 addr, u32 v, int sz)
 		v &= (BIT(1)|BIT(8)|BIT(9)|BIT(10));
 		DPSTTS |= v;
 		return;
-	}
-	
-	if( addr == 0x5F860 ) { bgpal[0] = v; return; }
-	if( addr == 0x5F862 ) { bgpal[1] = v; return; }
-	if( addr == 0x5F864 ) { bgpal[2] = v; return; }
-	if( addr == 0x5F866 ) { bgpal[3] = v; return; }
-	if( addr == 0x5F868 ) { objpal[0] = v; return; }
-	if( addr == 0x5F86A ) { objpal[1] = v; return; }
-	if( addr == 0x5F86C ) { objpal[2] = v; return; }
-	if( addr == 0x5F86E ) { objpal[3] = v; return; }
-
+	}	
 }
 
 void virtualboy::step()
@@ -299,36 +282,6 @@ void virtualboy::step()
 	if( INTPND & INTENB ) cpu.irq(4, 0xFE40, 0xffffFE40);
 	u64 cc = cpu.step();
 	stamp += cc;
-	
-/*	for(u32 i = 0; i < 6; ++i)
-	{
-		if( !(channel[i][0] & BIT(7)) ) continue;
-		chancycles[i] += cc;
-		u32 upper = ((channel[i][3]&7)<<8)|channel[i][2];
-		upper *= ( (i==5) ? 40 : 4 );
-		if( chancycles[i] >= upper )
-		{
-			chancycles[i] -= upper;
-			chanpos[i] += 1;
-			chanpos[i] &= 31;			
-		}
-	}
-	
-	sample_cycles += cc;
-	if( sample_cycles >= 453 )
-	{
-		sample_cycles -= 453;
-		u16 L=0, R=0;
-		for(u32 i = 0; i < 6; ++i)
-		{
-			if( !(channel[i][0] & BIT(7)) ) continue;
-			if( (channel[i][6] & 7) > 5 ) continue;
-			const u32 wav = (channel[i][6] & 7) * 32;
-			L += wavram[wav + chanpos[i]] * ((channel[i][1]>>4)/15.f);
-			R += wavram[wav + chanpos[i]] * ((channel[i][1]&0xf)/15.f);
-		}
-		audio_add(L, R);
-	}*/
 }
 
 #define FCLK 0x80
@@ -410,26 +363,25 @@ void virtualboy::run_frame()
 		if( attr[0] & BIT(6) ) break;
 		if( (attr[0]&0xc000) == 0 ) continue;
 		const u32 BGM = ((attr[0]>>12)&3);
-		if( BGM == 2 ) 
-		{
-			draw_affine_bg(attr);
-			continue;
-		}
 		if( BGM == 3 ) 
-		{
+		{ 
 			//printf("world %i is sprites\n", world); 
 			draw_obj_group(objgroup); 
 			objgroup = (objgroup-1)&3; 
 			continue; 
 		}
 		if( BGM == 0 )
-		{ //todo: make h-bias worlds a bool param to draw_normal_bg
+		{
 			draw_normal_bg(attr);
+			continue;		
+		}
+		if( BGM == 2 )
+		{
+			draw_affine_bg(attr);
 			continue;		
 		}
 	}
 }
-
 void virtualboy::draw_normal_bg(u16* attr)
 {
 	u16* map =(u16*) &vram[0x20000 + 0x2000*(attr[0]&15)];
@@ -613,7 +565,6 @@ void virtualboy::draw_affine_bg(u16* attr)
 	}
 }
 
-
 void virtualboy::draw_obj_group(u32 group)
 {
 	u32 start_index = 0;
@@ -645,21 +596,21 @@ void virtualboy::draw_sprite(u32 index)
 	
 	for(u32 y = 0; y < 8 && JY+y < 224; ++y)
 	{
-		const u16 v = td[( ( attr[3] & BIT(12) ) ? (y^7) : y )];
+		const u8 Y = ( ( attr[3] & BIT(12) ) ? (y^7) : y );
+		const u16 v = td[Y];
 		
 		for(u32 x = 0; x < 8; ++x)
 		{
 			const u8 X = ( (attr[3] & BIT(13)) ? (x^7) : x );
 			const u32 px = (v >> (X*2))&3;
 			if( !px ) continue;
-			u32 pal = (objpal[attr[3]>>14] >> (px*2))&3;
 			if( attr[1]&0x8000 )
 			{ // left
-				set_fb_pixel(0, (JX-JP)+x, JY+y, pal);			
+				set_fb_pixel(0, (JX-JP)+x, JY+y, px);			
 			}
 			if( attr[1]&0x4000 )
 			{ // right
-				set_fb_pixel(1, (JX+JP)+x, JY+y, pal);	
+				set_fb_pixel(1, (JX+JP)+x, JY+y, px);	
 			}
 		}		
 	}
@@ -698,12 +649,7 @@ void virtualboy::reset()
 	INTPND = INTENB = 0;
 	DPSTTS = 0;
 	which_buffer = 0;
-	frame_divider = sample_cycles = 0;
-	for(u32 i = 0; i < 6; ++i) { chancycles[i] = 0; channel[i][0] = 0; }
+	frame_divider = 0;
 	for(u32 i = 0; i < 256*1024; ++i) vram[i] = 0;
-}
-
-virtualboy::~virtualboy()
-{
 }
 
