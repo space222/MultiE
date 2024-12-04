@@ -10,10 +10,10 @@ Framework Todo List
 Virtual Boy Todo List
 ------------------------
 1. Finish at least hw-read controller input and document default key bindings (vb controller has a lot of buttons for the time)
-2. Timer
-3. Sound: envelopes, noise channel, channel 5 sweep/modulation
-4. CPU Bitstring instructions
-5. World layers that use more than one background
+2. Sound: envelopes, noise channel, channel 5 sweep/modulation
+3. CPU Bitstring instructions
+4. World layers that use more than one background
+5. Red Alarm crashes the emulator. Will need to gdb it up.
 Questions: 
 Do FRAMESTART/LFBEND/RFBEND irqs correspond to 0ms/FCLK-hi,8ms/left finish,18ms/right finish?
 Are only 1 of DPBSY active at a time and only between (3, 8) and (13, 18) ms?
