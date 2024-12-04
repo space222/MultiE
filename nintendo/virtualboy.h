@@ -45,6 +45,11 @@ public:
 	u32 sample_cycles;
 	void snd_clock(u64);
 	
+	u8 timer_ctrl;
+	u16 timer_reload, timer_value;
+	u32 timer_cycles;
+	bool timer_irq;
+	
 	u32 frame_divider;
 	
 	std::vector<u8> ROM;	

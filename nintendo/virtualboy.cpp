@@ -17,12 +17,33 @@ static void sized_write(u8* data, u32 addr, u32 v, int sz)
 
 void virtualboy::write_miscio(u32 addr, u32 v, int sz)
 {
+	if( addr == 0x02000018 ) 
+	{ 
+		timer_reload &= 0xff00; timer_reload |= v&0xff; 
+		timer_value = timer_reload; 
+		timer_cycles = 0; 
+		return; 
+	}
+	if( addr == 0x0200001C ) 
+	{ 
+		timer_reload &= 0x00ff; timer_reload |= (v&0xff)<<8; 
+		timer_value = timer_reload; 
+		timer_cycles = 0;
+		return;
+	}
+
 	if( addr == 0x02000020 )
 	{
-		if( (v & 9) == 9 ) 
+		timer_ctrl &= ~BIT(1);
+		timer_ctrl |= v&~BIT(1);
+		if( timer_ctrl & BIT(2) )
 		{
-			printf("Timer control write = $%X\n", v);
-			//exit(1);
+			timer_irq = false;
+			timer_ctrl &= ~6;
+		}
+		if( !(timer_ctrl & BIT(3)) )
+		{
+			timer_irq = false;
 		}
 		return;
 	}
@@ -48,14 +69,11 @@ void virtualboy::write_miscio(u32 addr, u32 v, int sz)
 
 u32 virtualboy::read_miscio(u32 addr, int sz)
 {
-	if( addr == 0x02000010 ) 
-	{
-		return padkeys&0xff;
-	}
-	if( addr == 0x02000014 ) 
-	{
-		return padkeys>>8;
-	}
+	if( addr == 0x02000010 ) return padkeys&0xff;
+	if( addr == 0x02000014 ) return padkeys>>8;
+	if( addr == 0x02000018 ) return timer_value&0xff;
+	if( addr == 0x0200001C ) return timer_value>>8;
+	if( addr == 0x02000020 ) return timer_ctrl;
 	if( addr == 0x02000028 ) return 0;
 	printf("IO Read%i <$%X\n", sz, addr);
 	return 0;
@@ -317,11 +335,38 @@ void virtualboy::write(u32 addr, u32 v, int sz)
 
 void virtualboy::step()
 {
-	if( INTPND & INTENB ) cpu.irq(4, 0xFE40, 0xffffFE40);
+	if( INTPND & INTENB ) 
+	{
+		cpu.irq(4, 0xFE40, 0xffffFE40);
+	}
+	if( timer_irq )
+	{
+		cpu.irq(1, 0xFE10, 0xffffFE10);
+	}
 	u64 cc = cpu.step();
 	stamp += cc;
 	
 	snd_clock(cc);
+	
+	if( timer_ctrl & 1 )
+	{
+		timer_cycles += cc;
+		const u32 timer_interval = ( (timer_ctrl&BIT(4)) ? 400 : 2000 );
+		if( timer_cycles >= timer_interval )
+		{
+			timer_cycles -= timer_interval;
+			timer_value -= 1;
+			if( timer_value == 0 )
+			{
+				timer_ctrl |= BIT(1);
+				if( timer_ctrl & BIT(3) )
+				{
+					timer_irq = true;				
+				}
+				timer_value = timer_reload;		
+			}			
+		}
+	}
 }
 
 #define FCLK 0x80
@@ -684,6 +729,11 @@ void virtualboy::reset()
 	DPSTTS = 0;
 	which_buffer = 0;
 	frame_divider = 0;
+	
+	timer_ctrl = 0;
+	timer_value = 0xffff;
+	timer_reload = 0;
+	timer_irq = false;
 	for(u32 i = 0; i < 256*1024; ++i) vram[i] = 0;
 }
 
