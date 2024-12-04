@@ -53,14 +53,21 @@ void virtualboy::write_miscio(u32 addr, u32 v, int sz)
 		{
 			auto keys = SDL_GetKeyboardState(nullptr);
 			padkeys = 2;
-			if( keys[SDL_SCANCODE_Z] ) padkeys ^= BIT(2);
-			if( keys[SDL_SCANCODE_X] ) padkeys ^= BIT(3);
-			if( keys[SDL_SCANCODE_RIGHT] ) padkeys ^= BIT(8);
-			if( keys[SDL_SCANCODE_LEFT] ) padkeys ^= BIT(9);
-			if( keys[SDL_SCANCODE_DOWN] ) padkeys ^= BIT(10);
-			if( keys[SDL_SCANCODE_UP] ) padkeys ^= BIT(11);
-			if( keys[SDL_SCANCODE_S] ) padkeys ^= BIT(12);
-			if( keys[SDL_SCANCODE_A] ) padkeys ^= BIT(13);
+			if( keys[SDL_SCANCODE_Z] ) padkeys ^= BIT(2);     // A
+			if( keys[SDL_SCANCODE_X] ) padkeys ^= BIT(3);	  // B
+			if( keys[SDL_SCANCODE_RIGHT] ) padkeys ^= BIT(8); // LRight
+			if( keys[SDL_SCANCODE_LEFT] ) padkeys ^= BIT(9);  // LLeft
+			if( keys[SDL_SCANCODE_DOWN] ) padkeys ^= BIT(10); // LDown
+			if( keys[SDL_SCANCODE_UP] ) padkeys ^= BIT(11);   // LUp
+			if( keys[SDL_SCANCODE_S] ) padkeys ^= BIT(12);    // Start
+			if( keys[SDL_SCANCODE_A] ) padkeys ^= BIT(13);    // Select
+			if( keys[SDL_SCANCODE_R] ) padkeys ^= BIT(5);     // LT
+			if( keys[SDL_SCANCODE_Y] ) padkeys ^= BIT(4);     // RT
+			
+			if( keys[SDL_SCANCODE_T] ) padkeys ^= BIT(6);     // RUp
+			if( keys[SDL_SCANCODE_G] ) padkeys ^= BIT(15);     // RDown
+			if( keys[SDL_SCANCODE_F] ) padkeys ^= BIT(14);     // RLeft
+			if( keys[SDL_SCANCODE_H] ) padkeys ^= BIT(7);     // RRight
 		}
 		return;
 	}

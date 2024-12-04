@@ -9,11 +9,11 @@ Framework Todo List
 
 Virtual Boy Todo List
 ------------------------
-1. Finish at least hw-read controller input and document default key bindings (vb controller has a lot of buttons for the time)
+1. CPU Bitstring instructions
 2. Sound: envelopes, noise channel, channel 5 sweep/modulation
-3. CPU Bitstring instructions
-4. World layers that use more than one background
-5. Red Alarm crashes the emulator. Will need to gdb it up.
+3. World layers that use more than one background
+4. Red Alarm crashes the emulator. Will need to gdb it up.
+5. Software controller clocking
 Questions: 
 Do FRAMESTART/LFBEND/RFBEND irqs correspond to 0ms/FCLK-hi,8ms/left finish,18ms/right finish?
 Are only 1 of DPBSY active at a time and only between (3, 8) and (13, 18) ms?
@@ -23,6 +23,7 @@ current when drawing was disabled?
 Notes:
 1 cpu cycle = 0.05 microseconds
 Mario Tennis match setup screen differs between "some" and "all" garbage between runs.
+See the source code for the current key mapping. SDLJoystick not yet supported for Virtual Boy.
 
 
 
