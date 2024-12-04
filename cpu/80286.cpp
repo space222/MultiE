@@ -439,7 +439,7 @@ u64 c80286::step()
 	case 0x5F:
 		r[opc&7].v = pop();
 		break;		
-	case 0x60:
+	//case 0x60:
 	case 0x70:
 		temp8 = read_next();
 		if( F.b.O )
@@ -447,7 +447,7 @@ u64 c80286::step()
 			IP += (s8)temp8;
 		}
 		break;
-	case 0x61:
+	//case 0x61:
 	case 0x71:
 		temp8 = read_next();
 		if( F.b.O == 0 )
@@ -455,7 +455,7 @@ u64 c80286::step()
 			IP += (s8)temp8;
 		}
 		break;
-	case 0x62:
+	//case 0x62:
 	case 0x72:
 		temp8 = read_next();
 		if( F.b.C )
@@ -463,7 +463,7 @@ u64 c80286::step()
 			IP += (s8)temp8;
 		}
 		break;
-	case 0x63:
+	//case 0x63:
 	case 0x73:
 		temp8 = read_next();
 		if( F.b.C == 0 )
@@ -471,7 +471,7 @@ u64 c80286::step()
 			IP += (s8)temp8;
 		}
 		break;
-	case 0x64:
+	//case 0x64:
 	case 0x74:
 		temp8 = read_next();
 		if( F.b.Z == 1 )
@@ -479,7 +479,7 @@ u64 c80286::step()
 			IP += (s8)temp8;
 		}
 		break;	
-	case 0x65:
+	//case 0x65:
 	case 0x75:
 		temp8 = read_next();
 		if( F.b.Z == 0 )
@@ -487,7 +487,7 @@ u64 c80286::step()
 			IP += (s8)temp8;
 		}
 		break;		
-	case 0x66:
+	//case 0x66:
 	case 0x76:
 		temp8 = read_next();
 		if( F.b.Z || F.b.C )
@@ -495,7 +495,7 @@ u64 c80286::step()
 			IP += (s8)temp8;
 		}
 		break;
-	case 0x67:
+	//case 0x67:
 	case 0x77:
 		temp8 = read_next();
 		if( !F.b.Z && !F.b.C )
@@ -504,6 +504,9 @@ u64 c80286::step()
 		}
 		break;
 	case 0x68:
+		push(read16(CS, IP));
+		IP+=2;
+		break;
 	case 0x78:
 		temp8 = read_next();
 		if( F.b.S )
@@ -511,7 +514,7 @@ u64 c80286::step()
 			IP += (s8)temp8;
 		}
 		break;
-	case 0x69:
+	//case 0x69:
 	case 0x79:
 		temp8 = read_next();
 		if( F.b.S == 0 )
@@ -519,7 +522,7 @@ u64 c80286::step()
 			IP += (s8)temp8;
 		}
 		break;
-	case 0x6A:
+	//case 0x6A:
 	case 0x7A:
 		temp8 = read_next();
 		if( F.b.P )
@@ -527,7 +530,7 @@ u64 c80286::step()
 			IP += (s8)temp8;
 		}
 		break;
-	case 0x6B:
+	//case 0x6B:
 	case 0x7B:
 		temp8 = read_next();
 		if( F.b.P == 0 )
@@ -535,7 +538,7 @@ u64 c80286::step()
 			IP += (s8)temp8;
 		}
 		break;
-	case 0x6C:
+	//case 0x6C:
 	case 0x7C:
 		temp8 = read_next();
 		if( F.b.S != F.b.O )
@@ -543,7 +546,7 @@ u64 c80286::step()
 			IP += (s8)temp8;
 		}
 		break;
-	case 0x6D:
+	//case 0x6D:
 	case 0x7D:
 		temp8 = read_next();
 		if( F.b.S == F.b.O )
@@ -551,7 +554,7 @@ u64 c80286::step()
 			IP += (s8)temp8;
 		}
 		break;
-	case 0x6E:
+	//case 0x6E:
 	case 0x7E:
 		temp8 = read_next();
 		if( F.b.Z || (F.b.S != F.b.O) )
@@ -559,7 +562,7 @@ u64 c80286::step()
 			IP += (s8)temp8;
 		}
 		break;
-	case 0x6F:
+	//case 0x6F:
 	case 0x7F:
 		temp8 = read_next();
 		if( F.b.Z==0 && (F.b.S == F.b.O) )
@@ -1418,7 +1421,7 @@ u64 c80286::step()
 		break;
 	case 0xE7:
 		temp8 = read_next();
-		port_out(temp8, AX, 8);
+		port_out(temp8, AX, 16);
 		break;
 	case 0xE8:
 		temp16 = read_next16();

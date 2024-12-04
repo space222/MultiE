@@ -38,6 +38,7 @@
 #include "fc_chanf.h"
 #include "gba.h"
 #include "virtualboy.h"
+#include "WonderSwan.h"
 void try_kirq();
 
 namespace fs = std::filesystem;
@@ -473,6 +474,22 @@ void imgui_run()
 			}
 			if( ImGui::BeginMenu("Experimental") ) 
 			{
+				if( ImGui::MenuItem("Bandai WonderSwan") )
+				{
+					std::string f = getOpenFile("WonderSwan");
+					if( !f.empty() )
+					{
+						delete sys;
+						sys = new WonderSwan;
+						if( ! sys->loadROM(f) ) 
+						{
+							printf("unable to load ROM\n");
+							exit(1);
+						}
+						else newinstance = true;
+						crt_scale = 3;
+					}				
+				}
 				if( ImGui::MenuItem("Nintendo GBA") )
 				{
 					std::string f = getOpenFile("GBA");

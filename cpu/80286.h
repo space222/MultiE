@@ -1,12 +1,13 @@
 #pragma once
 #include <concepts>
 #include <bit>
+#include <functional>
 #include "itypes.h"
 
-typedef void (*c80286_writer)(u32 addr, u8 val);
-typedef u8 (*c80286_reader)(u32 addr);
-typedef void (*c80286_port_out)(u16, u16, int);
-typedef u16 (*c80286_port_in)(u16, int);
+//typedef void (*c80286_writer)(u32 addr, u8 val);
+//typedef u8 (*c80286_reader)(u32 addr);
+//typedef void (*c80286_port_out)(u16, u16, int);
+//typedef u16 (*c80286_port_in)(u16, int);
 
 union mreg86
 {
@@ -96,10 +97,14 @@ public:
 	
 	u8 seg_override(u8 index);
 	
-	c80286_reader read;
-	c80286_writer write;
-	c80286_port_out port_out;
-	c80286_port_in port_in;
+	//c80286_reader read;
+	//c80286_writer write;
+	//c80286_port_out port_out;
+	//c80286_port_in port_in;
+	std::function<u8(u32)> read;
+	std::function<void(u32,u8)> write;
+	std::function<void(u16,u16,int)> port_out;
+	std::function<u16(u16,int)> port_in;
 	
 	struct {
 		u8 irr, isr, imr;
