@@ -22,6 +22,8 @@ public:
 	u8 bios[2048];
 	u8 ram[0x400];
 	
+	u64 stamp, last_target, sample_cycles;
+	
 	c6502 cpu;
 	TMS9918A vdp;
 	SN79489 psg;

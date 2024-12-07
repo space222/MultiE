@@ -41,8 +41,35 @@ u8 CreatiVision::read(u16 addr)
 
 void CreatiVision::run_frame()
 {
-	for(u32 i = 0; i < 1500; ++i) cpu.step();
-	for(u32 i = 0; i < fb_height(); ++i) vdp.draw_scanline(i);
+	for(u32 line = 0; line < 262; ++line)
+	{
+		//set_vcount(line);	
+		u64 target = last_target + 128;
+		while( stamp < target )
+		{
+			cpu.step();
+			stamp += 1;
+			u8 snd = psg.clock(1);
+			/*sample_cycles += c;
+			if( sample_cycles >= 45 )
+			{
+				sample_cycles -= 45;
+				float sm = ((snd/45.f)*2 - 1);
+				audio_add(sm,sm);
+			}*/
+		}
+		last_target = target;
+		if( line < 192 )
+		{
+			vdp.draw_scanline(line);
+		} else if( line == 192 ) {
+			vdp.vdp_ctrl_stat |= 0x80;
+			if( (vdp.vdp_regs[1] & BIT(5)) )
+			{
+				//cpu.irq_line = 1;			
+			}
+		}
+	}
 }
 
 void CreatiVision::reset()
@@ -52,6 +79,8 @@ void CreatiVision::reset()
 	cpu.reset();
 	vdp.reset();
 	psg.reset();
+	
+	stamp = last_target = sample_cycles = 0;
 }
 
 bool CreatiVision::loadROM(const std::string fname)
