@@ -135,6 +135,7 @@ void TMS9918A::data(u8 v)
 	rdbuf = v;
 	if( vdp_cd == 1 || vdp_cd == 0 ) 
 	{
+		//printf("vdp: $%X = $%X\n", vdp_addr, v);
 		vram[vdp_addr&0x3fff] = v;	
 		vdp_addr++;
 	}

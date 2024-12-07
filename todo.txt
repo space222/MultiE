@@ -13,7 +13,7 @@ Virtual Boy Todo List
 2. Sound: envelopes, noise channel, channel 5 sweep/modulation
 3. World layers that use more than one background
 4. Red Alarm crashes the emulator. Will need to gdb it up.
-5. Software controller clocking
+5. Software controller clocking ((almost?) everything uses the hw controller read function)
 Questions: 
 Do FRAMESTART/LFBEND/RFBEND irqs correspond to 0ms/FCLK-hi,8ms/left finish,18ms/right finish?
 Are only 1 of DPBSY active at a time and only between (3, 8) and (13, 18) ms?

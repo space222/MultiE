@@ -14,8 +14,8 @@ public:
 	
 	void ctrl(u8 v);
 	void data(u8 v);
-	u8 read();
-	u8 stat();
+	u8 read() { return 0; } // todo
+	u8 stat() { return 0; } // todo
 	
 	void reset() { memset(vdp_regs, 0, 8); vdp_ctrl_latch = false; }
 	

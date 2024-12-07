@@ -39,6 +39,7 @@
 #include "gba.h"
 #include "virtualboy.h"
 #include "WonderSwan.h"
+#include "CreatiVision.h"
 void try_kirq();
 
 namespace fs = std::filesystem;
@@ -474,6 +475,22 @@ void imgui_run()
 			}
 			if( ImGui::BeginMenu("Experimental") ) 
 			{
+				if( ImGui::MenuItem("V.Tech CreatiVision") )
+				{
+					std::string f = getOpenFile("CreatiVision");
+					if( !f.empty() )
+					{
+						delete sys;
+						sys = new CreatiVision;
+						if( ! sys->loadROM(f) ) 
+						{
+							printf("unable to load ROM\n");
+							exit(1);
+						}
+						else newinstance = true;
+						crt_scale = 3;
+					}				
+				}
 				if( ImGui::MenuItem("Bandai WonderSwan") )
 				{
 					std::string f = getOpenFile("WonderSwan");
