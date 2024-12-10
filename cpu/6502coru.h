@@ -61,7 +61,7 @@ struct coru6502
 
 	std::function<u8(coru6502&, u32)> reader;
 	std::function<void(coru6502&, u32, u8)> writer;
-	u32 cpu_type = ENABLE_65C02;
+	u32 cpu_type = DISABLE_DECIMAL;
 	
 	//todo: HuC6280 MMU regs
 	u8 read(u16 addr) 

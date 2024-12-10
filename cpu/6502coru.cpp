@@ -81,8 +81,9 @@ Yieldable coru6502::run()
 			break;
 			
 		case 0x24: // bit zp
-			temp = read(pc++);
+			t = read(pc++);
 			CYCLE;
+			temp = read(t);
 			F.b.Z = (((temp&a)==0)?1:0);
 			F.b.N = temp>>7;
 			F.b.V = (temp>>6)&1;
