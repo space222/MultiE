@@ -18,7 +18,8 @@ void nes::run_frame()
 {
 	while( !frame_complete )
 	{
-		cpu.step();
+		//cpu.step();
+		cycle();
 		apu_clock();
 		ppu_dot();
 		ppu_dot();
@@ -26,7 +27,7 @@ void nes::run_frame()
 		if( isFDS ) 
 		{	
 			fds_clock();
-			cpu.irq_assert = (fds_timer_irq || fds_disk_irq);
+			cpu.irq_line = (fds_timer_irq || fds_disk_irq);
 		}
 	}
 	frame_complete = false;
@@ -243,12 +244,15 @@ bool nes::loadROM(std::string fname)
 	return true;
 }
 
-void nes_write(u16 addr, u8 val) { NES.write(addr,val); }
-u8 nes_read(u16 addr) { return NES.read(addr); }
+//void nes_write(u16 addr, u8 val) { NES.write(addr,val); }
+//u8 nes_read(u16 addr) { return NES.read(addr); }
+void nes_write(coru6502&, u16 addr, u8 val) { NES.write(addr,val); }
+u8 nes_read(coru6502&, u16 addr) { return NES.read(addr); }
 
 void nes::reset()
 {
-	cpu.reset();
+	//cpu.reset();
+	cycle = cpu.run();
 	for(int i = 0; i < 8; ++i) ppu_regs[i] = 0;
 	for(int i = 0; i < 0x20; ++i) ppu_palmem[i] = 0;
 	for(int i = 0; i < 0x100; ++i) OAM[i] = 0;
@@ -265,8 +269,8 @@ nes::nes()
 {
 	setVsync(false);
 	fbuf.resize(256*240);
-	cpu.read = nes_read;
-	cpu.write = nes_write;
+	cpu.reader = nes_read;
+	cpu.writer = nes_write;
 	pad1_index = pad2_index = pad_strobe = 0;
 }
 

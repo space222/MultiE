@@ -5,10 +5,9 @@ void CreatiVision::write(u16 addr, u8 v)
 {
 	if( addr < 0x400 ) { ram[addr] = v; return; }
 	if( addr == 0x1002 ) { psg.out(v); return; }
-
-	printf("CV:$%X: write $%X = $%X\n", cpu.PC, addr, v);
 	if( addr == 0x3000 ) { vdp.data(v); return; }
 	if( addr == 0x3001 ) { vdp.ctrl(v); return; }
+	printf("CV:$%X: write $%X = $%X\n", cpu.PC, addr, v);
 }
 
 u8 CreatiVision::read(u16 addr)
@@ -43,8 +42,7 @@ void CreatiVision::run_frame()
 {
 	for(u32 line = 0; line < 262; ++line)
 	{
-		//set_vcount(line);	
-		u64 target = last_target + 128;
+		u64 target = last_target + 128; // roughly 2'000'000 / 60 / 262
 		while( stamp < target )
 		{
 			cpu.step();
@@ -66,7 +64,7 @@ void CreatiVision::run_frame()
 			vdp.vdp_ctrl_stat |= 0x80;
 			if( (vdp.vdp_regs[1] & BIT(5)) )
 			{
-				//cpu.irq_line = 1;			
+				cpu.irq_assert = true;			
 			}
 		}
 	}

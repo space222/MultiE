@@ -161,7 +161,7 @@ void mapper_mmc3_write(nes* NES, u16 addr, u8 val)
 		{
 			mmc3_irq_enabled = true;
 		} else {
-			mmc3_irq_enabled = NES->cpu.irq_assert = false;
+			mmc3_irq_enabled = NES->cpu.irq_line = false;
 		}	
 	}
 	if( !need_rebank ) return;
@@ -209,7 +209,7 @@ void mapper_mmc3_ppu_bus(nes* NES, u16 addr)
 	
 	if( mmc3_irq_reload || mmc3_irq_cnt == 0 )
 	{
-		if( mmc3_irq_enabled && mmc3_irq_cnt == 0 ) NES->cpu.irq_assert = true;
+		if( mmc3_irq_enabled && mmc3_irq_cnt == 0 ) NES->cpu.irq_line = true;
 		//if( NES->scanline >= 2 )
 		//	for(int i = 0; i < 256; ++i) NES->fbuf[(NES->scanline-2)*256 + i] = 0x00ff000;
 		mmc3_irq_cnt = mmc3_irq_latch;

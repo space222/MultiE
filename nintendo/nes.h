@@ -1,7 +1,8 @@
 #pragma once
 #include <vector>
 #include "console.h"
-#include "6502.h"
+//#include "6502.h"
+#include "6502coru.h"
 
 class nes;
 
@@ -74,7 +75,10 @@ public:
 	u8* chrbanks[8];
 	u8* prgbanks[4];
 		
-	c6502 cpu;
+	//c6502 cpu;
+	coru6502 cpu;
+	Yieldable cycle;
+	
 	std::vector<u32> fbuf;
 	std::vector<u8> PRG;
 	std::vector<u8> CHR;

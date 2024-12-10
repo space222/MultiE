@@ -20,7 +20,7 @@ other/casio_pv1k.cpp sega/gen_pad.cpp Settings.cpp cpu/SH2.cpp sega/gen_32x.cpp 
 coleco/colecovision.cpp other/TMS9918A.cpp other/msx.cpp other/AY-3-8910.cpp
 other/macplus.cpp nintendo/nes_fds.cpp cpu/f8.cpp other/fc_chanf.cpp nintendo/gbc.cpp nintendo/gbc_apu.cpp
 nintendo/gba.cpp cpu/arm7tdmi.cpp cpu/arm7tdmi_arm.cpp cpu/nvc.cpp nintendo/virtualboy.cpp
-other/WonderSwan.cpp other/CreatiVision.cpp
+other/WonderSwan.cpp other/CreatiVision.cpp cpu/6502coru.cpp
 )
 
 add_library(ym3438 SHARED sega/ym3438.cpp)

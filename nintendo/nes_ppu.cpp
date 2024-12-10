@@ -295,7 +295,7 @@ void nes::ppu_dot()
 			return;
 		} else if( scanline == 241 ) {
 			PPUSTAT |= 0x80;
-			if( PPUCTRL & 0x80 ) cpu.nmi();
+			if( PPUCTRL & 0x80 ) cpu.nmi_line = true; //();
 			frame_complete = true;
 		} else if( scanline == 261 ) {
 			PPUSTAT = 0;

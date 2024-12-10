@@ -178,8 +178,23 @@ Status: Things boot and display text and take console-front-button-input.
 
 Bandai WonderSwan Todo List
 ------------------------------
-1. The 80286 is currently mostly a 8088/6 with a few 186 instructions. Need to go through and actually implement
-at least the 186 instructions for the WS boot rom to function (currently dies at fe187 as $C0 is a different instruction
+1. The 80286 is currently, mostly a 8088/6 with a few 186 instructions. Need to go through and actually implement
+at least the 186 instructions for the WS boot rom to function (currently dies at $fe187 as $C0 is a different instruction
 on the later cpu).
+
+
+
+V.Tech CreatiVision Todo List
+--------------------------------
+1. Figure out how creativision likes its vblank interrupts
+2. Input
+3. The psg possibly need its divider made customizable?
+4. TMS9918(a) sprites likely need work.
+Status: The one game I have runs until the 3 lives are used up as I don't have input yet.
+
+
+
+
+
 
 
