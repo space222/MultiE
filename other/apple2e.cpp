@@ -2,6 +2,18 @@
 
 void apple2e::key_down(int sc)
 {
+	if( sc == SDL_SCANCODE_F10 )
+	{
+		char* str = SDL_GetClipboardText();
+		paste = str;
+		SDL_free(str);
+		if( paste.empty() ) return;
+		key_last = paste[0];
+		if( key_last == '\n' ) key_last = '\r';
+		paste.erase(paste.begin());
+		key_strobe = 0x80;
+		return;
+	}
 	if( sc == SDL_SCANCODE_LSHIFT || sc == SDL_SCANCODE_LCTRL ) return;
 	if( key_strobe == 0 ) 
 	{
@@ -34,24 +46,48 @@ void apple2e::key_down(int sc)
 	key_strobe = 0x80;
 }
 
+void apple2e::drawtile(int px, int py, int c)
+{
+	c *= 8;
+	
+	for(int y = py; y < py+8; ++y)
+	{
+		u8 b = font[c+(y&7)];
+		for(int x = 1; x < 8; ++x)
+		{
+			u32 bit = 7^x;
+			fbuf[y*fb_width() + px + x] = (((b>>bit)&1)?0xffffff00 : 0);
+		}
+	}
+}
+
 void apple2e::run_frame()
 {
 	for(u32 i = 0; i < 17062; ++i)
 	{
 		cycle();
 	}
-	printf("\033[0;0H");
-	for(u32 y = 0; y < 24; ++y) 
+
+	for(u32 y = 0; y < 8; ++y) 
 	{
-		for(u32 x = 0; x < 40; ++x)
+		for(u32 x = 0; x < 40; ++x) 
 		{
-			u32 addr = 0;
-			if( y < 8 ) addr = 0x400+(y*128);
-			else if( y < 16 ) addr = 0x428+((y-8)*128);
-			else addr = 0x450+((y-16)*128);
-			putchar(ram[addr+x]&0x7f);
+			drawtile(x*7, y*8, ram[0x400+(y*128)+x]&0x7f);
 		}
-		putchar('\n');
+	}
+	for(u32 y = 0; y < 8; ++y) 
+	{
+		for(u32 x = 0; x < 40; ++x) 
+		{
+			drawtile(x*7, (y+8)*8, ram[0x428+(y*128)+x]&0x7f);
+		}
+	}
+	for(u32 y = 0; y < 8; ++y) 
+	{
+		for(u32 x = 0; x < 40; ++x) 
+		{
+			drawtile(x*7, (y+16)*8, ram[0x450+(y*128)+x]&0x7f);
+		}
 	}
 }
 
@@ -62,8 +98,7 @@ bool apple2e::loadROM(const std::string)
 	{
 		printf("Unable to load monitor\n");
 		return false;
-	}
-	
+	}	
 	[[maybe_unused]] int unu = fread(bios, 1, 2048, fp);
 	fclose(fp);
 	
@@ -73,8 +108,16 @@ bool apple2e::loadROM(const std::string)
 		printf("Unable to load applebasic.bin\n");
 		return false;
 	}
-	
 	unu = fread(basic, 1, 10*1024, fp);
+	fclose(fp);
+	
+	fp = fopen("./bios/apple2font.bin", "rb");
+	if(!fp)
+	{
+		printf("Unable to load apple2font.bin\n");
+		return false;
+	}
+	unu = fread(font, 1, 8*128, fp);
 	fclose(fp);
 	
 	return true;
@@ -88,7 +131,19 @@ u8 apple2e::read(coru6502&, u16 addr)
 		if( addr == 0xc000 ) return key_last|key_strobe;
 		if( addr == 0xc030 ) return 0;
 		printf("a2e:$%X: io <$%X\n", c6502.pc, addr);
-		if( addr == 0xc010 ) { key_strobe = 0; return 0; }
+		if( addr == 0xc010 ) 
+		{ 
+			if( paste.size() )
+			{
+				key_last = paste[0];
+				if( key_last == '\n' ) key_last = '\r';
+				paste.erase(paste.begin());
+				key_strobe = 0x80;
+				return 0;
+			}
+			key_strobe = 0; 
+			return 0;
+		}
 
 	}
 	if( addr < 0xf800 ) return basic[addr - 0xd000];
@@ -102,7 +157,19 @@ void apple2e::write(coru6502&, u16 addr, u8 v)
 	if( addr < 0xd000 ) 
 	{ //todo: io
 		printf("a2e: IO $%X = $%X\n", addr, v); 
-		if( addr == 0xc010 ) { key_strobe = 0; exit(1); return; }
+		if( addr == 0xc010 ) 
+		{
+			if( paste.size() )
+			{
+				key_last = paste[0];
+				if( key_last == '\n' ) key_last = '\r';
+				paste.erase(paste.begin());
+				key_strobe = 0x80;
+				return;
+			}
+			key_strobe = 0; 
+			return;
+		}
 	 	return; 
 	}
 }
@@ -113,9 +180,9 @@ void apple2e::reset()
 	c6502.writer = [&](coru6502& c, u16 a, u8 v) { this->write(c, a, v); };
 	c6502.cpu_type = CPU_65C02;
 	cycle = c6502.run();
-	//cycle();
-	//c6502.pc = 0xe000;
+	
 	for(u32 i = 0; i < 0x10000; ++i) ram[i] = 0xff;
+	for(u32 i = 0; i < fb_width()*fb_height(); ++i) fbuf[i] = 0;
 	key_last = ' ';
 	key_strobe = 0;
 }
