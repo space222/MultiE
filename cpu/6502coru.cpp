@@ -8,15 +8,15 @@
 #include "6502coru.h"
 
 #define CYCLE co_yield opc
-#define NEWCPU (cpu_type & (ENABLE_65C02|ENABLE_HuC6280))
+#define NEWCPU (cpu_type > CPU_6502)
 
 Yieldable coru6502::run()
 {
 	u16 temp = 0;
 	u8 t = 0;
-	F.v = 0;
+	F.v = 0x34;
 	irq_line = nmi_line = waiting = false;
-	if( cpu_type & ENABLE_HuC6280 )
+	if( cpu_type == CPU_HUC6280 )
 	{
 		pc = read(0xfffe);
 		pc |= read(0xffff)<<8;
@@ -27,13 +27,16 @@ Yieldable coru6502::run()
 	
 	while(true)
 	{
-		u8 opc = read(pc);
+		u8 I_FLAG = F.b.I;
+		u8 opc = 0;
+		
+	if( !waiting ) {
+		opc = read(pc);
 		pc += 1;
 		CYCLE;
 		u8 oldC = F.b.C;		
-		u8 I_FLAG = F.b.I;
-		const u8 T = ( (cpu_type&ENABLE_HuC6280) ? F.b.t : 0 );
-		F.b.t = (( cpu_type & ENABLE_HuC6280 ) ? 0 : 1);
+		const u8 T = ( (cpu_type==CPU_HUC6280) ? F.b.t : 0 );
+		F.b.t = (( cpu_type==CPU_HUC6280 ) ? 0 : 1);
 		
 		switch( opc )
 		{	
@@ -575,6 +578,7 @@ Yieldable coru6502::run()
 		case 0x69: // adc imm
 			a = add(a, read(pc++));
 			CYCLE;
+			if( NEWCPU && F.b.D ) CYCLE;
 			break;
 		case 0x65: // adc zp
 			temp = read(pc++);
@@ -582,6 +586,7 @@ Yieldable coru6502::run()
 			t = read(temp);
 			a = add(a, t);
 			CYCLE;
+			if( NEWCPU && F.b.D ) CYCLE;
 			break;
 		case 0x75: // adc zp, x
 			temp = read(pc++);
@@ -592,6 +597,7 @@ Yieldable coru6502::run()
 			t = read(temp);
 			a = add(a, t);
 			CYCLE;		
+			if( NEWCPU && F.b.D ) CYCLE;
 			break;
 		case 0x6D: // adc abs
 			temp = read(pc++);
@@ -601,6 +607,7 @@ Yieldable coru6502::run()
 			t = read(temp);
 			a = add(a, t);
 			CYCLE;		
+			if( NEWCPU && F.b.D ) CYCLE;
 			break;
 		case 0x7D: // adc abs, x
 			temp = read(pc++);
@@ -615,6 +622,7 @@ Yieldable coru6502::run()
 			}
 			a = add(a, t);
 			CYCLE;
+			if( NEWCPU && F.b.D ) CYCLE;
 			break;
 		case 0x79: // adc abs, y
 			temp = read(pc++);
@@ -629,6 +637,7 @@ Yieldable coru6502::run()
 			}
 			a = add(a, t);
 			CYCLE;		
+			if( NEWCPU && F.b.D ) CYCLE;
 			break;
 		case 0x61: // adc (ind, x)
 			t = read(pc++);
@@ -642,6 +651,7 @@ Yieldable coru6502::run()
 			CYCLE; // 5
 			a = add(a, read(temp));
 			CYCLE; // 6		
+			if( NEWCPU && F.b.D ) CYCLE;
 			break;
 		case 0x71: // adc (ind),y
 			t = read(pc++);
@@ -658,11 +668,13 @@ Yieldable coru6502::run()
 			}
 			a = add(a, t);
 			CYCLE; // 6
+			if( NEWCPU && F.b.D ) CYCLE;
 			break;	
 //--
 		case 0xE9: // sbc imm
 			a = add(a, ~read(pc++));
 			CYCLE;
+			if( NEWCPU && F.b.D ) CYCLE;
 			break;
 		case 0xE5: // sbc zp
 			temp = read(pc++);
@@ -670,6 +682,7 @@ Yieldable coru6502::run()
 			t = read(temp);
 			a = add(a, ~t);
 			CYCLE;
+			if( NEWCPU && F.b.D ) CYCLE;
 			break;
 		case 0xF5: // sbc zp, x
 			temp = read(pc++);
@@ -680,6 +693,7 @@ Yieldable coru6502::run()
 			t = read(temp);
 			a = add(a, ~t);
 			CYCLE;		
+			if( NEWCPU && F.b.D ) CYCLE;
 			break;
 		case 0xED: // sbc abs
 			temp = read(pc++);
@@ -689,6 +703,7 @@ Yieldable coru6502::run()
 			t = read(temp);
 			a = add(a, ~t);
 			CYCLE;		
+			if( NEWCPU && F.b.D ) CYCLE;
 			break;
 		case 0xFD: // sbc abs, x
 			temp = read(pc++);
@@ -703,6 +718,7 @@ Yieldable coru6502::run()
 			}
 			a = add(a, ~t);
 			CYCLE;
+			if( NEWCPU && F.b.D ) CYCLE;
 			break;
 		case 0xF9: // sbc abs, y
 			temp = read(pc++);
@@ -717,6 +733,7 @@ Yieldable coru6502::run()
 			}
 			a = add(a, ~t);
 			CYCLE;		
+			if( NEWCPU && F.b.D ) CYCLE;
 			break;
 		case 0xE1: // sbc (ind, x)
 			t = read(pc++);
@@ -730,6 +747,7 @@ Yieldable coru6502::run()
 			CYCLE; // 5
 			a = add(a, ~read(temp));
 			CYCLE; // 6		
+			if( NEWCPU && F.b.D ) CYCLE;
 			break;
 		case 0xF1: // sbc (ind),y
 			t = read(pc++);
@@ -746,6 +764,7 @@ Yieldable coru6502::run()
 			}
 			a = add(a, ~t);
 			CYCLE; // 6
+			if( NEWCPU && F.b.D ) CYCLE;
 			break;	
 //--
 		case 0x2C: // bit abs
@@ -817,7 +836,7 @@ Yieldable coru6502::run()
 			CYCLE; // 3
 			pc = read(temp);
 			CYCLE; // 4
-			if( cpu_type & (ENABLE_65C02|ENABLE_HuC6280) )
+			if( cpu_type > CPU_6502 )
 			{
 				pc |= read(temp+1)<<8;			
 			} else {
@@ -1676,16 +1695,21 @@ Yieldable coru6502::run()
 			CYCLE;
 			break;
 		default:
-			if( !(cpu_type & (ENABLE_65C02|ENABLE_HuC6280)) )
+			if( cpu_type <= CPU_6502 )
 			{
 				//todo: original 6502 unofficial opcodes
 				printf("6502coru:$%X: Unimpl opc (possibly unofficial) $%X\n", pc, opc);
 				exit(1);
+				break;
 			}
-			//todo: 65C02 extra opcodes
-			//todo: HuC6280 extra opcodes
+			printf("65C02coru:$%X: Unimpl opc $%X\n", pc, opc);
+
+			// this point it's time for the 'C02
+			// C++ coroutines can't co_yield from a function, so time to include more code
+			#include "65C02coru.impl"
 			break;		
 		}
+	} // end of waiting if
 		
 		u16 vectaddr = 0;
 		

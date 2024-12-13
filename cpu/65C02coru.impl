@@ -1,0 +1,258 @@
+switch( opc )
+{
+case 0x89: // bit imm
+	t = read(pc++);
+	F.b.Z = (((t&a)==0)?1:0);
+	CYCLE;
+	break;
+case 0x34: // bit zp, x
+	t = read(pc++);
+	CYCLE;
+	read(t);
+	t += x;
+	CYCLE;
+	temp = read(t);
+	F.b.Z = (((temp&a)==0)?1:0);
+	F.b.N = temp>>7;
+	F.b.V = (temp>>6)&1;
+	CYCLE;
+	break;
+case 0x3C: // bit abs, x  // todo: check cycles and read addresses
+	temp = read(pc++);
+	CYCLE;
+	temp |= read(pc++)<<8;
+	CYCLE;
+	t = read((temp&0xff00)+((temp+x)&0xff));
+	if( (temp&0xff00) != ((temp+x)&0xff00) )
+	{
+		CYCLE;
+		t = read(temp+x);
+	}
+	F.b.Z = (((t&a)==0)?1:0);
+	F.b.N = t>>7;
+	F.b.V = (t>>6)&1;
+	CYCLE;
+	break;
+	
+case 0x3A: // dec a
+	a -= 1;
+	setnz(a);
+	CYCLE;
+	break;
+case 0x1A: // inc a
+	a += 1;
+	setnz(a);
+	CYCLE;
+	break;
+
+case 0x80: // bra
+	t = read(pc++);
+	CYCLE;
+	temp = pc + (s8)t;
+	CYCLE;
+	if( (temp&0xff00) != (pc&0xff00) )
+	{
+		CYCLE;
+	}
+	pc = temp;
+	break;
+
+case 0x64: // stz zp
+	t = read(pc++);
+	CYCLE;
+	write(t, 0);
+	CYCLE;
+	break;
+case 0x74: // stz zp, x
+	t = read(pc++);
+	CYCLE;
+	read(t);
+	t += x;
+	CYCLE;
+	write(t, 0);
+	CYCLE;
+	break;
+case 0x9C: // stz abs
+	temp = read(pc++);
+	CYCLE;
+	temp |= read(pc++)<<8;
+	CYCLE;
+	write(temp, 0);
+	CYCLE;
+	break;
+case 0x9E: // stz abs, x  //todo: check read addresses, might be pc instead
+	temp = read(pc++);
+	CYCLE;
+	temp |= read(pc++)<<8;
+	CYCLE;
+	read((temp&0xff00)+((temp+x)&0xff));
+	if( (temp&0xff00) != ((temp+x)&0xff00) )
+	{
+		CYCLE;
+		read(temp+x);
+	}
+	write(temp+x, 0);
+	CYCLE;
+	break;
+
+case 0xCB: // wai(t)
+	CYCLE;
+	CYCLE;
+	CYCLE;
+	waiting = true;
+	break;
+
+
+case 0x5A: // phy
+	read(pc);
+	CYCLE;
+	write(0x100+s, y);
+	s -= 1;
+	CYCLE;
+	break;
+case 0x7A: // ply
+	read(pc);
+	CYCLE;
+	s += 1;
+	CYCLE;
+	y = read(0x100+s);
+	setnz(y);
+	CYCLE;
+	break;
+case 0xDA: // phx
+	read(pc);
+	CYCLE;
+	write(0x100+s, x);
+	s -= 1;
+	CYCLE;
+	break;
+case 0xFA: // plx
+	read(pc);
+	CYCLE;
+	s += 1;
+	CYCLE;
+	x = read(0x100+s);
+	setnz(x);
+	CYCLE;
+	break;
+	
+case 0x12: // ora (ind zp)
+	t = read(pc++);
+	CYCLE; // 2
+	temp = read(t);
+	CYCLE; // 3
+	temp |= read((t+1)&0xff)<<8;
+	CYCLE; // 4
+	a |= read(temp);
+	setnz(a);
+	CYCLE; // 5
+	break;
+case 0x32: // and (ind zp)
+	t = read(pc++);
+	CYCLE; // 2
+	temp = read(t);
+	CYCLE; // 3
+	temp |= read((t+1)&0xff)<<8;
+	CYCLE; // 4
+	a &= read(temp);
+	setnz(a);
+	CYCLE; // 5
+	break;
+case 0x52: // eor (ind zp)
+	t = read(pc++);
+	CYCLE; // 2
+	temp = read(t);
+	CYCLE; // 3
+	temp |= read((t+1)&0xff)<<8;
+	CYCLE; // 4
+	a ^= read(temp);
+	setnz(a);
+	CYCLE; // 5
+	break;
+case 0x72: // adc (ind zp)
+	t = read(pc++);
+	CYCLE; // 2
+	temp = read(t);
+	CYCLE; // 3
+	temp |= read((t+1)&0xff)<<8;
+	CYCLE; // 4
+	a = add(a, read(temp));
+	if( F.b.D ) CYCLE;
+	setnz(a);
+	CYCLE; // 5
+	break;
+case 0x92: // sta (ind zp)
+	t = read(pc++);
+	CYCLE; // 2
+	temp = read(t);
+	CYCLE; // 3
+	temp |= read((t+1)&0xff)<<8;
+	CYCLE; // 4
+	write(temp, a);
+	CYCLE; // 5
+	break;
+case 0xB2: // lda (ind zp)
+	t = read(pc++);
+	CYCLE; // 2
+	temp = read(t);
+	CYCLE; // 3
+	temp |= read((t+1)&0xff)<<8;
+	CYCLE; // 4
+	a = read(temp);
+	setnz(a);
+	CYCLE; // 5
+	break;	
+case 0xD2: // cmp (ind zp)
+	t = read(pc++);
+	CYCLE; // 2
+	temp = read(t);
+	CYCLE; // 3
+	temp |= read((t+1)&0xff)<<8;
+	CYCLE; // 4
+	cmp(a, read(temp));
+	CYCLE; // 5
+	break;	
+case 0xF2: // sbc (ind zp)
+	t = read(pc++);
+	CYCLE; // 2
+	temp = read(t);
+	CYCLE; // 3
+	temp |= read((t+1)&0xff)<<8;
+	CYCLE; // 4
+	a = add(a, ~read(temp));
+	if( F.b.D ) CYCLE;
+	setnz(a);
+	CYCLE; // 5
+	break;
+
+case 0x7C: // jmp (ind abs x)
+	temp = read(pc++);
+	CYCLE; // 2
+	temp |= read(pc++)<<8;
+	CYCLE; // 3
+	read(pc);
+	temp += x;
+	CYCLE; // 4
+	pc = read(temp);
+	CYCLE; // 5
+	pc |= read(temp+1)<<8;
+	CYCLE; // 6
+	break;
+	
+default:
+	if( cpu_type == CPU_HUC6280 )
+	{
+		//todo: this is where the yet-more-opcodes of HuC6280 would go
+		//#include "HuC6280coru.impl"
+		break;
+	}
+
+	if( (opc&15) == 3 || (opc&15) == 0xB )
+	{	// other than a few actual opcodes handled above, these are all 1-byte/1-cycle NOPs that block interrupts
+		continue;
+	}
+
+	CYCLE; //todo: undefined/unofficial 65C02 opcodes are all nops of some type, will need a table eventually
+	break;
+}
+

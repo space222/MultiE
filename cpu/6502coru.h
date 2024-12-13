@@ -4,10 +4,8 @@
 #include <cstdlib>
 #include <functional>
 #include <coroutine>
-typedef uint8_t u8;
-typedef uint16_t u16;
-typedef uint32_t u32;
-typedef int8_t s8;
+#include <utility>
+#include "itypes.h"
 
 struct Yieldable
 {
@@ -24,12 +22,23 @@ struct Yieldable
 		void unhandled_exception() {}
 	};
 	
-	Yieldable() {}
+	Yieldable() : handle(nullptr) {}
 	Yieldable(std::coroutine_handle<promise_type> h) : handle(h) {}
 	std::coroutine_handle<promise_type> handle;
-		
+
+	Yieldable& operator=(Yieldable&& y) { handle = std::exchange(y.handle, nullptr); return *this; }
+	//todo: ^ probably will need to ask someone if this makes sense how to handle assignable coroutine wrapper objs
+	
+	~Yieldable()
+	{
+		if( handle )
+		{
+			 handle.destroy();
+		}
+	}
+	
 	int operator()() 
-	{ 
+	{
 		handle(); 
 		return handle.promise().val;
 	}
@@ -37,13 +46,14 @@ struct Yieldable
 
 #define PACKED __attribute__((packed))
 
-enum c6502_type { ENABLE_65C02 = 1, ENABLE_HuC6280 = 2, DISABLE_DECIMAL = 4 };
+enum coru6502_type { CPU_2A03=0, CPU_6502, CPU_65C02, CPU_WDC65C02, CPU_HUC6280 };
 
 struct coru6502
 {
 	u16 pc;
 	u8 s, a, x, y;
 	bool irq_line, nmi_line, waiting;
+	u32 pba;
 	union {
 		struct {
 			unsigned int C : 1;
@@ -61,17 +71,21 @@ struct coru6502
 
 	std::function<u8(coru6502&, u32)> reader;
 	std::function<void(coru6502&, u32, u8)> writer;
-	u32 cpu_type = DISABLE_DECIMAL;
+	u32 cpu_type = CPU_6502;
 	
 	//todo: HuC6280 MMU regs
 	u8 read(u16 addr) 
 	{
+		pba = addr;
 		return reader(*this, addr); 
 	}
 	void write(u16 addr, u8 v) 
 	{ 
+		pba = addr;
 		writer(*this, addr, v); 
 	}
+	
+	void prev() { read(pba); }
 	
 	void setnz(u8 v)
 	{
@@ -81,7 +95,7 @@ struct coru6502
 	
 	u8 add(u8 A, u8 B)
 	{
-		if( F.b.D && !(cpu_type&DISABLE_DECIMAL) )
+		if( F.b.D && cpu_type!=CPU_2A03 )
 		{
 			printf("6502coru:todo: decimal mode.\n");
 			exit(1);
