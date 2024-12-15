@@ -1,5 +1,12 @@
 #include "apple2e.h"
 
+static u32 a2pal[16] = {
+	0, 0x8a2140, 0x3c22a5, 0xc847e4, 0x07653e,
+	0x7b7e80, 0x308fe3, 0xb9a9fd, 0x3b5107, 0xc77028,
+	0x7b7e80, 0xf39ac2, 0x2fb81f, 0xb9d060, 0x6ee1c0,
+	0xffffff
+};
+
 void apple2e::key_down(int sc)
 {
 	if( sc == SDL_SCANCODE_F10 )
@@ -85,26 +92,90 @@ void apple2e::run_frame()
 		}
 	}
 
-	for(u32 y = 0; y < 8; ++y) 
+	if( text_mode )
 	{
-		for(u32 x = 0; x < 40; ++x) 
+		for(u32 y = 0; y < 8; ++y) 
 		{
-			drawtile(x*7, y*8, ram[0x400+(y*128)+x]&0x7f);
+			for(u32 x = 0; x < 40; ++x) 
+			{
+				drawtile(x*7, y*8, ram[0x400+(y*128)+x]&0x7f);
+			}
 		}
+		for(u32 y = 0; y < 8; ++y) 
+		{
+			for(u32 x = 0; x < 40; ++x) 
+			{
+				drawtile(x*7, (y+8)*8, ram[0x428+(y*128)+x]&0x7f);
+			}
+		}
+		for(u32 y = 0; y < 8; ++y) 
+		{
+			for(u32 x = 0; x < 40; ++x) 
+			{
+				drawtile(x*7, (y+16)*8, ram[0x450+(y*128)+x]&0x7f);
+			}
+		}
+		return;
 	}
-	for(u32 y = 0; y < 8; ++y) 
+	
+	if( !hires )
 	{
-		for(u32 x = 0; x < 40; ++x) 
+		for(u32 y = 0; y < 32; ++y)
 		{
-			drawtile(x*7, (y+8)*8, ram[0x428+(y*128)+x]&0x7f);
+			for(u32 x = 0; x < 40; ++x)
+			{
+				u8 b = ram[0x400+((y>>1)*128)+x] >> ((y&1)?4:0);
+				u32 px = a2pal[b&15]<<8;
+				for(u32 i = 0; i < 7; ++i)
+				{
+					fbuf[(y*4+0)*fb_width() + (x*7) + i] = 
+					fbuf[(y*4+1)*fb_width() + (x*7) + i] =
+					fbuf[(y*4+2)*fb_width() + (x*7) + i] = 
+					fbuf[(y*4+3)*fb_width() + (x*7) + i] = px;
+				}
+			}
 		}
-	}
-	for(u32 y = 0; y < 8; ++y) 
-	{
-		for(u32 x = 0; x < 40; ++x) 
+		for(u32 y = 0; y < 32; ++y)
 		{
-			drawtile(x*7, (y+16)*8, ram[0x450+(y*128)+x]&0x7f);
+			for(u32 x = 0; x < 40; ++x)
+			{
+				u8 b = ram[0x428+((y>>1)*128)+x] >> ((y&1)?4:0);
+				u32 px = a2pal[b&15]<<8;
+				for(u32 i = 0; i < 7; ++i)
+				{
+					fbuf[64*fb_width() + (y*4+0)*fb_width() + (x*7) + i] = 
+					fbuf[64*fb_width() + (y*4+1)*fb_width() + (x*7) + i] =
+					fbuf[64*fb_width() + (y*4+2)*fb_width() + (x*7) + i] = 
+					fbuf[64*fb_width() + (y*4+3)*fb_width() + (x*7) + i] = px;
+				}
+			}
 		}
+		for(u32 y = 0; y < 32; ++y)
+		{
+			for(u32 x = 0; x < 40; ++x)
+			{
+				u8 b = ram[0x450+((y>>1)*128)+x] >> ((y&1)?4:0);
+				u32 px = a2pal[b&15]<<8;
+				for(u32 i = 0; i < 7; ++i)
+				{
+					fbuf[128*fb_width() + (y*4+0)*fb_width() + (x*7) + i] = 
+					fbuf[128*fb_width() + (y*4+1)*fb_width() + (x*7) + i] =
+					fbuf[128*fb_width() + (y*4+2)*fb_width() + (x*7) + i] = 
+					fbuf[128*fb_width() + (y*4+3)*fb_width() + (x*7) + i] = px;
+				}
+			}
+		}			
+		if( mixed_mode )
+		{
+			for(u32 y = 4; y < 8; ++y) 
+			{
+				for(u32 x = 0; x < 40; ++x) 
+				{
+					drawtile(x*7, (y+16)*8, ram[0x450+(y*128)+x]&0x7f);
+				}
+			}		
+		}
+		return;
 	}
 }
 
@@ -151,6 +222,36 @@ bool apple2e::loadROM(const std::string)
 
 u8 apple2e::io_access(u16 addr, bool read)
 {
+	if( addr == 0xC050 )
+	{
+		text_mode = false;
+		return 0x80;
+	}
+	if( addr == 0xC051 )
+	{
+		text_mode = true;
+		return 0;
+	}
+	if( addr == 0xC052 )
+	{
+		mixed_mode = false;
+		return 0x80;
+	}
+	if( addr == 0xC053 )
+	{
+		mixed_mode = true;
+		return 0;
+	}
+	if( addr == 0xC056 )
+	{
+		hires = false;
+		return 0x80;
+	}
+	if( addr == 0xC057 )
+	{
+		hires = true;
+		return 0;
+	}
 	if( addr == 0xc030 ) 
 	{ 
 		snd_toggle ^= 1; 
@@ -213,6 +314,9 @@ void apple2e::reset()
 	key_strobe = 0;
 	snd_toggle = 0;
 	sample_cycles = 0;
+	
+	mixed_mode = hires = false;
+	text_mode = true;
 	
 	paste = "REM use f10 to paste into here\r";
 }

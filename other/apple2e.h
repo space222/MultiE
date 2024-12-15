@@ -7,7 +7,7 @@ class apple2e : public console
 public:
 	apple2e() { setVsync(0); }
 
-	u32 fb_width() override { return 320; }
+	u32 fb_width() override { return 280; }
 	u32 fb_height() override { return 192; }
 	u8* framebuffer() override { return (u8*)&fbuf[0]; }
 	
@@ -24,6 +24,10 @@ public:
 
 	coru6502 c6502;
 	Yieldable cycle;
+	
+	u8 text_mode;
+	bool hires;
+	bool mixed_mode;
 	
 	u8 key_last, key_strobe;
 	std::string paste;
