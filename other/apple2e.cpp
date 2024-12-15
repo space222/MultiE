@@ -8,24 +8,35 @@ void apple2e::key_down(int sc)
 		paste = str;
 		SDL_free(str);
 		if( paste.empty() ) return;
+		if( paste.back() == '\n' ) 
+		{
+			paste.back() = '\r';
+		} else if( paste.back() != '\r' ) {
+			paste.push_back('\r');
+		}
 		key_last = paste[0];
 		if( key_last == '\n' ) key_last = '\r';
 		paste.erase(paste.begin());
 		key_strobe = 0x80;
 		return;
 	}
-	if( sc == SDL_SCANCODE_LSHIFT || sc == SDL_SCANCODE_LCTRL ) return;
+	if( sc == SDL_SCANCODE_LSHIFT || sc == SDL_SCANCODE_LCTRL || 
+		sc == SDL_SCANCODE_RSHIFT || sc == SDL_SCANCODE_RCTRL ) return;
 	if( key_strobe == 0 ) 
 	{
 		auto keys = SDL_GetKeyboardState(nullptr);
-		bool shift = keys[SDL_SCANCODE_LSHIFT];
-		bool ctrl = keys[SDL_SCANCODE_LCTRL];
+		bool shift = keys[SDL_SCANCODE_LSHIFT] || keys[SDL_SCANCODE_RSHIFT];
+		//bool ctrl = keys[SDL_SCANCODE_LCTRL];
 		switch( sc )
 		{
 		case SDL_SCANCODE_RETURN: key_last = '\r'; break;
 		case SDL_SCANCODE_SPACE: key_last = 32; break;
 		case SDL_SCANCODE_APOSTROPHE: key_last = (shift ? '"' : '\''); break;
-		
+		case SDL_SCANCODE_SLASH: key_last = (shift ? '?' : '/'); break;
+		case SDL_SCANCODE_COMMA: key_last = (shift ? '<' : ','); break;
+		case SDL_SCANCODE_PERIOD: key_last = (shift ? '>' : '.'); break;
+		case SDL_SCANCODE_EQUALS: key_last = (shift ? '+' : '='); break;
+		case SDL_SCANCODE_MINUS: key_last = (shift ? '_' : '-'); break;
 		
 		case SDL_SCANCODE_0: key_last = (shift ? ')' : '0'); break;
 		case SDL_SCANCODE_1: key_last = (shift ? '!' : '1'); break;
@@ -53,9 +64,9 @@ void apple2e::drawtile(int px, int py, int c)
 	for(int y = py; y < py+8; ++y)
 	{
 		u8 b = font[c+(y&7)];
-		for(int x = 1; x < 8; ++x)
+		for(int x = 0; x < 7; ++x)
 		{
-			u32 bit = 7^x;
+			u32 bit = 7^(x+1);
 			fbuf[y*fb_width() + px + x] = (((b>>bit)&1)?0xffffff00 : 0);
 		}
 	}
@@ -66,6 +77,12 @@ void apple2e::run_frame()
 	for(u32 i = 0; i < 17062; ++i)
 	{
 		cycle();
+		sample_cycles += 1;
+		if( sample_cycles >= 23 )
+		{
+			sample_cycles = 0;
+			audio_add(snd_toggle?1:-1, snd_toggle?1:-1);
+		}
 	}
 
 	for(u32 y = 0; y < 8; ++y) 
@@ -120,31 +137,53 @@ bool apple2e::loadROM(const std::string)
 	unu = fread(font, 1, 8*128, fp);
 	fclose(fp);
 	
+	fp = fopen("./bios/a2disk.rom", "rb");
+	if(!fp)
+	{
+		printf("Unable to load a2disk.rom\n");
+		return false;
+	}
+	unu = fread(disk, 1, 256, fp);
+	fclose(fp);
+	
 	return true;
+}
+
+u8 apple2e::io_access(u16 addr, bool read)
+{
+	if( addr == 0xc030 ) 
+	{ 
+		snd_toggle ^= 1; 
+		return 0; 
+	}
+	if( addr == 0xc010 ) 
+	{ 
+		if( paste.size() )
+		{
+			key_last = paste[0];
+			if( key_last == '\n' ) key_last = '\r';
+			paste.erase(paste.begin());
+			key_strobe = 0x80;
+			return 0;
+		}
+		key_strobe = 0; 
+		return 0;
+	}
+	if( addr == 0xc000 ) 
+	{
+		return key_last|key_strobe;
+	}
+	return 0;
 }
 	
 u8 apple2e::read(coru6502&, u16 addr)
 {
 	if( addr < 0xc000 ) return ram[addr];
+	//if( addr >= 0xc600 && addr <= 0xc6ff ) return disk[addr&0xff];
 	if( addr < 0xd000 ) 
-	{ //todo: io 
-		if( addr == 0xc000 ) return key_last|key_strobe;
-		if( addr == 0xc030 ) return 0;
+	{				
 		printf("a2e:$%X: io <$%X\n", c6502.pc, addr);
-		if( addr == 0xc010 ) 
-		{ 
-			if( paste.size() )
-			{
-				key_last = paste[0];
-				if( key_last == '\n' ) key_last = '\r';
-				paste.erase(paste.begin());
-				key_strobe = 0x80;
-				return 0;
-			}
-			key_strobe = 0; 
-			return 0;
-		}
-
+		return io_access(addr, true);
 	}
 	if( addr < 0xf800 ) return basic[addr - 0xd000];
 	//printf("a2e: <$%X\n", addr);
@@ -155,22 +194,9 @@ void apple2e::write(coru6502&, u16 addr, u8 v)
 {
 	if( addr < 0xc000 ) { ram[addr] = v; return; }
 	if( addr < 0xd000 ) 
-	{ //todo: io
-		printf("a2e: IO $%X = $%X\n", addr, v); 
-		if( addr == 0xc010 ) 
-		{
-			if( paste.size() )
-			{
-				key_last = paste[0];
-				if( key_last == '\n' ) key_last = '\r';
-				paste.erase(paste.begin());
-				key_strobe = 0x80;
-				return;
-			}
-			key_strobe = 0; 
-			return;
-		}
-	 	return; 
+	{
+		io_access(addr, false);
+		return; 
 	}
 }
 
@@ -185,5 +211,14 @@ void apple2e::reset()
 	for(u32 i = 0; i < fb_width()*fb_height(); ++i) fbuf[i] = 0;
 	key_last = ' ';
 	key_strobe = 0;
+	snd_toggle = 0;
+	sample_cycles = 0;
+	
+	paste = "REM use f10 to paste into here\r";
 }
+
+
+
+
+
 
