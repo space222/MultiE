@@ -200,39 +200,19 @@ void apple2e::run_frame()
 	}
 	
 	if( hires )
-	{
+	{      
+		// monochrone for now		
 		const u32 segs = (24 - (mixed_mode?4:0));
 		u32 page = 0;
 		for(u32 s = 0; s < segs; ++s)
 		{
 			for(u32 y = 0; y < 8; ++y)
 			{
-				u32 last_bit = 0;
-				u32 line_pos = 0;
-				for(u32 x = 0; x < 280;)
+				const u32 lineoffs = (s*8+y)*fb_width();
+				for(u32 x = 0; x < 40; ++x)
 				{
-					u8 b = ram[page + segoffs[s] + y*1024 + line_pos];
-					const u32 lineoffs = (s*8+y)*fb_width();
-					if( !(line_pos & 1) )
-					{
-						fbuf[lineoffs + x++] = hires_px(b>>7, b);
-						fbuf[lineoffs + x++] = hires_px(b>>7, b);
-						fbuf[lineoffs + x++] = hires_px(b>>7, b>>2);
-						fbuf[lineoffs + x++] = hires_px(b>>7, b>>2);
-						fbuf[lineoffs + x++] = hires_px(b>>7, b>>4);
-						fbuf[lineoffs + x++] = hires_px(b>>7, b>>4);
-						last_bit = (b>>5)&2;
-					} else {
-						fbuf[lineoffs + x++] = hires_px(b>>7, (b&1)|last_bit);
-						fbuf[lineoffs + x++] = hires_px(b>>7, (b&1)|last_bit);
-						fbuf[lineoffs + x++] = hires_px(b>>7, b>>1);
-						fbuf[lineoffs + x++] = hires_px(b>>7, b>>1);
-						fbuf[lineoffs + x++] = hires_px(b>>7, b>>3);
-						fbuf[lineoffs + x++] = hires_px(b>>7, b>>3);
-						fbuf[lineoffs + x++] = hires_px(b>>7, b>>5);
-						fbuf[lineoffs + x++] = hires_px(b>>7, b>>5);
-					}
-					line_pos+=1;
+					u8 b = ram[segoffs[s] + y*1024 + x];
+					for(u32 i = 0; i < 7; ++i) fbuf[lineoffs + x*7 + i] = ( ((b>>i)&1)?0xffFFff00:0 );
 				}
 			}
 		}	

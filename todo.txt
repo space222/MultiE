@@ -196,9 +196,10 @@ Status: The one game I have runs until the 3 lives are used up as I don't have i
 
 Apple IIe Todo List
 ----------------------
-1. Do a get-some-output implementation of hires mode
-2. Begin floppy
-3. Figure out how all the extra ram bits work.
+1. Figure out why active text line is not set to the bottom in hires mode. Code is same as lores, so ???
+2. Better hires
+3. Begin floppy
+4. Figure out how all the extra ram bits work.
 Status: Turns out getting from boot to basic running wasn't hard and the keyboard is pretty simple.
 
 
