@@ -43,6 +43,6 @@ public:
 	u8 disk[256];
 	void drawtile(int x, int y, int c);
 	
-	u32 fbuf[320*300];
+	u32 fbuf[560*200];
 };
 

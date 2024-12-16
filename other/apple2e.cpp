@@ -79,6 +79,27 @@ void apple2e::drawtile(int px, int py, int c)
 	}
 }
 
+u32 hires_px(u8 hb, u8 pair)
+{
+	pair &= 3;
+	if( pair == 0 ) return 0;
+	if( pair == 3 ) return 0xffFFff00;
+	if( hb )
+	{
+		if( pair == 1 ) return 0x0ab1ff00;
+		return 0xff4e0600;	
+	}
+	if( pair == 1 ) return 0xff00ff00;
+	return 0x05ff0300;
+}
+
+static u32 segoffs[24] = {
+	0x2000, 0x2080, 0x2100, 0x2180, 0x2200, 0x2280, 0x2300,
+	0x2380, 0x2028, 0x20A8, 0x2128, 0x21A8, 0x2228, 0x22A8,
+	0x2328, 0x23A8, 0x2050, 0x20D0, 0x2150, 0x21D0, 0x2250,
+	0x22D0, 0x2350, 0x23D0
+};
+
 void apple2e::run_frame()
 {
 	for(u32 i = 0; i < 17062; ++i)
@@ -177,6 +198,58 @@ void apple2e::run_frame()
 		}
 		return;
 	}
+	
+	if( hires )
+	{
+		const u32 segs = (24 - (mixed_mode?4:0));
+		u32 page = 0;
+		for(u32 s = 0; s < segs; ++s)
+		{
+			for(u32 y = 0; y < 8; ++y)
+			{
+				u32 last_bit = 0;
+				u32 line_pos = 0;
+				for(u32 x = 0; x < 280;)
+				{
+					u8 b = ram[page + segoffs[s] + y*1024 + line_pos];
+					const u32 lineoffs = (s*8+y)*fb_width();
+					if( !(line_pos & 1) )
+					{
+						fbuf[lineoffs + x++] = hires_px(b>>7, b);
+						fbuf[lineoffs + x++] = hires_px(b>>7, b);
+						fbuf[lineoffs + x++] = hires_px(b>>7, b>>2);
+						fbuf[lineoffs + x++] = hires_px(b>>7, b>>2);
+						fbuf[lineoffs + x++] = hires_px(b>>7, b>>4);
+						fbuf[lineoffs + x++] = hires_px(b>>7, b>>4);
+						last_bit = (b>>5)&2;
+					} else {
+						fbuf[lineoffs + x++] = hires_px(b>>7, (b&1)|last_bit);
+						fbuf[lineoffs + x++] = hires_px(b>>7, (b&1)|last_bit);
+						fbuf[lineoffs + x++] = hires_px(b>>7, b>>1);
+						fbuf[lineoffs + x++] = hires_px(b>>7, b>>1);
+						fbuf[lineoffs + x++] = hires_px(b>>7, b>>3);
+						fbuf[lineoffs + x++] = hires_px(b>>7, b>>3);
+						fbuf[lineoffs + x++] = hires_px(b>>7, b>>5);
+						fbuf[lineoffs + x++] = hires_px(b>>7, b>>5);
+					}
+					line_pos+=1;
+				}
+			}
+		}	
+	
+		if( mixed_mode )
+		{
+			for(u32 y = 4; y < 8; ++y) 
+			{
+				for(u32 x = 0; x < 40; ++x) 
+				{
+					drawtile(x*7, (y+16)*8, ram[0x450+(y*128)+x]&0x7f);
+				}
+			}		
+		}
+		return;
+	}
+	
 }
 
 bool apple2e::loadROM(const std::string)
@@ -234,6 +307,7 @@ u8 apple2e::io_access(u16 addr, bool read)
 	}
 	if( addr == 0xC052 )
 	{
+		printf("mixed mode off!\n");
 		mixed_mode = false;
 		return 0x80;
 	}
@@ -283,7 +357,7 @@ u8 apple2e::read(coru6502&, u16 addr)
 	//if( addr >= 0xc600 && addr <= 0xc6ff ) return disk[addr&0xff];
 	if( addr < 0xd000 ) 
 	{				
-		printf("a2e:$%X: io <$%X\n", c6502.pc, addr);
+		//printf("a2e:$%X: io <$%X\n", c6502.pc, addr);
 		return io_access(addr, true);
 	}
 	if( addr < 0xf800 ) return basic[addr - 0xd000];
@@ -315,8 +389,9 @@ void apple2e::reset()
 	snd_toggle = 0;
 	sample_cycles = 0;
 	
-	mixed_mode = hires = false;
+	hires = false;
 	text_mode = true;
+	mixed_mode = true;
 	
 	paste = "REM use f10 to paste into here\r";
 }
