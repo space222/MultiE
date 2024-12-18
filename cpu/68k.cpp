@@ -2912,7 +2912,7 @@ void m68k::step()
 		u32 trapaddr = EXC_LEVEL_1 + (pending_irq-1)*4;
 		if( autovector ) trapaddr = autovector;
 		m68k_trap(*this, trapaddr, false);
-		//printf("68K: IRQ %i, to $%X\n", pending_irq, pc);
+		//printf("68K: IRQ %i, vector $%X\n", pending_irq, trapaddr);
 		sr.b.IPL = pending_irq;
 		pending_irq = 0;
 		intack();

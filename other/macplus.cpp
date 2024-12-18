@@ -6,6 +6,8 @@ extern console* sys;
 extern u8 byte2gcr[]; //at bottom
 
 
+bool dolog = false;
+
 void macplus::run_frame()
 {
 	via_pc &= ~1;
@@ -14,20 +16,23 @@ void macplus::run_frame()
 		u64 target = last_target + 352;
 		while( stamp < target ) 
 		{ 
-			cpu.step(); stamp += cpu.icycles; 
+			printf("pc = $%X\n", cpu.pc);
+			cpu.step(); 
+			stamp += cpu.icycles; 
 		}
 		last_target = target;
 		if( line == 342 )
 		{
-			if( via_ie & BIT(1) )
+			if( via_ie & 2 )
 			{
 				cpu.pending_irq = 1;
-				via_if |= 0x82;	
+				via_if = 0x82;
+				//printf("IRQ IF = $%X, IE = $%X\n", via_if, via_ie);
 			}
 			via_pc |= 1;
+			if( (via_ie & 0x20) && !dolog ) { dolog= true; cpu.pending_irq = 1; via_if |= 0xa0; }
 		}
 	}
-	//ram[0x16a]+=1;
 	
 	for(u32 y = 0; y < 342; ++y)
 	{
@@ -45,12 +50,13 @@ void macplus::write(u32 addr, u32 v, int size)
 	addr &= 0xffFFff;
 	if( addr < 0x400000 )
 	{
-		if( cpu.pc < 0x400500 && cpu.pc > 0x400400 ) printf("%X: w%i $%X = $%X\n", cpu.pc, size, addr, v);
 		if( size == 16 )
 		{
 			ram[addr] = v>>8;
 			addr += 1;
 		}
+		if( addr == 0x168 || addr == 0x16a ) printf("ticks set to $%X\n", v);
+		if( addr < 0x102 && u16(v) == 0x1B12 ) printf("VBLANK VECTOR: $%X = $%X\n", addr, v);
 		ram[addr] = v;
 		return;
 	}
@@ -59,11 +65,14 @@ void macplus::write(u32 addr, u32 v, int size)
 	if( addr == 0xEFFFFE ) { via_a = v; return; }
 	if( addr == 0xEFFDFE ) { via_ie = v; printf("VIA_IE = $%X\n", v); return; }
 	if( addr == 0xEFF9FE ) { via_pc = v; return; }
+	
+	printf("macplus: w%i $%X = $%X\n", size, addr, v);
 }
 
 u32 macplus::read(u32 addr, int size)
 {
 	addr &= 0xffFFff;
+	if( cpu.pc >= 0x401a70 && cpu.pc <= 0x401a80 && addr < 0x400 ) printf("$%X: read%i <$%X\n", cpu.pc, size, addr);
 	if( size != 16 )
 	{
 		printf("non16bit read!\n");
@@ -72,12 +81,15 @@ u32 macplus::read(u32 addr, int size)
 	if( addr < 0x400000 ) return __builtin_bswap16(*(u16*)&ram[addr]);
 	if( addr < 0x500000 ) return __builtin_bswap16(*(u16*)&rom[addr&0x1ffff]);
 
-	if( addr == 0xDFFDFE ) return 0x1F;
-	if( addr == 0xEFE1FE ) return via_b|BIT(6);
+	//todo: go back to 8 and 16bit read/writes. 
+	// I messed myself up trying to get clever in converting everything to 16bit
+	// in the cpu.read/write handlers
+	if( addr == 0xEFE1FE ) return (via_b|BIT(6));
 	if( addr == 0xEFFFFE ) return via_a;
-	if( addr == 0xEFFBFE ) { return via_if; }
-	if( addr == 0xEFFDFE ) { return via_ie; }
-	if( addr == 0xEFF9FE ) return via_pc;
+	if( addr == 0xEFFBFE ) { return via_if<<8; }
+	if( addr == 0xEFFDFE ) { return via_ie<<8; }
+	if( addr == 0xEFF9FE ) return via_pc<<8;
+	if( addr == 0xDFFDFE ) return 0x1f;
 	
 	printf("MAC+:%06X: read%i <$%X\n", cpu.pc, size, addr);
 	return 0xfffff;
@@ -89,7 +101,10 @@ void macplus::reset()
 {
 	memset(&cpu, 0, sizeof(cpu));
 	cpu.read_code16 = cpu.mem_read16 = [](u32 a)->u16 { return dynamic_cast<macplus*>(sys)->read(a, 16); };
-	cpu.mem_read8 = [](u32 a) -> u8 { return 0xff & (dynamic_cast<macplus*>(sys)->read(a&~1, 16)>>(((a&1)^1)*8)); };
+	cpu.mem_read8 = [](u32 a) -> u8 
+	{ 
+		return 0xff & (dynamic_cast<macplus*>(sys)->read(a&~1, 16)>>(((a&1)^1)*8));
+	};
 	cpu.mem_read32= [](u32 a) -> u32
 		{ return (dynamic_cast<macplus*>(sys)->read(a, 16)<<16)|dynamic_cast<macplus*>(sys)->read(a+2,16); };
 	cpu.intack = []{};
