@@ -197,13 +197,22 @@ Status: The one game I have runs until the 3 lives are used up as I don't have i
 Apple IIe Todo List
 ----------------------
 1. Figure out why active text line is not set to the bottom in hires mode. Code is same as lores, so ???
-2. Better hires
-3. Begin floppy
-4. Figure out how all the extra ram bits work.
+2. Begin floppy
+3. Find Apple 2 software 48K compat. with no copy protection that comes in WOZ format.
+	- possible attempt to write my own hello world, create a boot sector and load it in another emu
+4. Continue to collect info on Apple ][e memory map with aux ram and language card.
 Status: Turns out getting from boot to basic running wasn't hard and the keyboard is pretty simple.
 
 
 
-
+6502coru Todo List
+---------------------
+1. Run 6502coru through the JSON tests (2A03 if possible, regular 6502 otherwise, maybe implement bcd-mode)
+2. Finish the 65C02 instructions that are on all variants and run JSON tests.
+3. Deep dive the whole dead cycle thing and fix all the read/writes for all cycles on each processor.
+4. Try to find per-cycle operation lists for HuC6280, or just cycle counts otherwise and come up with something
+	for both the extra instructions and any extra cycles needed for T-flag stuff.
+Status: After switching NES over to the coroutine, it still works.
+	Also, wow, the first Todo List for a specific chip rather than system.
 
 

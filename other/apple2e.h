@@ -1,6 +1,7 @@
 #pragma once
 #include "console.h"
 #include "6502coru.h"
+#include "wozfile.h"
 
 class apple2e : public console
 {
@@ -21,6 +22,17 @@ public:
 	u8 io_access(u16,bool);
 	u8 read(coru6502&, u16);
 	void write(coru6502&, u16, u8);
+	
+	struct {
+		wozfile* floppy;
+		bool motorOn;
+		u8 curtrack;
+		u32 curbit;
+		u8 phase;
+	} drive[2];
+	u32 curdrive;
+	u8 floppy_access(u16,bool);
+	
 
 	coru6502 c6502;
 	Yieldable cycle;

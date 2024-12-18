@@ -275,6 +275,7 @@ bool apple2e::loadROM(const std::string)
 
 u8 apple2e::io_access(u16 addr, bool read)
 {
+	if( addr == 0xc0ec ) return 0xda;
 	if( addr == 0xC050 )
 	{
 		text_mode = false;
@@ -287,7 +288,6 @@ u8 apple2e::io_access(u16 addr, bool read)
 	}
 	if( addr == 0xC052 )
 	{
-		printf("mixed mode off!\n");
 		mixed_mode = false;
 		return 0x80;
 	}
@@ -328,13 +328,15 @@ u8 apple2e::io_access(u16 addr, bool read)
 	{
 		return key_last|key_strobe;
 	}
+	if( addr >= 0xc011 && addr <= 0xc01f ) { printf("a2e: status io <$%X\n", addr); exit(1); }
+	printf("a2e: io access $%X\n", addr);
 	return 0;
 }
 	
 u8 apple2e::read(coru6502&, u16 addr)
 {
 	if( addr < 0xc000 ) return ram[addr];
-	//if( addr >= 0xc600 && addr <= 0xc6ff ) return disk[addr&0xff];
+	if( addr >= 0xc600 && addr <= 0xc6ff ) return disk[addr&0xff];
 	if( addr < 0xd000 ) 
 	{				
 		//printf("a2e:$%X: io <$%X\n", c6502.pc, addr);
