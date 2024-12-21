@@ -104,12 +104,15 @@ void apple2e::run_frame()
 {
 	for(u32 i = 0; i < 17062; ++i)
 	{
+		//if( c6502.pc == 0x801 ) { printf("running bootsector\n"); exit(1); }
 		cycle();
+		floppy_clock();
 		sample_cycles += 1;
 		if( sample_cycles >= 23 )
 		{
 			sample_cycles = 0;
-			audio_add(snd_toggle?1:-1, snd_toggle?1:-1);
+			float out = ((snd_toggle&1) ? 0.9f : 0);
+			audio_add(out, out);
 		}
 	}
 
@@ -228,11 +231,10 @@ void apple2e::run_frame()
 			}		
 		}
 		return;
-	}
-	
+	}	
 }
 
-bool apple2e::loadROM(const std::string)
+bool apple2e::loadROM(const std::string fname)
 {
 	FILE* fp = fopen("./bios/a2p_monitor.bin", "rb");
 	if(!fp)
@@ -270,40 +272,137 @@ bool apple2e::loadROM(const std::string)
 	unu = fread(disk, 1, 256, fp);
 	fclose(fp);
 	
+	drive[0].floppy = wozfile::loadWOZ(fname);
+	if( !drive[0].floppy )
+	{
+		printf("Unable to load WOZ '%s'\n", fname.c_str());
+		return 1;
+	}
+	
 	return true;
 }
 
-u8 apple2e::io_access(u16 addr, bool read)
+void apple2e::floppy_clock()
 {
-	if( addr == 0xc0ec ) return 0xda;
-	if( addr == 0xC050 )
+	if( drive[0].motor_cycles )
 	{
-		text_mode = false;
-		return 0x80;
+		drive[0].motor_cycles -= 1;
+		if( !drive[0].motor_cycles )
+		{
+			drive[0].motorOn = !drive[0].motorOn;
+			if( drive[0].motorOn == false ) { printf("floppy motor off!\n"); exit(1); }
+		}		
 	}
-	if( addr == 0xC051 )
+	if( drive[1].motor_cycles )
 	{
-		text_mode = true;
+		drive[1].motor_cycles -= 1;
+		if( !drive[1].motor_cycles ) drive[1].motorOn = !drive[1].motorOn;
+	}
+
+	if( ! drive[curdrive].motorOn ) return;
+	if( ! drive[curdrive].floppy ) return;
+	
+	floppy_cycles -= 1;
+	if( floppy_cycles == 0 )
+	{
+		iwm_shifter <<= 1;
+		iwm_shifter |= drive[curdrive].floppy->getBit(drive[curdrive].track, drive[curdrive].bit);
+		drive[curdrive].bit += 1;		
+		if( iwm_shifter & 0x80 )
+		{
+			iwm_data_rd = iwm_shifter;
+			iwm_shifter = 0;
+			floppy_cycles = 8;
+		} else {
+			floppy_cycles = 4;
+		}
+	}
+
+	return;
+}
+
+u8 apple2e::floppy_access(u16 addr, u8 v, bool read)
+{
+	u8 oldswitches = iwm_switches;	
+	iwm_switches &= ~BIT( (addr>>1)&7 );
+	if( addr & 1 ) iwm_switches |= BIT( (addr>>1)&7 );
+	curdrive = 0;// ((iwm_switches&BIT(5))?1:0);
+	
+	if( (oldswitches & BIT(4)) != (iwm_switches&BIT(4)) )
+	{
+		//drive[curdrive].motor_cycles = 300000; //todo: calc how many cycles for motor state change
+		drive[curdrive].motorOn = (iwm_switches&BIT(4));
+	}
+	
+	if( (iwm_switches&0xd0) == 0xd0 && !read )
+	{
+		printf("floppy: mode set to $%X\n", v);
+	}
+
+	if( !drive[curdrive].floppy ) return 0;
+	
+	u32 newphase = std::countr_zero(u8((iwm_switches&~(1<<drive[curdrive].phase))|16));
+	if( newphase != 4 )
+	{
+		if( addr != 0xc0ec ) printf("floppy access $%X\n", addr);
+		
+		if( newphase == ((drive[curdrive].phase-1)&3) )
+		{
+			if( drive[curdrive].track ) { drive[curdrive].track -= 2; drive[curdrive].bit = 0; }
+			printf("$%X: floppy track = %i\n", c6502.pc, drive[curdrive].track);
+			drive[curdrive].phase = newphase;
+			//todo: make sure current bit is in semi-right place on new track
+		} else if( newphase == ((drive[curdrive].phase+1)&3) ) {
+			if( drive[curdrive].track < 159 ) { drive[curdrive].track += 2;  drive[curdrive].bit = 0; }
+			printf("$%X: floppy track = %i\n", c6502.pc, drive[curdrive].track);
+			drive[curdrive].phase = newphase;
+		}	
+	}
+	
+	if( addr == 0xc0ec )
+	{
+		return std::exchange(iwm_data_rd, 0);
+	}
+	return 0;
+}
+
+u8 apple2e::langcard(u16 addr, bool)
+{
+	bank2 = ( (addr&BIT(3)) ? 0xd000 : 0xc000 );
+	lc_read_ff = ((addr&3)==3) || ((addr&3)==0);
+
+	if( addr & 1 )
+	{
+		if( lc_prewrite ) lc_write_ff = false;
+	} else {
+		lc_write_ff = true;
+	}
+	
+	lc_prewrite = addr&2; // address line 1 ??
+
+	return 0;
+}
+
+u8 apple2e::io_access(u16 addr, u8 v, bool read)
+{
+	u16 upper = addr & ~1;
+	
+	if( addr >= 0xc0e0 && addr < 0xc0f0 ) return floppy_access(addr, v, read);	
+	if( addr >= 0xc080 && addr < 0xc090 ) return langcard(addr, read);
+	
+	if( upper == 0xC050 )
+	{
+		text_mode = addr&1;
 		return 0;
 	}
-	if( addr == 0xC052 )
+	if( upper == 0xC052 )
 	{
-		mixed_mode = false;
-		return 0x80;
-	}
-	if( addr == 0xC053 )
-	{
-		mixed_mode = true;
+		mixed_mode = addr&1;
 		return 0;
 	}
-	if( addr == 0xC056 )
+	if( upper == 0xC056 )
 	{
-		hires = false;
-		return 0x80;
-	}
-	if( addr == 0xC057 )
-	{
-		hires = true;
+		hires = addr&1;
 		return 0;
 	}
 	if( addr == 0xc030 ) 
@@ -324,9 +423,29 @@ u8 apple2e::io_access(u16 addr, bool read)
 		key_strobe = 0; 
 		return 0;
 	}
-	if( addr == 0xc000 ) 
+	if( addr == 0xc000 && read ) 
 	{
 		return key_last|key_strobe;
+	}
+	if( upper == 0xc000 )
+	{
+		store80 = addr&1;
+		return 0;
+	}
+	if( upper == 0xc002 )
+	{
+		ramrd = addr&1;
+		return 0;
+	}
+	if( upper == 0xc004 )
+	{
+		ramwrt = addr&1;
+		return 0;
+	}
+	if( upper == 0xc008 )
+	{
+		altzp = addr&1;
+		return 0;
 	}
 	if( addr >= 0xc011 && addr <= 0xc01f ) { printf("a2e: status io <$%X\n", addr); exit(1); }
 	printf("a2e: io access $%X\n", addr);
@@ -335,13 +454,28 @@ u8 apple2e::io_access(u16 addr, bool read)
 	
 u8 apple2e::read(coru6502&, u16 addr)
 {
-	if( addr < 0xc000 ) return ram[addr];
+	//printf("a2e: <$%X\n", addr);
+	if( addr < 0x200 ) return altzp ? aux[addr] : ram[addr];
+	if( addr < 0x400 ) return ramrd ? aux[addr] : ram[addr];
+	if( addr < 0x800 ) return ((store80 && page2) || (!store80 && ramrd)) ? aux[addr] : ram[addr];
+	if( addr < 0x2000) return ramrd ? aux[addr] : ram[addr];
+	if( addr < 0x4000) return ((store80&& page2 &&hires)||(!store80&&ramrd))? aux[addr]:ram[addr];
+	if( addr < 0xc000) return ramrd ? aux[addr] : ram[addr];
+	
 	if( addr >= 0xc600 && addr <= 0xc6ff ) return disk[addr&0xff];
 	if( addr < 0xd000 ) 
 	{				
 		//printf("a2e:$%X: io <$%X\n", c6502.pc, addr);
-		return io_access(addr, true);
+		return io_access(addr, 0, true);
 	}
+	
+	if( lc_read_ff )
+	{
+		if( addr < 0xe000 ) 
+			return altzp ? aux[bank2 + (addr&0xfff)] : ram[bank2 + (addr&0xfff)];
+		return altzp ? aux[addr] : ram[addr];	
+	}
+	
 	if( addr < 0xf800 ) return basic[addr - 0xd000];
 	//printf("a2e: <$%X\n", addr);
 	return bios[addr&0x7ff];
@@ -349,11 +483,36 @@ u8 apple2e::read(coru6502&, u16 addr)
 
 void apple2e::write(coru6502&, u16 addr, u8 v)
 {
-	if( addr < 0xc000 ) { ram[addr] = v; return; }
+	//printf("a2e: w $%X = $%X\n", addr, v);
+	if( addr < 0x200 ) { altzp ? (aux[addr]=v) : (ram[addr]=v); return; }
+	if( addr < 0x400 ) { ramwrt? (aux[addr]=v) : (ram[addr]=v); return; }
+	if( addr < 0x800 ) 
+	{
+		((store80 && page2) || (!store80 && ramwrt)) ? (aux[addr]=v) : (ram[addr]=v); return;
+	}
+	if( addr < 0x2000) { ramwrt ? (aux[addr]=v) : (ram[addr]=v); return; }
+	if( addr < 0x4000) { ((store80&& page2 &&hires)||(!store80&&ramwrt))? (aux[addr]=v):(ram[addr]=v); return; }
+	if( addr < 0xc000) { ramwrt ? (aux[addr]=v) : (ram[addr]=v); return; }
 	if( addr < 0xd000 ) 
 	{
-		io_access(addr, false);
+		io_access(addr, v, false);
 		return; 
+	}
+	
+	if( !lc_write_ff )
+	{
+		if( addr < 0xe000 )
+		{
+			if( altzp ) { aux[bank2 + (addr&0xfff)] = v; return; }
+			ram[bank2 + (addr&0xfff)] = v;
+			return;
+		}
+		if( altzp )
+		{
+			aux[addr] = v;
+		} else {
+			ram[addr] = v;
+		}
 	}
 }
 
@@ -374,6 +533,18 @@ void apple2e::reset()
 	hires = false;
 	text_mode = true;
 	mixed_mode = true;
+	ramrd = ramwrt = store80 = false;
+	altzp = false;
+	
+	lc_read_ff = lc_write_ff = lc_prewrite = false;
+	bank2 = 0xd000;
+	
+	iwm_switches = iwm_data_rd = iwm_shifter = 0;
+	floppy_cycles = 8;
+	drive[0].motorOn = drive[1].motorOn = false;
+	drive[0].motor_cycles = drive[1].motor_cycles = 0;
+	drive[0].bit = drive[1].bit = 0;
+	drive[0].phase = drive[1].phase = 0;
 	
 	paste = "REM use f10 to paste into here\r";
 }
