@@ -36,6 +36,12 @@ void apple2e::key_down(int sc)
 		//bool ctrl = keys[SDL_SCANCODE_LCTRL];
 		switch( sc )
 		{
+		case SDL_SCANCODE_UP: key_last = 11; break;
+		case SDL_SCANCODE_DOWN: key_last = 10; break;
+		case SDL_SCANCODE_LEFT: key_last = 8; break;
+		case SDL_SCANCODE_RIGHT: key_last = 0x15; break;
+		case SDL_SCANCODE_ESCAPE: key_last = 0x1B; break;
+		
 		case SDL_SCANCODE_RETURN: key_last = '\r'; break;
 		case SDL_SCANCODE_SPACE: key_last = 32; break;
 		case SDL_SCANCODE_APOSTROPHE: key_last = (shift ? '"' : '\''); break;
@@ -66,6 +72,8 @@ void apple2e::key_down(int sc)
 
 void apple2e::drawtile(int px, int py, int c)
 {
+	bool inverse = !(c&0x80);
+	c &= 0x7f;
 	c *= 8;
 	
 	for(int y = py; y < py+8; ++y)
@@ -74,7 +82,7 @@ void apple2e::drawtile(int px, int py, int c)
 		for(int x = 0; x < 7; ++x)
 		{
 			u32 bit = 7^(x+1);
-			fbuf[y*fb_width() + px + x] = (((b>>bit)&1)?0xffffff00 : 0);
+			fbuf[y*fb_width() + px + x] = ((((b>>bit)&1)?0xffffff00 : 0)) ^ (inverse ? 0xffFFff00:0);
 		}
 	}
 }
@@ -122,21 +130,21 @@ void apple2e::run_frame()
 		{
 			for(u32 x = 0; x < 40; ++x) 
 			{
-				drawtile(x*7, y*8, ram[0x400+(y*128)+x]&0x7f);
+				drawtile(x*7, y*8, ram[0x400+(y*128)+x]);
 			}
 		}
 		for(u32 y = 0; y < 8; ++y) 
 		{
 			for(u32 x = 0; x < 40; ++x) 
 			{
-				drawtile(x*7, (y+8)*8, ram[0x428+(y*128)+x]&0x7f);
+				drawtile(x*7, (y+8)*8, ram[0x428+(y*128)+x]);
 			}
 		}
 		for(u32 y = 0; y < 8; ++y) 
 		{
 			for(u32 x = 0; x < 40; ++x) 
 			{
-				drawtile(x*7, (y+16)*8, ram[0x450+(y*128)+x]&0x7f);
+				drawtile(x*7, (y+16)*8, ram[0x450+(y*128)+x]);
 			}
 		}
 		return;
@@ -206,7 +214,7 @@ void apple2e::run_frame()
 	{      
 		// monochrone for now		
 		const u32 segs = (24 - (mixed_mode?4:0));
-		u32 page = 0;
+		u32 page = (page2 ? 0x2000 : 0);
 		for(u32 s = 0; s < segs; ++s)
 		{
 			for(u32 y = 0; y < 8; ++y)
@@ -214,7 +222,7 @@ void apple2e::run_frame()
 				const u32 lineoffs = (s*8+y)*fb_width();
 				for(u32 x = 0; x < 40; ++x)
 				{
-					u8 b = ram[segoffs[s] + y*1024 + x];
+					u8 b = ram[page + segoffs[s] + y*1024 + x];
 					for(u32 i = 0; i < 7; ++i) fbuf[lineoffs + x*7 + i] = ( ((b>>i)&1)?0xffFFff00:0 );
 				}
 			}
@@ -272,7 +280,7 @@ bool apple2e::loadROM(const std::string fname)
 	unu = fread(disk, 1, 256, fp);
 	fclose(fp);
 	
-	drive[0].floppy = wozfile::loadWOZ(fname);
+	drive[0].floppy = std::unique_ptr<wozfile>(wozfile::loadWOZ(fname));
 	if( !drive[0].floppy )
 	{
 		printf("Unable to load WOZ '%s'\n", fname.c_str());
@@ -400,6 +408,11 @@ u8 apple2e::io_access(u16 addr, u8 v, bool read)
 		mixed_mode = addr&1;
 		return 0;
 	}
+	if( upper == 0xC054 )
+	{
+		page2 = addr&1;
+		return 0;
+	}
 	if( upper == 0xC056 )
 	{
 		hires = addr&1;
@@ -448,7 +461,7 @@ u8 apple2e::io_access(u16 addr, u8 v, bool read)
 		return 0;
 	}
 	if( addr >= 0xc011 && addr <= 0xc01f ) { printf("a2e: status io <$%X\n", addr); exit(1); }
-	printf("a2e: io access $%X\n", addr);
+	if( addr < 0xc100 ) printf("a2e: io access $%X\n", addr);
 	return 0;
 }
 	
@@ -536,6 +549,8 @@ void apple2e::reset()
 	ramrd = ramwrt = store80 = false;
 	altzp = false;
 	
+	frame_cnt = 0;
+	
 	lc_read_ff = lc_write_ff = lc_prewrite = false;
 	bank2 = 0xd000;
 	
@@ -546,7 +561,7 @@ void apple2e::reset()
 	drive[0].bit = drive[1].bit = 0;
 	drive[0].phase = drive[1].phase = 0;
 	
-	paste = "REM use f10 to paste into here\r";
+	//paste = "REM use f10 to paste into here\r";
 }
 
 

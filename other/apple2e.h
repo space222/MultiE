@@ -1,4 +1,5 @@
 #pragma once
+#include <memory>
 #include "console.h"
 #include "6502coru.h"
 #include "wozfile.h"
@@ -25,7 +26,7 @@ public:
 	void write(coru6502&, u16, u8);
 	
 	struct {
-		wozfile* floppy;
+		std::unique_ptr<wozfile> floppy;
 		bool motorOn;
 		u32 motor_cycles;
 		u32 track;
