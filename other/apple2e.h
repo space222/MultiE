@@ -16,6 +16,7 @@ public:
 	void run_frame() override;
 	void reset() override;
 	bool loadROM(const std::string) override;
+	bool load_media(int, std::string) override;
 	
 	void key_down(int) override;
 	//void key_up(int) override;
@@ -24,6 +25,12 @@ public:
 	u8 io_access(u16,u8,bool);
 	u8 read(coru6502&, u16);
 	void write(coru6502&, u16, u8);
+	
+	std::array<std::string, 8>& media_names() override
+	{
+		static std::array<std::string, 8> a = { "Floppy A", "Floppy B" };
+		return a;
+	}
 	
 	struct {
 		std::unique_ptr<wozfile> floppy;

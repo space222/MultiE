@@ -645,7 +645,7 @@ void imgui_run()
 				{
 					if( ImGui::MenuItem(M[i].c_str()) )
 					{
-						sys->load_media(i, getOpenFile("Load Media"));
+						sys->load_media(i, getOpenFile("Load Media: " + M[i]));
 					}
 				}
 			}

@@ -290,6 +290,17 @@ bool apple2e::loadROM(const std::string fname)
 	return true;
 }
 
+bool apple2e::load_media(int index, std::string fname)
+{
+	if( index >= 2 ) return false;
+	wozfile *W = wozfile::loadWOZ(fname);
+	if( W )
+	{
+		drive[index].floppy = std::unique_ptr<wozfile>(W);
+	}
+	return true;
+}
+
 void apple2e::floppy_clock()
 {
 	if( drive[0].motor_cycles )
@@ -334,7 +345,7 @@ u8 apple2e::floppy_access(u16 addr, u8 v, bool read)
 	u8 oldswitches = iwm_switches;	
 	iwm_switches &= ~BIT( (addr>>1)&7 );
 	if( addr & 1 ) iwm_switches |= BIT( (addr>>1)&7 );
-	curdrive = 0;// ((iwm_switches&BIT(5))?1:0);
+	curdrive = ((iwm_switches&BIT(5))?1:0);
 	
 	if( (oldswitches & BIT(4)) != (iwm_switches&BIT(4)) )
 	{
@@ -548,8 +559,6 @@ void apple2e::reset()
 	mixed_mode = true;
 	ramrd = ramwrt = store80 = false;
 	altzp = false;
-	
-	frame_cnt = 0;
 	
 	lc_read_ff = lc_write_ff = lc_prewrite = false;
 	bank2 = 0xd000;
