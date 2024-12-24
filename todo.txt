@@ -201,8 +201,8 @@ Apple IIe Todo List
 3. Color in HiRes mode.
 4. Double Res modes.
 5. Better floppy
+6. Trying to load a new Apple 2 instance while running one results in segfault. That really shouldn't happen.
 Status: Oregon Trail and DOS run. Three Mile Island requires the 13-sector slot rom, but still doesn't load.
-Number Munchers might just be taking a while, but looks like fail. 
 But as I can do a playthrough of Oregon Trail, I'm thinking of moving this one out of the experimental menu. 
 
 

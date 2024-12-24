@@ -108,6 +108,13 @@ static u32 segoffs[24] = {
 	0x22D0, 0x2350, 0x23D0
 };
 
+#define WHITE 0xffFFff00
+#define BLACK 0
+#define VIOLET 0xa200ff00
+#define BLUE  0x0981ff00
+#define GREEN 0x099c2900
+#define ORANGE 0xf04e0500
+
 void apple2e::run_frame()
 {
 	for(u32 i = 0; i < 17062; ++i)
@@ -213,6 +220,7 @@ void apple2e::run_frame()
 	if( hires )
 	{      
 		// monochrone for now		
+		/*
 		const u32 segs = (24 - (mixed_mode?4:0));
 		u32 page = (page2 ? 0x2000 : 0);
 		for(u32 s = 0; s < segs; ++s)
@@ -224,6 +232,48 @@ void apple2e::run_frame()
 				{
 					u8 b = ram[page + segoffs[s] + y*1024 + x];
 					for(u32 i = 0; i < 7; ++i) fbuf[lineoffs + x*7 + i] = ( ((b>>i)&1)?0xffFFff00:0 );
+				}
+			}
+		}*/
+		
+		// the rolling 3 bytes thing is based on a emulator that I saw days ago
+		// but haven't found again, but the rest is me trying to get sane output
+		// (if I understood composite signals, this might have been easier?)
+		// the thing that really made it possible is the Apple 2e Tech Reference (rtfm go figure)
+		const u32 segs = (24 - (mixed_mode?4:0));
+		u32 page = (page2 ? 0x2000 : 0);
+		for(u32 s = 0; s < segs; ++s)
+		{
+			for(u32 y = 0; y < 8; ++y)
+			{
+				const u32 lineoffs = (s*8+y)*fb_width();
+				u32 x = 0;
+				u8 A = 0;
+				u8 B = ram[page + segoffs[s] + y*1024];
+				u8 group = 0;
+				for(u32 i = 0; i < 40; ++i)
+				{
+					group = B>>7;
+					u8 C = ((i != 39) ? ram[page + segoffs[s] + y*1024 + i + 1] : 0);
+					u32 gen = (C<<15)|((B&0x7f)<<8)|((A&0x7f)<<1);
+					
+					for(u32 n = 0; n < 7; ++n)
+					{
+						u16 res = (gen>>7)&3;
+						if( res == 0 )
+						{
+							fbuf[lineoffs + x++] = BLACK;
+						} else if( res == 3 ) {
+							fbuf[lineoffs + x++] = WHITE;
+						} else if( (res == 2 && (x&1)) || ((res == 1) && !(x&1)) ) {
+							fbuf[lineoffs + x++] = (group ? ORANGE : GREEN);
+						} else {
+							fbuf[lineoffs + x++] = (group ? BLUE : VIOLET);
+						}
+						gen >>= 1;
+					}				
+					A = B;
+					B = C;
 				}
 			}
 		}	
