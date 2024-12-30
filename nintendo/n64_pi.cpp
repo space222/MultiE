@@ -1,0 +1,49 @@
+#include <cstring>
+#include "n64.h"
+
+void n64::pi_dma(bool write)
+{
+	if( write )
+	{  // into RAM
+		u32 cart = (PI_CART_ADDR & ~1) - 0x10000000;
+		if( cart >= ROM.size() ) return;
+		u32 ramaddr = (PI_DRAM_ADDR & 0x7fffff);
+		printf("PI DMA: cart $%X, ram $%X, len $%X\n", cart, ramaddr, PI_WR_LEN+1);
+		memcpy(mem.data()+ramaddr, ROM.data()+cart, (PI_WR_LEN&0xffFFff)+1);
+		PI_CART_ADDR += (PI_WR_LEN+1);
+		PI_DRAM_ADDR += (PI_WR_LEN+1);
+	} else {
+		//todo: writing from RAM to cart's save ram
+	}
+	
+	raise_mi_bit(MI_INTR_PI_BIT);
+}
+
+void n64::pi_write(u32 addr, u32 v)
+{
+	u32 reg = (addr&0x3F)>>2;
+	if( reg > 12 ) return;
+	if( reg == 4 )
+	{
+		if( v & BIT(1) )
+		{
+			PI_STATUS &= ~BIT(3);
+			clear_mi_bit(MI_INTR_PI_BIT);
+		}
+		return;
+	}
+	pi_regs[reg] = v;
+	if( reg == 2 )
+	{
+		pi_dma(false);
+	} else if( reg == 3 ) {
+		pi_dma(true);
+	}
+}
+
+u32 n64::pi_read(u32 addr)
+{
+	return pi_regs[(addr&0x3F)>>2];
+}
+
+

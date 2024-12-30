@@ -417,12 +417,12 @@ u8 apple2e::floppy_access(u16 addr, u8 v, bool read)
 		
 		if( newphase == ((drive[curdrive].phase-1)&3) )
 		{
-			if( drive[curdrive].track ) { drive[curdrive].track -= 2; drive[curdrive].bit = 0; }
+			if( drive[curdrive].track ) { drive[curdrive].track -= 2; /*drive[curdrive].bit = 0;*/ }
 			printf("$%X: floppy track = %i\n", c6502.pc, drive[curdrive].track);
 			drive[curdrive].phase = newphase;
 			//todo: make sure current bit is in semi-right place on new track
 		} else if( newphase == ((drive[curdrive].phase+1)&3) ) {
-			if( drive[curdrive].track < 159 ) { drive[curdrive].track += 2;  drive[curdrive].bit = 0; }
+			if( drive[curdrive].track < 159 ) { drive[curdrive].track += 2; /*drive[curdrive].bit = 0;*/ }
 			printf("$%X: floppy track = %i\n", c6502.pc, drive[curdrive].track);
 			drive[curdrive].phase = newphase;
 		}	

@@ -41,6 +41,7 @@
 #include "WonderSwan.h"
 #include "CreatiVision.h"
 #include "apple2e.h"
+#include "n64.h"
 void try_kirq();
 
 namespace fs = std::filesystem;
@@ -476,6 +477,22 @@ void imgui_run()
 			}
 			if( ImGui::BeginMenu("Experimental") ) 
 			{
+				if( ImGui::MenuItem("Nintendo 64") )
+				{
+					std::string f = getOpenFile("Nintendo 64");
+					if( !f.empty() )
+					{
+						delete sys;
+						sys = new n64;
+						if( ! sys->loadROM(f) ) 
+						{
+							printf("unable to load ROM\n");
+							exit(1);
+						}
+						else newinstance = true;
+						crt_scale = 2;
+					}				
+				}
 				if( ImGui::MenuItem("Apple IIe") )
 				{
 					std::string f = getOpenFile("Apple IIe");
@@ -572,7 +589,7 @@ void imgui_run()
 						crt_scale = 2;
 					}				
 				}
-				if( ImGui::MenuItem("MSX") )
+				if( ImGui::MenuItem("Microsoft MSX") )
 				{
 					std::string f = getOpenFile("Microsoft MSX");
 					if( !f.empty() )
