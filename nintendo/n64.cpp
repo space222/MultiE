@@ -21,7 +21,9 @@ u64 n64::read(u32 addr, int size)
 	if( addr < 8*1024*1024 ) return sized_read(mem.data(), addr, size);
 	if( addr >= 0x04300000 && addr < 0x04400000 ) return mi_read(addr);
 	if( addr >= 0x04400000 && addr < 0x04500000 ) return vi_read(addr);
+	if( addr >= 0x04500000 && addr < 0x04600000 ) return ai_read(addr);
 	if( addr >= 0x04600000 && addr < 0x04700000 ) return pi_read(addr);
+	if( addr >= 0x04800000 && addr < 0x04900000 ) return si_read(addr);
 	printf("N64: r%i <$%X\n", size, addr);
 	return 0;
 }
@@ -31,7 +33,9 @@ void n64::write(u32 addr, u64 v, int size)
 	if( addr < 8*1024*1024 ) { sized_write(mem.data(), addr, v, size); return; }
 	if( addr >= 0x04300000 && addr < 0x04400000 ) { mi_write(addr, v); return; }
 	if( addr >= 0x04400000 && addr < 0x04500000 ) { vi_write(addr, v); return; }
+	if( addr >= 0x04500000 && addr < 0x04600000 ) { ai_write(addr, v); return; }
 	if( addr >= 0x04600000 && addr < 0x04700000 ) { pi_write(addr, v); return; }
+	if( addr >= 0x04800000 && addr < 0x04900000 ) { si_write(addr, v); return; }
 }
 
 bool n64::loadROM(const std::string fname)

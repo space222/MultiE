@@ -70,6 +70,7 @@ public:
 	
 	const u32 MI_INTR_DP_BIT = 5;
 	const u32 MI_INTR_PI_BIT = 4;
+	const u32 MI_INTR_AI_BIT = 2;
 	void raise_mi_bit(u32 b);
 	void clear_mi_bit(u32 b);
 	
@@ -90,5 +91,8 @@ public:
 	bool ai_dma_enabled;
 	u32 ai_read(u32);
 	void ai_write(u32, u32);
+	
+	u32 si_read(u32);
+	void si_write(u32, u32);
 };
 
