@@ -8,12 +8,12 @@ u32 n64::ai_read(u32 addr)
 	u32 r = (addr&0x1F)>>2;
 	if( r == 3 )
 	{  // AI_STATUS
-		u32 full = (ai_buf[0].valid&&ai_buf[1].valid) ? (BIT(31)|1) : 0;
+		u32 full = ai_buf[1].valid ? (BIT(31)|1) : 0;
 		u32 busy = ai_buf[0].valid ? BIT(30) : 0;
 		u32 enabled = ai_dma_enabled ? BIT(25) : 0;	
 		return full|busy|enabled|BIT(24)|BIT(20);
 	}
-	return ai_buf[0].length; // everything but status is write-only, with reads returning length
+	return ai_buf[0].length & ~7; // everything but status is write-only, with reads returning length
 }
 
 void n64::ai_write(u32 addr, u32 v)

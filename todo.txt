@@ -237,24 +237,23 @@ Status: Boots and displays mouse cursor + floppy question mark.
 Nintendo 64 Todo List
 ------------------------
 VR4300:
-1. Begin COP0, (D)M(T/F)C0 and ERET especially.
-2. Exceptions, syscall & break, and timer.
-3. That might be enough to run PeterLemon tests and possibly start on n64-systemtest (might need VI for systemtest).
-4. Try to figure out the ordering for what exceptional conditions get checked in what order
-	for unaligned load/store (address error vs TLB stuff) and what kind of memory accesses actually happen.
-
+1. Fix unaligned load/stores (there's failing cases in the PeterLemon tests)
+2. Fill in the functions for MTC0 and friends.
+3. timer, and syscall & break.
+4. Serial Interface (SI)
 5. FPU, not gonna deal with 16vs32 reg mode
 6. TLB, if I support 64bit addresss mode, this is different between the two. 
+7. Try to figure out the ordering for what exceptional conditions get checked in what order
+	for unaligned load/store (address error vs TLB stuff) and what kind of memory accesses actually happen.
 RCP:
-1. VI is an obvious starting point, always need visual output.
-2. MI: need interrupts, so v-int tests?
-3. PI: needed rather soon for IPL3 to be able to read code into ram. Don't need to support unaligned xfer right away.
-4. SI: will need PIF support early on. so the 64byte in/out dma is important.
-5. RI: some regs need to return values to help boot (or rather boot faster)
-6. SP: I/DMEM need to work to boot. Otherwise most can wait (maybe stub a ctrl reg).
-7. DP: Don't need it for now. Texture cmds still used even if doing HLE.
-
-
+1. VI is currently just all registers being r/w so I can display output. Actually do things per-line and v-int.
+2. PI: basic aligned cart->RAM implemented along with interrupt.
+3. SI: will need PIF support early on. so the 64byte in/out dma is important.
+4. RI: some regs need to return values to help boot (or rather boot faster)
+5. SP: I/DMEM need to work to boot. Otherwise most can wait (maybe stub a ctrl reg).
+6. DP: Don't need it for now. Texture cmds still used even if doing HLE.
+*. MI: done except for MI_MODE's repeat feature
+*. AI: Audio is ready other than actually doing the output.
 
 
 
