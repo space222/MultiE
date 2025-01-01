@@ -28,7 +28,7 @@ public:
 	
 	u32 c0_read32(u32 reg);
 	u64 c0_read64(u32 reg);
-	void c0_write32(u32 reg, u32 v);
+	void c0_write32(u32 reg, u64 v);
 	void c0_write64(u32 reg, u64 v);
 	
 	BusResult read(u64, int);
@@ -40,6 +40,7 @@ public:
 	u64 pc, npc, nnpc;
 	bool delay, ndelay;
 	
+	u64& CONTEXT = c[4];
 	u64& BADVADDR = c[8];
 	u64& COUNT = c[9];
 	u64& COMPARE = c[11];

@@ -65,12 +65,15 @@ public:
 	void pi_dma(bool);
 	
 	bool pif_rom_enabled;
-	u8 pifrom[0x400];
+	u8 pifrom[0x800];
 	u8 pifram[0x40];
 	
 	const u32 MI_INTR_DP_BIT = 5;
 	const u32 MI_INTR_PI_BIT = 4;
+	const u32 MI_INTR_VI_BIT = 3;
 	const u32 MI_INTR_AI_BIT = 2;
+	const u32 MI_INTR_SI_BIT = 1;
+	const u32 MI_INTR_SP_BIT = 0;
 	void raise_mi_bit(u32 b);
 	void clear_mi_bit(u32 b);
 	
@@ -92,7 +95,9 @@ public:
 	u32 ai_read(u32);
 	void ai_write(u32, u32);
 	
+	u32 si_regs[6];
 	u32 si_read(u32);
 	void si_write(u32, u32);
+	void pif_run();
 };
 

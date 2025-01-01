@@ -24,6 +24,12 @@ u64 n64::read(u32 addr, int size)
 	if( addr >= 0x04500000 && addr < 0x04600000 ) return ai_read(addr);
 	if( addr >= 0x04600000 && addr < 0x04700000 ) return pi_read(addr);
 	if( addr >= 0x04800000 && addr < 0x04900000 ) return si_read(addr);
+	if( addr >= 0x1FC00000 && addr <= 0x1FCFFFFF )
+	{
+		addr &= 0x7ff;
+		if( addr >= 0x7c0 ) return *(u32*)&pifram[addr&0x3F];
+		return *(u32*)&pifrom[addr];
+	}
 	printf("N64: r%i <$%X\n", size, addr);
 	return 0;
 }
@@ -36,6 +42,13 @@ void n64::write(u32 addr, u64 v, int size)
 	if( addr >= 0x04500000 && addr < 0x04600000 ) { ai_write(addr, v); return; }
 	if( addr >= 0x04600000 && addr < 0x04700000 ) { pi_write(addr, v); return; }
 	if( addr >= 0x04800000 && addr < 0x04900000 ) { si_write(addr, v); return; }
+	if( addr >= 0x1FC00000 && addr <= 0x1FCFFFFF )
+	{
+		addr &= 0x7ff;
+		if( addr < 0x7c0 ) return;
+		*(u32*)&pifram[addr&0x3F] = v;
+		return;
+	}
 }
 
 bool n64::loadROM(const std::string fname)
@@ -104,7 +117,7 @@ void n64::raise_mi_bit(u32 b)
 	{
 		cpu.CAUSE |= BIT(10);
 	} else {
-		cpu.CAUSE &= BIT(10);
+		cpu.CAUSE &= ~BIT(10);
 	}
 }
 
@@ -115,7 +128,7 @@ void n64::clear_mi_bit(u32 b)
 	{
 		cpu.CAUSE |= BIT(10);
 	} else {
-		cpu.CAUSE &= BIT(10);
+		cpu.CAUSE &= ~BIT(10);
 	}
 }
 	
@@ -184,7 +197,7 @@ void n64::mi_write(u32 r, u32 v)
 		{
 			cpu.CAUSE |= BIT(10);
 		} else {
-			cpu.CAUSE &= BIT(10);
+			cpu.CAUSE &= ~BIT(10);
 		}	
 		return;
 	}

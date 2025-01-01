@@ -29,6 +29,9 @@ vr4300_instr decode_special(VR4300&, u32 opcode)
 	case 0x08: return INSTR { RTYPE; cpu.branch(cpu.r[s]); }; // JR
 	case 0x09: return INSTR { RTYPE; u64 temp = cpu.r[s]; cpu.r[d] = LINK; cpu.branch(temp); }; // JALR
 	
+	case 0x0C: return INSTR { cpu.exception(8); }; // SYSCALL
+	case 0x0D: return INSTR { cpu.exception(9); }; // BREAK
+	
 	case 0x0F: return INSTR {}; // SYNC
 	case 0x10: return INSTR { RTYPE; cpu.r[d] = cpu.hi; }; // MFHI
 	case 0x11: return INSTR { RTYPE; cpu.hi = cpu.r[s]; }; // MTHI
@@ -560,7 +563,11 @@ void VR4300::step()
 	ndelay = false;
 	BusResult opc;
 	
-	//todo: run timer
+	COUNT += 1;
+	if( (u32(COUNT)>>1) == u32(COMPARE) )
+	{
+		CAUSE |= BIT(15);
+	}
 	
 	if( ((STATUS&7)==1) && (STATUS & CAUSE & 0xff00) )
 	{       // exception() will set npc
@@ -627,6 +634,9 @@ void VR4300::reset()
 	pc = 0xbfc00000;
 	STATUS = 0;
 	CAUSE = 0;
+	COMPARE = 0xffffffffu;
+	STATUS = 0x34000000;
+	c[15] = 0x00000B00;
 	npc = pc + 4;
 	nnpc = npc + 4;
 	delay = ndelay = LLbit = false;
@@ -637,6 +647,8 @@ BusResult VR4300::read(u64 addr, int size)
 	if( (size == 64 && (addr&7)) || (size == 32 && (addr&3)) || (size == 16 && (addr&1)) ) 
 	{
 		BADVADDR = addr;
+		CONTEXT &= ~0xffFFff;
+		CONTEXT |= (u32(addr)>>9);
 		address_error(false); 
 		return BusResult::exception(1); 
 	}
@@ -654,6 +666,8 @@ BusResult VR4300::write(u64 addr, u64 v, int size)
 	if( (size == 64 && (addr&7)) || (size == 32 && (addr&3)) || (size == 16 && (addr&1)) ) 
 	{
 		BADVADDR = addr;
+		CONTEXT &= ~0xffFFff;
+		CONTEXT |= (u32(addr)>>9);
 		address_error(true); 
 		return BusResult::exception(1); 
 	}
@@ -669,22 +683,39 @@ BusResult VR4300::write(u64 addr, u64 v, int size)
 
 u32 VR4300::c0_read32(u32 reg)
 {
-	return 0xbadf33d;
+	return c0_read64(reg);
 }
-
 
 u64 VR4300::c0_read64(u32 reg)
 {
-	return 0xb00b135;
+	switch( reg )
+	{
+	case 9: return COUNT>>1;
+	default: break;
+	}
+	return c[reg];
 }
 
-void VR4300::c0_write32(u32 reg, u32 v)
+// c0_write32 is implemented as the full 64bits for now. 
+// according to discord posts MTC0 is the same as DMTC0
+// but mFc0 is not the same as DmFc0.
+void VR4300::c0_write32(u32 reg, u64 v)
 {
+	switch( reg )
+	{
+	case 9: COUNT = v<<1; return;
+	case 11: CAUSE &= ~BIT(15); COMPARE = v; return;
+	
+	case  1: return;  // Random is read-only
+	case 15: return;  // PRid is read-only
+	default: break;
+	}
+	c[reg] = v;
 	return;
 }
 
 void VR4300::c0_write64(u32 reg, u64 v)
 {
-	return;
+	c0_write32(reg, v);
 }
 
