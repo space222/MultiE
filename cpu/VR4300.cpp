@@ -80,7 +80,7 @@ vr4300_instr decode_special(VR4300&, u32 opcode)
 			{
 				cpu.lo = (a&BIT(31))?1:-1;
 				cpu.hi = cpu.r[s];
-			} else if( cpu.r[s] == 0x80000000u && cpu.r[t] == 0xffffFFFFu) {
+			} else if( u32(cpu.r[s]) == 0x80000000u && u32(cpu.r[t]) == 0xffffFFFFu) {
 				cpu.lo = a;
 				cpu.hi = 0;
 			} else {
@@ -113,14 +113,13 @@ vr4300_instr decode_special(VR4300&, u32 opcode)
 			s64 b = cpu.r[t];
 			if( b == 0 )
 			{
-				cpu.lo = -1;
+				cpu.lo = (a<0)?1:-1;
 				cpu.hi = cpu.r[s];
 			} else if( cpu.r[s] == 0x8000'0000'0000'0000ull && cpu.r[t] == 0xffffFFFFffffFFFFull ) {
-				cpu.lo = (a&BITL(63))?1:-1;
 				cpu.hi = 0;
+				cpu.lo = a;
 			} else {
 				cpu.lo = a / b;
-				printf("%lx / %lx = %lx, %lx\n", a, b, cpu.lo, a/b);
 				cpu.hi = a % b;			
 			}
 		};
@@ -573,7 +572,7 @@ void VR4300::step()
 	{       // exception() will set npc
 		exception(0);
 		printf("interrupt!\n");
-		exit(1);
+		//exit(1);
 	} else if( !(opc = read(pc, 32)) ) {
 		// if an exception happened on opcode fetch, exception() will already have been called
 		// nothing else to be done here other than skip to pc pipeline advance
@@ -631,12 +630,16 @@ void VR4300::exception(u32 ec, u32 vector)
 
 void VR4300::reset()
 {
-	pc = 0xbfc00000;
 	STATUS = 0;
 	CAUSE = 0;
 	COMPARE = 0xffffffffu;
 	STATUS = 0x34000000;
+	cop1_half_mode = !(STATUS & BIT(26));
 	c[15] = 0x00000B00;
+	WIRED = 0;
+	RANDOM = 31;
+
+	pc = 0xbfc00000;
 	npc = pc + 4;
 	nnpc = npc + 4;
 	delay = ndelay = LLbit = false;
@@ -647,7 +650,7 @@ BusResult VR4300::read(u64 addr, int size)
 	if( (size == 64 && (addr&7)) || (size == 32 && (addr&3)) || (size == 16 && (addr&1)) ) 
 	{
 		BADVADDR = addr;
-		CONTEXT &= ~0xffFFff;
+		CONTEXT &= ~0x7fFFff;
 		CONTEXT |= (u32(addr)>>9);
 		address_error(false); 
 		return BusResult::exception(1); 
@@ -666,7 +669,7 @@ BusResult VR4300::write(u64 addr, u64 v, int size)
 	if( (size == 64 && (addr&7)) || (size == 32 && (addr&3)) || (size == 16 && (addr&1)) ) 
 	{
 		BADVADDR = addr;
-		CONTEXT &= ~0xffFFff;
+		CONTEXT &= ~0x7fFFff;
 		CONTEXT |= (u32(addr)>>9);
 		address_error(true); 
 		return BusResult::exception(1); 
@@ -703,8 +706,11 @@ void VR4300::c0_write32(u32 reg, u64 v)
 {
 	switch( reg )
 	{
+	//case 1: RANDOM &= ~BIT(5); RANDOM |= v & BIT(5); return;
+	case 6: WIRED = v & 0x3F; RANDOM = 31; return;
 	case 9: COUNT = v<<1; return;
 	case 11: CAUSE &= ~BIT(15); COMPARE = v; return;
+	case 12: STATUS = u32(v); cop1_half_mode = !(STATUS & BIT(26)); return;
 	
 	case  1: return;  // Random is read-only
 	case 15: return;  // PRid is read-only

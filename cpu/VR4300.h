@@ -40,7 +40,9 @@ public:
 	u64 pc, npc, nnpc;
 	bool delay, ndelay;
 	
+	u64& RANDOM = c[1];
 	u64& CONTEXT = c[4];
+	u64& WIRED = c[6];
 	u64& BADVADDR = c[8];
 	u64& COUNT = c[9];
 	u64& COMPARE = c[11];
@@ -50,12 +52,12 @@ public:
 	u64& LL_ADDR = c[17];
 	
 	u64& ErrorEPC = c[30];
-	
+		
 	u64 r[32];
 	u64 c[32];
-	u64 f[32];
+	u8 f[32*8];
 	u64 hi, lo;
-	bool LLbit;
+	bool LLbit, cop1_half_mode;
 	
 	const u64 STATUS_EXL = 2;
 	const u64 STATUS_ERL = 4;

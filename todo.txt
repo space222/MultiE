@@ -238,8 +238,8 @@ Nintendo 64 Todo List
 ------------------------
 VR4300:
 1. Fix unaligned load/stores (there's failing cases in the PeterLemon tests)
-2. Fill in the functions for MTC0 and friends.
-3. FPU, not gonna deal with 16vs32 reg mode
+2. Fill in the functions for MTC0 and friends. (will need systemtest for some of the masks)
+3. FPU, not gonna deal with 16vs32 reg mode (actually found a discord msg for 16vs32 mode, but dunno how accurate)
 4. TLB, if I support 64bit addresss mode, this is different between the two. 
 5. Try to figure out the ordering for what exceptional conditions get checked in what order
 	for unaligned load/store (address error vs TLB stuff) and what kind of memory accesses actually happen.
@@ -248,11 +248,19 @@ RCP:
 2. PI: basic aligned cart->RAM implemented along with interrupt.
 3. PIF: run the cmd in the final byte, including pif-rom lock and controller comms.
 4. RI: some regs need to return values to help boot (or rather boot faster)
-5. SP: I/DMEM need to work to boot. Otherwise most can wait (maybe stub a ctrl reg).
+5. SP: I/DMEM need to work to boot, plus a RSP control reg to halt it. Otherwise most can wait.
 6. DP: Don't need it for now. Texture cmds still used even if doing HLE.
 *. MI: done except for MI_MODE's repeat feature
 *. SI: done (PIF now gets its own todo item). Not supporting the single-word xfer regs.
 *. AI: Audio is ready other than actually doing the output.
+Status: Almost ready to either boot from PIFROM or HLE it. After that, already have PI+VI(ish)+SI+COUNT interrupts
+	so Namco should run unless it needs audio actually happening. Will need FPU for Namco to be legit.
+	After that, it becomes RSP time, unless I want to run the PeterLemon RDP stuff (will need some RDP like textures anyway).
+
+
+
+
+
 
 
 
