@@ -66,6 +66,7 @@ void n64::ai_write(u32 addr, u32 v)
 		}
 		float DAChz = VI_CLOCK / float(v&0x3fff);
 		ai_cycles_per_sample = CPU_HZ / DAChz;
+		if( ai_cycles_per_sample < 800 ) ai_cycles_per_sample = 8000;
 		printf("N64: AI config %fHz, %li cycles per sample\n", DAChz, ai_cycles_per_sample);
 		return;
 	}

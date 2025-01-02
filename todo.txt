@@ -252,9 +252,9 @@ RCP:
 6. DP: Don't need it for now. Texture cmds still used even if doing HLE.
 *. MI: done except for MI_MODE's repeat feature
 *. SI: done (PIF now gets its own todo item). Not supporting the single-word xfer regs.
-*. AI: Audio is ready other than actually doing the output.
+*. AI: Audio is ready (question mark. The Super Fighter Demo has junk, silence, then repeats song then silence)
 Status: Almost ready to either boot from PIFROM or HLE it. After that, already have PI+VI(ish)+SI+COUNT interrupts
-	so Namco should run unless it needs audio actually happening. Will need FPU for Namco to be legit.
+	so Namco should run. Will need FPU for Namco to be legit.
 	After that, it becomes RSP time, unless I want to run the PeterLemon RDP stuff (will need some RDP like textures anyway).
 
 

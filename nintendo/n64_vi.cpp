@@ -29,7 +29,11 @@ void n64::vi_draw_frame()
 		{
 			for(u32 i = 0; i < width; ++i)
 			{
-				*(u16*)&fbuf[line*width*2 + i*2] = __builtin_bswap16(*(u16*)&mem[offset + i*2]);
+				u16 p = __builtin_bswap16(*(u16*)&mem[offset + i*2]);
+				u8 b = (p>>11)&0x1f;
+				u8 g = (p>>6)&0x1f;
+				u8 r = (p>>1)&0x1f;
+				*(u16*)&fbuf[line*width*2 + i*2] = (r<<10)|(g<<5)|b;
 			}
 		}
 		return;

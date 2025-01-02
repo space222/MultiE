@@ -5,6 +5,7 @@
 class n64 : public console
 {
 public:
+	//n64() { setVsync(0); }
 	u32 fb_width() override { return curwidth; }
 	u32 fb_height() override { return curheight; }
 	u32 fb_bpp() override { return curbpp; }
@@ -91,6 +92,8 @@ public:
 		bool valid;
 	} ai_buf[2];
 	u64 ai_cycles_per_sample, ai_cycles;
+	u64 ai_output_cycles;
+	float ai_L, ai_R;
 	bool ai_dma_enabled;
 	u32 ai_read(u32);
 	void ai_write(u32, u32);

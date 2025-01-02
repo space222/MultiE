@@ -69,7 +69,8 @@ bool n64::loadROM(const std::string fname)
 	[[maybe_unused]] int unu = fread(ROM.data(), 1, fsz, fp);
 	fclose(fp);
 	printf("ROM size = %li bytes\n", fsz);
-	memcpy(mem.data()+0x1000, ROM.data()+0x1000, fsz < 0x101000 ? fsz : 0x100000);
+	u32 entry = __builtin_bswap32(*(u32*)&ROM[8]);
+	memcpy(mem.data()+(entry&0x7fffff), ROM.data()+0x1000, fsz < 0x101000 ? fsz : 0x100000);
 	
 	
 	return true;
@@ -83,6 +84,34 @@ void n64::run_frame()
 		for(u32 i = 0; i < 5725; ++i)
 		{
 			cpu.step();
+			if( ai_dma_enabled && ai_buf[0].valid )
+			{
+				ai_cycles += 1;
+				if( ai_cycles >= ai_cycles_per_sample )
+				{
+					ai_cycles = 0;
+					s16 L = __builtin_bswap16(*(u16*)&mem[ai_buf[0].ramaddr&0x7fffff]);
+					ai_buf[0].ramaddr += 2;
+					s16 R = __builtin_bswap16(*(u16*)&mem[ai_buf[0].ramaddr&0x7fffff]);
+					ai_buf[0].ramaddr += 2;
+					ai_buf[0].length -= 4;
+					if( ai_buf[0].length == 0 )
+					{
+						ai_buf[0] = ai_buf[1];
+						ai_buf[1].valid = false;
+						if( ai_buf[0].valid ) raise_mi_bit(MI_INTR_AI_BIT);
+					}
+					
+					ai_L = (L / 32768.f);
+					ai_R = (R / 32768.f);				
+				}
+			}
+			ai_output_cycles += 1;
+			if( ai_output_cycles >= (93750000/44100) )
+			{
+				ai_output_cycles -= (93750000/44100);
+				//audio_add(ai_L, ai_R);
+			}
 		}
 	}
 	vi_draw_frame();
@@ -96,7 +125,7 @@ void n64::reset()
 	cpu.phys_read = [&](u64 a, int s)->u64 { return read(a, s); };
 	cpu.phys_write= [&](u64 a, u64 v, int s) { write(a, v, s); };
 	cpu.reset();
-	cpu.pc = s32(0x80001000u);
+	cpu.pc = s32(__builtin_bswap32(*(u32*)&ROM[8]));
 	cpu.npc = cpu.pc + 4;
 	cpu.nnpc = cpu.npc + 4;
 	
@@ -107,7 +136,7 @@ void n64::reset()
 	ai_buf[0].valid = ai_buf[1].valid = false;
 	ai_dma_enabled = false;
 	ai_cycles_per_sample = 800;
-	ai_cycles = 0;
+	ai_cycles = ai_output_cycles = 0;
 }
 
 void n64::raise_mi_bit(u32 b)
