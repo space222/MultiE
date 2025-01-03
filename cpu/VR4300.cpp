@@ -403,7 +403,7 @@ vr4300_instr decode_regular(VR4300&, u32 opcode)
 			{	//todo: address for exception might need to be the full unaligned value
 				return;
 			}
-			cpu.r[t] &= ~((1ull<<(((addr&7)+1)*8))-1); //might be UB if shift becomes 64?
+			cpu.r[t] &= (~((1ull<<(((addr&7))*8))-1))<<8;
 			cpu.r[t] |= res>>((7-(addr&7))<<3);
 		};
 	

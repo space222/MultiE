@@ -4,6 +4,7 @@ Framework Todo List
 2. Windows support
 3. ability to remap controls across systems
 4. Stereo sound
+5. Support letter/pillar boxing rather than scaling the boxed size to 640x480.
 
 
 
@@ -236,8 +237,10 @@ Status: Boots and displays mouse cursor + floppy question mark.
 
 Nintendo 64 Todo List
 ------------------------
+Overall:
+1. Once VR4300#1 (fix aligned stores) is complete, RCP#5(RSP mem/ctrl), then need to start attempting to run full IPL.
 VR4300:
-1. Fix unaligned load/stores (there's failing cases in the PeterLemon tests)
+1. Fix unaligned stores (there's failing cases in the PeterLemon tests)
 2. Fill in the functions for MTC0 and friends. (will need systemtest for some of the masks)
 3. FPU, not gonna deal with 16vs32 reg mode (actually found a discord msg for 16vs32 mode, but dunno how accurate)
 4. TLB, if I support 64bit addresss mode, this is different between the two. 
@@ -250,10 +253,11 @@ RCP:
 4. RI: some regs need to return values to help boot (or rather boot faster)
 5. SP: I/DMEM need to work to boot, plus a RSP control reg to halt it. Otherwise most can wait.
 6. DP: Don't need it for now. Texture cmds still used even if doing HLE.
+Status: 
 *. MI: done except for MI_MODE's repeat feature
 *. SI: done (PIF now gets its own todo item). Not supporting the single-word xfer regs.
 *. AI: Audio is ready (question mark. The Super Fighter Demo has junk, silence, then repeats song then silence)
-Status: Almost ready to either boot from PIFROM or HLE it. After that, already have PI+VI(ish)+SI+COUNT interrupts
+	Almost ready to either boot from PIFROM or HLE it. After that, already have PI+VI(ish)+SI+COUNT interrupts
 	so Namco should run. Will need FPU for Namco to be legit.
 	After that, it becomes RSP time, unless I want to run the PeterLemon RDP stuff (will need some RDP like textures anyway).
 

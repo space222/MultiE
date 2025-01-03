@@ -28,7 +28,11 @@ u64 n64::read(u32 addr, int size)
 	{
 		addr &= 0x7ff;
 		if( addr >= 0x7c0 ) return *(u32*)&pifram[addr&0x3F];
-		return *(u32*)&pifrom[addr];
+		if( pif_rom_enabled )
+		{
+			return *(u32*)&pifrom[addr];
+		}
+		return 0;
 	}
 	printf("N64: r%i <$%X\n", size, addr);
 	return 0;
