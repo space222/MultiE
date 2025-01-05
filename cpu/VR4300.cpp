@@ -322,8 +322,10 @@ vr4300_instr decode_regular(VR4300&, u32 opcode)
 				};
 			}
 			printf("VR4300: Unimpl COP0 opcode = $%X\n", opcode);
-			exit(1);
-		}		
+			return INSTR {};
+			//exit(1);
+		}
+	case 0x11: return INSTR {}; // COP1 / FPU todo		
 	case 0x14:  // BEQL 
 		return INSTR {
 			ITYPE; 
@@ -454,12 +456,14 @@ vr4300_instr decode_regular(VR4300&, u32 opcode)
 			u64 addr = cpu.r[s] + s16(imm16);
 			auto mem = cpu.read(addr&~3, 32);
 			if( !mem ) return;
-			cpu.write(addr&~3, (cpu.r[t] >> ((addr&3)*8)) | (mem & ~((1ull<<(32-((addr&3)*8)))-1)), 32);
+			cpu.write(addr&~3, (u32(cpu.r[t]) >> ((addr&3)*8)) | (u32(mem) & ~((1ull<<(32-((addr&3)*8)))-1)), 32);
 		};
 	case 0x2B: return INSTR { ITYPE; cpu.write(cpu.r[s] + s16(imm16), cpu.r[t], 32); }; // SW
 	case 0x2C: // SDL
 		//todo: there's only 1 actual bus transaction in these
 		//	will need to do a more raw, tlb translation + physical access here
+		printf("SDL!\n");
+		exit(1);
 		return INSTR
 		{
 			ITYPE;
@@ -490,7 +494,7 @@ vr4300_instr decode_regular(VR4300&, u32 opcode)
 			auto mem = cpu.read(addr&~3, 32);
 			if( !mem ) return;
 			const u32 shift = (24-((addr&3)*8));
-			cpu.write(addr&~3, (mem&((1ull<<shift)-1)) | (cpu.r[t]<<shift), 32);
+			cpu.write(addr&~3, (mem&((1ull<<shift)-1)) | (u32(cpu.r[t])<<shift), 32);
 		};
 	case 0x2F: return INSTR { /*printf("VR4300: cache instruction\n");*/ }; // CACHE not implemented
 	case 0x30: // LL
@@ -504,6 +508,9 @@ vr4300_instr decode_regular(VR4300&, u32 opcode)
 			cpu.r[t] = s32(res);			
 		};
 
+	case 0x31: // LWC1
+		return INSTR {};
+
 	case 0x34: // LLD
 		return INSTR
 		{
@@ -514,6 +521,7 @@ vr4300_instr decode_regular(VR4300&, u32 opcode)
 			cpu.LLbit = true;
 			cpu.r[t] = res;			
 		};
+	case 0x35: return INSTR {}; // LDC1
 	
 	case 0x37: // LD
 		return INSTR 
@@ -535,6 +543,7 @@ vr4300_instr decode_regular(VR4300&, u32 opcode)
 				cpu.r[t] = 0;
 			}		
 		};
+	case 0x39: return INSTR {}; // SWC1
 		
 	case 0x3C: // SCD
 		return INSTR
@@ -548,12 +557,15 @@ vr4300_instr decode_regular(VR4300&, u32 opcode)
 				cpu.r[t] = 0;
 			}		
 		};
+	case 0x3D: return INSTR {}; // SCD1 ??
 	
 	case 0x3F: return INSTR { ITYPE; cpu.write(cpu.r[s] + s16(imm16), cpu.r[t], 64); }; // SD
 	default: printf("VR4300: unimpl regular opc $%X\n", opcode>>26); exit(1);
 	}
 	return nullptr;
 }
+
+extern u32 mimask, miirq;
 
 void VR4300::step()
 {
@@ -563,16 +575,15 @@ void VR4300::step()
 	BusResult opc;
 	
 	COUNT += 1;
-	if( (u32(COUNT)>>1) == u32(COMPARE) )
+	if( u32(COUNT>>1) == u32(COMPARE) )
 	{
 		CAUSE |= BIT(15);
 	}
 	
 	if( ((STATUS&7)==1) && (STATUS & CAUSE & 0xff00) )
 	{       // exception() will set npc
+		printf("interrupt: mask=$%X, intr=$%X\n", mimask, miirq);
 		exception(0);
-		printf("interrupt!\n");
-		//exit(1);
 	} else if( !(opc = read(pc, 32)) ) {
 		// if an exception happened on opcode fetch, exception() will already have been called
 		// nothing else to be done here other than skip to pc pipeline advance
@@ -602,6 +613,8 @@ void VR4300::branch(u64 target)
 
 void VR4300::overflow()
 {
+	printf("Overflow should not happen\n");
+	exit(1);
 	exception(12);
 }
 
@@ -632,10 +645,11 @@ void VR4300::reset()
 {
 	STATUS = 0;
 	CAUSE = 0;
+	COUNT = 0x80000000u;
 	COMPARE = 0xffffffffu;
 	STATUS = 0x34000000;
 	cop1_half_mode = !(STATUS & BIT(26));
-	c[15] = 0x00000B00;
+	c[15] = 0x00000B22;
 	WIRED = 0;
 	RANDOM = 31;
 
@@ -693,7 +707,7 @@ u64 VR4300::c0_read64(u32 reg)
 {
 	switch( reg )
 	{
-	case 9: return COUNT>>1;
+	case 9: return u32(COUNT>>1);
 	default: break;
 	}
 	return c[reg];
@@ -708,9 +722,10 @@ void VR4300::c0_write32(u32 reg, u64 v)
 	{
 	//case 1: RANDOM &= ~BIT(5); RANDOM |= v & BIT(5); return;
 	case 6: WIRED = v & 0x3F; RANDOM = 31; return;
-	case 9: COUNT = v<<1; return;
-	case 11: CAUSE &= ~BIT(15); COMPARE = v; return;
+	case 9: COUNT = (v&0xffffFFFFull)<<1; return;
+	case 11: CAUSE &= ~BIT(15); COMPARE = u32(v); printf("COMPARE = $%X\n", u32(COMPARE)); return;
 	case 12: STATUS = u32(v); cop1_half_mode = !(STATUS & BIT(26)); return;
+	case 13: CAUSE &= ~(BIT(8)|BIT(9)); CAUSE |= v & (BIT(8)|BIT(9)); return;
 	
 	case  1: return;  // Random is read-only
 	case 15: return;  // PRid is read-only

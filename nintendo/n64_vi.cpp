@@ -5,8 +5,6 @@
 
 void n64::vi_draw_frame()
 {
-	raise_mi_bit(MI_INTR_VI_BIT);
-
 	u32 width = (640.f * (VI_X_SCALE&0xfff)) / 0x400;
 	u32 height = (240.f * (VI_Y_SCALE&0xfff)) / 0x400;
 	curwidth = width>0 ? width : 320;
@@ -53,12 +51,14 @@ void n64::vi_draw_frame()
 
 void n64::vi_write(u32 addr, u32 v)
 {
+	addr = (addr&0x3F)>>2;
 	if( addr == 4 ) 
 	{	// VI_V_CURRENT: writes clear irq
+		printf("N64: VI irq cleared\n");
 		clear_mi_bit(MI_INTR_VI_BIT);
 		return; 
 	}
-	vi_regs[(addr&0x3F)>>2] = v;
+	vi_regs[addr] = v;
 }
 
 u32 n64::vi_read(u32 addr)

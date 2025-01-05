@@ -56,6 +56,7 @@ u64 n64::read(u32 addr, int size)
 	{
 		return __builtin_bswap32(*(u32*)&IMEM[addr&0xfff]);
 	}
+	//printf("N64:$%X: r%i <$%X\n", u32(cpu.pc), size, addr);
 	if( addr >= 0x04300000 && addr < 0x04400000 ) return mi_read(addr);
 	if( addr >= 0x04400000 && addr < 0x04500000 ) return vi_read(addr);
 	if( addr >= 0x04500000 && addr < 0x04600000 ) return ai_read(addr);
@@ -67,6 +68,7 @@ u64 n64::read(u32 addr, int size)
 	if( addr == 0x0410000C ) return 0;
 	if( addr == 0x0470000C ) return 0x14;
 	if( addr == 0x04080000 ) return 0;
+	if( addr == 0x05000508 ) return -1;
 	
 	if( addr >= 0x10000000 && addr < (0x10000000 + ROM.size()) )
 	{
@@ -84,7 +86,6 @@ u64 n64::read(u32 addr, int size)
 		return 0;
 	}
 	
-	printf("N64:$%X: r%i <$%X\n", u32(cpu.pc), size, addr);
 	exit(1);
 	return 0;
 }
@@ -174,13 +175,23 @@ bool n64::loadROM(const std::string fname)
 	return true;
 }
 
+u32 mimask, miirq;
+
 void n64::run_frame()
 {
 	for(u32 line = 0; line < 262; ++line)
 	{
-		VI_V_CURRENT = line<<1;
+		if( VI_CTRL & 3 )
+		{
+			VI_V_CURRENT = line<<1;
+			if( (VI_V_CURRENT>>1) == (VI_V_INTR>>1) ) raise_mi_bit(MI_INTR_VI_BIT);
+		} else {
+			VI_V_CURRENT = 0;
+		}
 		for(u32 i = 0; i < 5725; ++i)
 		{
+			mimask = MI_MASK;
+			miirq = MI_INTERRUPT;
 			cpu.step();
 			if( ai_dma_enabled && ai_buf[0].valid )
 			{
@@ -197,7 +208,11 @@ void n64::run_frame()
 					{
 						ai_buf[0] = ai_buf[1];
 						ai_buf[1].valid = false;
-						if( ai_buf[0].valid ) raise_mi_bit(MI_INTR_AI_BIT);
+						if( ai_buf[0].valid )
+						{
+							raise_mi_bit(MI_INTR_AI_BIT);
+							printf("N64: AI interrupt 2\n");
+						}
 					}
 					
 					ai_L = (L / 32768.f);
@@ -230,6 +245,8 @@ void n64::reset()
 	PI_STATUS = VI_CTRL = 0;
 	pif_rom_enabled = true;
 	MI_VERSION = 0x02020102;
+	MI_INTERRUPT = 0;
+	MI_MASK = 0;
 	
 	if( do_boot_hle )
 	{
@@ -255,7 +272,8 @@ void n64::reset()
 		pifram[0x27] = seed;
 	}
 	
-	ai_buf[0].valid = ai_buf[1].valid = false;
+	ai_buf[0].valid = false;
+	ai_buf[1].valid = false;
 	ai_dma_enabled = false;
 	ai_cycles_per_sample = 800;
 	ai_cycles = ai_output_cycles = 0;
@@ -342,8 +360,9 @@ void n64::mi_write(u32 r, u32 v)
 			MI_MASK &= ~16;
 		} else if( dp == 2 ) {
 			MI_MASK |= 16;
-		}	
+		}
 		
+		//printf("N64: MI_MASK = $%X, v = $%X\n", MI_MASK, u32(v));
 		if( MI_INTERRUPT & MI_MASK & 0x3F )
 		{
 			cpu.CAUSE |= BIT(10);

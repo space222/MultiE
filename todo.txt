@@ -238,9 +238,9 @@ Status: Boots and displays mouse cursor + floppy question mark.
 Nintendo 64 Todo List
 ------------------------
 Overall:
-1. Once VR4300#1 (fix aligned stores) is complete, RCP#5(RSP mem/ctrl), then need to start attempting to run full IPL.
+1. Figure out what is preventing Namco from running.
 VR4300:
-1. Fix unaligned stores (there's failing cases in the PeterLemon tests)
+1. Fix unaligned 64bit stores (there's failing cases in the PeterLemon tests)
 2. Fill in the functions for MTC0 and friends. (will need systemtest for some of the masks)
 3. FPU, not gonna deal with 16vs32 reg mode (actually found a discord msg for 16vs32 mode, but dunno how accurate)
 4. TLB, if I support 64bit addresss mode, this is different between the two. 
@@ -248,15 +248,15 @@ VR4300:
 	for unaligned load/store (address error vs TLB stuff) and what kind of memory accesses actually happen.
 RCP:
 1. VI is currently just all registers being r/w so I can display output. Actually do things per-line and v-int.
-2. PI: basic aligned cart->RAM implemented along with interrupt.
-3. PIF: run the cmd in the final byte, including pif-rom lock and controller comms.
-4. RI: some regs need to return values to help boot (or rather boot faster)
-5. SP: I/DMEM need to work to boot, plus a RSP control reg to halt it. Otherwise most can wait.
-6. DP: Don't need it for now. Texture cmds still used even if doing HLE.
+2. PIF: controller comms still need doing, but the necessary commands to make it thru IPL1/2/3 are done.
+3. RI: RI_SELECT returns 0x14 to help skip other setup in IPL, but should make all regs r/w.
+4. SP: I/DMEM work for 32bit r/w. The rest of the regs are stubbed so IPL works.
+5. DP: Don't need it for now. Texture cmds still used even if doing HLE.
 Status: 
-*. MI: done except for MI_MODE's repeat feature
-*. SI: done (PIF now gets its own todo item). Not supporting the single-word xfer regs.
-*. AI: Audio is ready (question mark. The Super Fighter Demo has junk, silence, then repeats song then silence)
+MI: done except for MI_MODE's repeat feature
+PI: basic aligned cart->RAM implemented along with interrupt.
+SI: done (PIF now gets its own todo item). Not supporting the single-word xfer regs.
+AI: Audio is ready (question mark. The Super Fighter Demo has junk, silence, then repeats song then silence)
 	Almost ready to either boot from PIFROM or HLE it. After that, already have PI+VI(ish)+SI+COUNT interrupts
 	so Namco should run. Will need FPU for Namco to be legit.
 	After that, it becomes RSP time, unless I want to run the PeterLemon RDP stuff (will need some RDP like textures anyway).
