@@ -492,7 +492,7 @@ vr4300_instr decode_regular(VR4300&, u32 opcode)
 			const u32 shift = (24-((addr&3)*8));
 			cpu.write(addr&~3, (mem&((1ull<<shift)-1)) | (cpu.r[t]<<shift), 32);
 		};
-	case 0x2F: return INSTR { printf("VR4300: cache instruction\n"); }; // CACHE not implemented
+	case 0x2F: return INSTR { /*printf("VR4300: cache instruction\n");*/ }; // CACHE not implemented
 	case 0x30: // LL
 		return INSTR
 		{

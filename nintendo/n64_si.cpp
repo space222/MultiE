@@ -3,7 +3,14 @@
 
 void n64::pif_run()
 {
+	if( pifram[0x3f] & 0x10 ) { pifram[0x3f] &= ~0x10; pif_rom_enabled = false; pifram[0x3f] &= 0x7f; }
+	if( pifram[0x3f] & 0x40 ) { pifram[0x3f] &= ~0x40; pifram[0x3f] &= 0x7f; }
+	if( pifram[0x3f] & 0x20 ) { pifram[0x3f] &= ~0x20; pifram[0x3f] |= 0x80; }
 
+
+	if( !(pifram[0x3f] & 1) ) return;
+	// from here on it's controller time
+	//todo: controller time
 }
 
 void n64::si_write(u32 addr, u32 v)

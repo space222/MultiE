@@ -5,7 +5,7 @@
 class n64 : public console
 {
 public:
-	//n64() { setVsync(0); }
+	n64() { setVsync(0); }
 	u32 fb_width() override { return curwidth; }
 	u32 fb_height() override { return curheight; }
 	u32 fb_bpp() override { return curbpp; }
@@ -65,7 +65,7 @@ public:
 	u32 pi_read(u32);
 	void pi_dma(bool);
 	
-	bool pif_rom_enabled;
+	bool pif_rom_enabled, do_boot_hle;
 	u8 pifrom[0x800];
 	u8 pifram[0x40];
 	
@@ -102,5 +102,10 @@ public:
 	u32 si_read(u32);
 	void si_write(u32, u32);
 	void pif_run();
+	
+	u8 DMEM[0x1000];
+	u8 IMEM[0x1000];
+	u32 sp_read(u32);
+	void sp_write(u32, u32);
 };
 
