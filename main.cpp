@@ -490,7 +490,7 @@ void imgui_run()
 							exit(1);
 						}
 						else newinstance = true;
-						crt_scale = 2;
+						crt_scale = 1.5f;
 					}				
 				}
 				if( ImGui::MenuItem("Apple IIe") )

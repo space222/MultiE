@@ -11,7 +11,6 @@ u32 n64::ai_read(u32 addr)
 		u32 full = ai_buf[1].valid ? (BIT(31)|1) : 0;
 		u32 busy = ai_buf[0].valid ? BIT(30) : 0;
 		u32 enabled = ai_dma_enabled ? BIT(25) : 0;
-		printf("n64: AI status read\n");
 		return full|busy|enabled|BIT(24)|BIT(20);
 	}
 	return ai_buf[0].length & ~7; // everything but status is write-only, with reads returning length
@@ -37,16 +36,13 @@ void n64::ai_write(u32 addr, u32 v)
 	if( r == 1 )
 	{	// AI_LENGTH
 		if( !(v & 0x3fff8) ) return;
-		printf("AI_LENGTH = $%X\n", v);
 		if( ai_buf[0].valid )
 		{
 			ai_buf[1].length = v&0x3fff8;
 			ai_buf[1].valid = true;
 		} else {
 			ai_buf[0].length = v&0x3fff8;
-			printf("ai_buf[0].length = $%X\n", ai_buf[0].length);
 			ai_buf[0].valid = true;
-			printf("N64: AI first irq\n");
 			raise_mi_bit(MI_INTR_AI_BIT);
 		}
 		return;

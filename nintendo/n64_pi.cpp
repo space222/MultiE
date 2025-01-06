@@ -5,10 +5,10 @@ void n64::pi_dma(bool write)
 {
 	if( write )
 	{  // into RAM
-		u32 cart = (PI_CART_ADDR & ~1) - 0x10000000;
+		u32 cart = PI_CART_ADDR - 0x10000000;
 		if( cart >= ROM.size() ) return;
 		u32 ramaddr = (PI_DRAM_ADDR & 0x7ffffe);
-		printf("PI DMA: cart $%X, ram $%X, len $%X\n", cart, ramaddr, PI_WR_LEN+1);
+		//printf("PI DMA: cart $%X, ram $%X, len $%X\n", cart, ramaddr, PI_WR_LEN+1);
 		memcpy(mem.data()+ramaddr, ROM.data()+cart, (PI_WR_LEN&0xffFFff)+1);
 		PI_CART_ADDR += (PI_WR_LEN+1);
 		PI_DRAM_ADDR += (PI_WR_LEN+1);
@@ -18,7 +18,7 @@ void n64::pi_dma(bool write)
 	
 	PI_STATUS |= BIT(3);
 	raise_mi_bit(MI_INTR_PI_BIT);
-	printf("PI irq raised. mask = $%X, intr = $%X\n", MI_MASK, MI_INTERRUPT);
+	//printf("PI irq raised. mask = $%X, intr = $%X\n", MI_MASK, MI_INTERRUPT);
 }
 
 void n64::pi_write(u32 addr, u32 v)
@@ -39,8 +39,22 @@ void n64::pi_write(u32 addr, u32 v)
 	if( reg == 2 )
 	{
 		pi_dma(false);
-	} else if( reg == 3 ) {
+		return;
+	}
+	if( reg == 3 ) 
+	{
 		pi_dma(true);
+		return;
+	}
+	if( reg == 0 )
+	{
+		pi_regs[reg] &= 0xffFFfe;
+		return;
+	}
+	if( reg == 1 )
+	{
+		pi_regs[reg] &= ~1;
+		return;
 	}
 }
 

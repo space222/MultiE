@@ -40,6 +40,7 @@ public:
 	u64 pc, npc, nnpc;
 	bool delay, ndelay;
 	
+	u64& INDEX = c[0];
 	u64& RANDOM = c[1];
 	u64& CONTEXT = c[4];
 	u64& WIRED = c[6];
@@ -49,8 +50,9 @@ public:
 	u64& STATUS = c[12];
 	u64& CAUSE  = c[13];
 	u64& EPC = c[14];
+	u64& CONFIG = c[16];
 	u64& LL_ADDR = c[17];
-	
+	u64& XCONTEXT = c[20];
 	u64& ErrorEPC = c[30];
 		
 	u64 r[32];

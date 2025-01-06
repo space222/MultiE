@@ -22,6 +22,7 @@ other/macplus.cpp nintendo/nes_fds.cpp cpu/f8.cpp other/fc_chanf.cpp nintendo/gb
 nintendo/gba.cpp cpu/arm7tdmi.cpp cpu/arm7tdmi_arm.cpp cpu/nvc.cpp nintendo/virtualboy.cpp
 other/WonderSwan.cpp other/CreatiVision.cpp cpu/6502coru.cpp other/apple2e.cpp other/wozfile.cpp
 cpu/VR4300.cpp nintendo/n64.cpp nintendo/n64_vi.cpp nintendo/n64_pi.cpp nintendo/n64_ai.cpp nintendo/n64_si.cpp
+cpu/VR4300_fpu.cpp
 )
 
 add_library(ym3438 SHARED sega/ym3438.cpp)

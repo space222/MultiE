@@ -15,11 +15,54 @@ void n64::pif_run()
 	//todo: controller time
 	
 	int chan = 0;
+	fprintf(stderr, "--------\nBefore:\n");
+	for(u32 i = 0; i < 64; ++i)
+	{
+		if( i && i % 8 == 0 ) fprintf(stderr, "\n");
+		fprintf(stderr, "$%X ", pifram[i]);
+	}
+	fprintf(stderr, "\n");
 	
 	for(u32 i = 0; i < 63 && chan < 6; ++i)
 	{
-		pifram[i] |= 0x80;
+		if( pifram[i] == 0xff || pifram[i] == 0xfd ) continue;
+		if( pifram[i] == 0xfe ) break;
+		if( pifram[i] == 0 ) { chan+=1; continue; }
+		u8 tx = pifram[i++];
+		u8 rx = pifram[i++];
+		u8 cmd = pifram[i];
+		if( cmd == 0 || cmd == 0xff )
+		{
+			i += tx;
+			pifram[i] = 5;
+			pifram[i+1] = 0;
+			pifram[i+2] = 2;
+			i += rx-1;
+			chan+=1;
+			continue;
+		}
+		if( cmd == 1 )
+		{
+			auto keys = SDL_GetKeyboardState(nullptr);
+			i += tx;
+			pifram[i] = 0xff ^ (keys[SDL_SCANCODE_Z]?0x40:0);
+			pifram[i+1] = 0xff;
+			pifram[i+2] = 0xff;
+			pifram[i+3] = 0xff;
+			i += rx-1;
+			chan+=1;
+			continue;
+		}
+		i += tx + rx - 1;
 	}
+	
+	fprintf(stderr, "--------\nAfter:\n");
+	for(u32 i = 0; i < 64; ++i)
+	{
+		if( i && i % 8 == 0 ) fprintf(stderr, "\n");
+		fprintf(stderr, "$%X ", pifram[i]);
+	}
+	fprintf(stderr, "\n");
 }
 
 void n64::si_write(u32 addr, u32 v)

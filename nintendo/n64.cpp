@@ -48,28 +48,39 @@ static void sized_write(u8* data, u32 addr, u64 v, int size)
 u64 n64::read(u32 addr, int size)
 {
 	if( addr < 8*1024*1024 ) return sized_read(mem.data(), addr, size);
-	if( addr >= 0x04000000 && addr < 0x04001000 )
+	if( addr >= 0x04000000 && addr < 0x05000000 )
 	{
-		return __builtin_bswap32(*(u32*)&DMEM[addr&0xfff]);
+		if( size != 32 )
+		{
+			printf("%ibit read from RCP area $%X\n", size, addr);
+			exit(1);
+		}
+		if( addr >= 0x04000000 && addr < 0x04001000 )
+		{
+			return __builtin_bswap32(*(u32*)&DMEM[addr&0xfff]);
+		}
+		if( addr >= 0x04001000 && addr < 0x04002000 )
+		{
+			return __builtin_bswap32(*(u32*)&IMEM[addr&0xfff]);
+		}
+		//printf("N64:$%X: r%i <$%X\n", u32(cpu.pc), size, addr);
+		if( addr >= 0x04300000 && addr < 0x04400000 ) return mi_read(addr);
+		if( addr >= 0x04400000 && addr < 0x04500000 ) return vi_read(addr);
+		if( addr >= 0x04500000 && addr < 0x04600000 ) return ai_read(addr);
+		if( addr >= 0x04600000 && addr < 0x04700000 ) return pi_read(addr);
+		if( addr >= 0x04800000 && addr < 0x04900000 ) return si_read(addr);
+		
+		if( addr == 0x04040010 ) return 1;
+		if( addr == 0x04040014 ) return 0;
+		if( addr == 0x04040018 ) return 0;
+		if( addr == 0x0410000C ) return 0;
+		if( addr == 0x0470000C ) return 0x14;
+		if( addr == 0x04080000 ) return 0;
+		return 0;
 	}
-	if( addr >= 0x04001000 && addr < 0x04002000 )
-	{
-		return __builtin_bswap32(*(u32*)&IMEM[addr&0xfff]);
-	}
-	//printf("N64:$%X: r%i <$%X\n", u32(cpu.pc), size, addr);
-	if( addr >= 0x04300000 && addr < 0x04400000 ) return mi_read(addr);
-	if( addr >= 0x04400000 && addr < 0x04500000 ) return vi_read(addr);
-	if( addr >= 0x04500000 && addr < 0x04600000 ) return ai_read(addr);
-	if( addr >= 0x04600000 && addr < 0x04700000 ) return pi_read(addr);
-	if( addr >= 0x04800000 && addr < 0x04900000 ) return si_read(addr);
 	
-	if( addr == 0x04040010 ) return 1;
-	if( addr == 0x04040018 ) return 0;
-	if( addr == 0x0410000C ) return 0;
-	if( addr == 0x0470000C ) return 0x14;
-	if( addr == 0x04080000 ) return 0;
 	if( addr == 0x05000508 ) return -1;
-	
+		
 	if( addr >= 0x10000000 && addr < (0x10000000 + ROM.size()) )
 	{
 		return __builtin_bswap32(*(u32*)&ROM[addr-0x10000000]);
@@ -77,6 +88,11 @@ u64 n64::read(u32 addr, int size)
 	
 	if( addr >= 0x1FC00000 && addr <= 0x1FCFFFFF )
 	{
+		if( size != 32 )
+		{
+			printf("%ibit read from pif!\n", size);
+			exit(1);
+		}
 		addr &= 0x7ff;
 		if( addr >= 0x7c0 ) return __builtin_bswap32(*(u32*)&pifram[addr&0x3F]);
 		if( pif_rom_enabled )
@@ -86,30 +102,44 @@ u64 n64::read(u32 addr, int size)
 		return 0;
 	}
 	
+	printf("N64:$%X: r%i <$%X\n", u32(cpu.pc), size, addr);
 	exit(1);
 	return 0;
 }
 
+char viewbuf[0x200];
+
 void n64::write(u32 addr, u64 v, int size)
 {
 	if( addr < 8*1024*1024 ) { sized_write(mem.data(), addr, v, size); return; }
-	if( addr >= 0x04000000 && addr < 0x04001000 )
+	if( addr >= 0x04000000 && addr < 0x05000000 )
 	{
-		*(u32*)&DMEM[addr&0xfff] = __builtin_bswap32(u32(v));
+		if( size != 32 )
+		{
+			printf("%ibit write to RCP area $%X = $%X\n", size, addr, u32(v));
+			exit(1);
+		}
+		if( addr >= 0x04000000 && addr < 0x04001000 )
+		{
+			*(u32*)&DMEM[addr&0xfff] = __builtin_bswap32(u32(v));
+			return;
+		}
+		if( addr >= 0x04001000 && addr < 0x04002000 )
+		{
+			*(u32*)&IMEM[addr&0xfff] = __builtin_bswap32(u32(v));
+			return;
+		}
+		if( addr >= 0x04300000 && addr < 0x04400000 ) { mi_write(addr, v); return; }
+		if( addr >= 0x04400000 && addr < 0x04500000 ) { vi_write(addr, v); return; }
+		if( addr >= 0x04500000 && addr < 0x04600000 ) { ai_write(addr, v); return; }
+		if( addr >= 0x04600000 && addr < 0x04700000 ) { pi_write(addr, v); return; }
+		if( addr >= 0x04800000 && addr < 0x04900000 ) { si_write(addr, v); return; }
 		return;
 	}
-	if( addr >= 0x04001000 && addr < 0x04002000 )
-	{
-		*(u32*)&IMEM[addr&0xfff] = __builtin_bswap32(u32(v));
-		return;
-	}
-	if( addr >= 0x04300000 && addr < 0x04400000 ) { mi_write(addr, v); return; }
-	if( addr >= 0x04400000 && addr < 0x04500000 ) { vi_write(addr, v); return; }
-	if( addr >= 0x04500000 && addr < 0x04600000 ) { ai_write(addr, v); return; }
-	if( addr >= 0x04600000 && addr < 0x04700000 ) { pi_write(addr, v); return; }
-	if( addr >= 0x04800000 && addr < 0x04900000 ) { si_write(addr, v); return; }
+	
 	if( addr >= 0x1FC00000 && addr <= 0x1FCFFFFF )
 	{
+		if( size != 32 ) { printf("%ibit write to pif, $%X = $%X\n", size, addr, u32(v)); exit(1); }
 		addr &= 0x7ff;
 		if( addr < 0x7c0 ) return;
 		printf("N64: pif%i write $%X = $%X\n", size, addr, u32(v));
@@ -117,6 +147,23 @@ void n64::write(u32 addr, u64 v, int size)
 		if( (addr&0x3F) == 0x3c ) pif_run();
 		return;
 	}
+	if( addr == 0x13FF0014 )
+	{
+		u32 len = (v < 0x200) ? v : 0x200;
+		for(u32 i = 0; i < len; ++i)
+		{
+			fputc(viewbuf[i], stderr);
+		}
+		return;
+	}
+	if( addr >= 0x13FF0020 && addr < 0x13FF0220 )
+	{
+		if( size != 32 ) { printf("ISViewer not word!\n"); exit(1); }
+		*(u32*)&viewbuf[addr-0x13ff0020] = __builtin_bswap32(u32(v));
+		return;
+	}
+	
+	printf("W%i $%X = $%lX\n", size, addr, v);
 }
 
 bool n64::loadROM(const std::string fname)
@@ -175,8 +222,6 @@ bool n64::loadROM(const std::string fname)
 	return true;
 }
 
-u32 mimask, miirq;
-
 void n64::run_frame()
 {
 	for(u32 line = 0; line < 262; ++line)
@@ -190,8 +235,6 @@ void n64::run_frame()
 		}
 		for(u32 i = 0; i < 5725; ++i)
 		{
-			mimask = MI_MASK;
-			miirq = MI_INTERRUPT;
 			cpu.step();
 			if( ai_dma_enabled && ai_buf[0].valid )
 			{

@@ -14,7 +14,9 @@
 
 typedef void(*vr4300_instr) (VR4300&, u32);
 
-vr4300_instr decode_special(VR4300&, u32 opcode)
+vr4300_instr cop1(VR4300&, u32);
+
+vr4300_instr decode_special(VR4300& proc, u32 opcode)
 {
 	switch( opcode & 0x3F )
 	{
@@ -195,6 +197,8 @@ vr4300_instr decode_special(VR4300&, u32 opcode)
 		};
 	case 0x2F: return INSTR { RTYPE; cpu.r[d] = cpu.r[s] - cpu.r[t]; }; // DSUBU
 
+	case 0x34: return INSTR { fprintf(stderr, "Trap $34\n"); }; // traps?
+
 	case 0x38: return INSTR { RTYPE; cpu.r[d] = cpu.r[t] << sa; }; // DSLL
 	
 	case 0x3A: return INSTR { RTYPE; cpu.r[d] = cpu.r[t] >> sa; }; // DSRL
@@ -203,6 +207,7 @@ vr4300_instr decode_special(VR4300&, u32 opcode)
 	
 	case 0x3E: return INSTR { RTYPE; cpu.r[d] = cpu.r[t] >> (sa+32); }; // DSRL32
 	case 0x3F: return INSTR { RTYPE; cpu.r[d] = s64(cpu.r[t]) >> (sa+32); }; // DSRA32
+	default: printf("$%lX: Unimpl special opcode = $%X\n", proc.pc, (opcode & 0x3F)); exit(1);
 	}
 	return nullptr;
 }
@@ -268,16 +273,16 @@ vr4300_instr decode_regimm(VR4300&, u32 opcode)
 	return nullptr;
 }
 
-vr4300_instr decode_regular(VR4300&, u32 opcode)
+vr4300_instr decode_regular(VR4300& proc, u32 opcode)
 {
 	switch( opcode>>26 )
 	{
 	case 0x02: return INSTR { JTYPE; cpu.branch(target); }; // J
 	case 0x03: return INSTR { JTYPE; cpu.r[31] = LINK; cpu.branch(target); }; // JAL
-	case 0x04: return INSTR { ITYPE; if( cpu.r[s] == cpu.r[t] ) cpu.branch(DS_REL_ADDR); }; // BEQ
-	case 0x05: return INSTR { ITYPE; if( cpu.r[s] != cpu.r[t] ) cpu.branch(DS_REL_ADDR); }; // BNE
-	case 0x06: return INSTR { ITYPE; if( s64(cpu.r[s]) <= 0 ) cpu.branch(DS_REL_ADDR); }; // BLEZ
-	case 0x07: return INSTR { ITYPE; if( s64(cpu.r[s]) > 0 ) cpu.branch(DS_REL_ADDR); }; // BGTZ
+	case 0x04: return INSTR { ITYPE; cpu.ndelay = true; if( cpu.r[s] == cpu.r[t] ) cpu.branch(DS_REL_ADDR); }; // BEQ
+	case 0x05: return INSTR { ITYPE; cpu.ndelay = true; if( cpu.r[s] != cpu.r[t] ) cpu.branch(DS_REL_ADDR); }; // BNE
+	case 0x06: return INSTR { ITYPE; cpu.ndelay = true; if( s64(cpu.r[s]) <= 0 ) cpu.branch(DS_REL_ADDR); }; // BLEZ
+	case 0x07: return INSTR { ITYPE; cpu.ndelay = true; if( s64(cpu.r[s]) > 0 ) cpu.branch(DS_REL_ADDR); }; // BGTZ
 	case 0x08: // ADDI
 		return INSTR 
 		{ 
@@ -301,7 +306,7 @@ vr4300_instr decode_regular(VR4300&, u32 opcode)
 	case 0x10: // COP0 instructions
 		switch( (opcode>>21) & 0x1F )
 		{
-		case 0: return INSTR { RTYPE; cpu.r[t] = s32(cpu.c0_read32(d)); }; // MFC0
+		case 0: return INSTR { RTYPE; cpu.r[t] = s32(u32(cpu.c0_read32(d))); }; // MFC0
 		case 1: return INSTR { RTYPE; cpu.r[t] = cpu.c0_read64(d); }; // DMFC0
 		case 4: return INSTR { RTYPE; cpu.c0_write32(d, cpu.r[t]); }; // MTC0
 		case 5: return INSTR { RTYPE; cpu.c0_write64(d, cpu.r[t]); }; // DMTC0	
@@ -313,10 +318,11 @@ vr4300_instr decode_regular(VR4300&, u32 opcode)
 					cpu.LLbit = false;
 					if( cpu.STATUS & cpu.STATUS_ERL )
 					{
-						cpu.npc = cpu.ErrorEPC;
+						cpu.npc = s32(cpu.ErrorEPC);
 					} else {
-						cpu.npc = cpu.EPC;
+						cpu.npc = s32(cpu.EPC);
 					}
+					//printf("ERET to $%lX\n", cpu.EPC);
 					cpu.nnpc = cpu.npc + 4;
 					cpu.STATUS &= ~(cpu.STATUS_ERL|cpu.STATUS_EXL);
 				};
@@ -325,10 +331,11 @@ vr4300_instr decode_regular(VR4300&, u32 opcode)
 			return INSTR {};
 			//exit(1);
 		}
-	case 0x11: return INSTR {}; // COP1 / FPU todo		
+	case 0x11: return cop1(proc, opcode); // COP1 / FPU todo
+	case 0x12: return INSTR { cpu.CAUSE &= ~(BIT(28)|BIT(29)); cpu.CAUSE |= BIT(29); cpu.exception(11); }; // COP2??		
 	case 0x14:  // BEQL 
 		return INSTR {
-			ITYPE; 
+			ITYPE;
 			if( cpu.r[s] == cpu.r[t] ) 
 			{ 
 				cpu.branch(DS_REL_ADDR); 
@@ -338,7 +345,7 @@ vr4300_instr decode_regular(VR4300&, u32 opcode)
 		};
 	case 0x15:  // BNEL 
 		return INSTR {
-			ITYPE; 
+			ITYPE;
 			if( cpu.r[s] != cpu.r[t] ) 
 			{ 
 				cpu.branch(DS_REL_ADDR); 
@@ -426,7 +433,7 @@ vr4300_instr decode_regular(VR4300&, u32 opcode)
 			cpu.r[t] |= res<<shift;
 			cpu.r[t] = s32(cpu.r[t]);
 		};	
-	case 0x23: return INSTR { ITYPE; auto res = cpu.read(cpu.r[s]+s16(imm16), 32); if(!res) return; cpu.r[t] = s32(res); }; // LW
+	case 0x23: return INSTR { ITYPE; auto res = cpu.read(cpu.r[s]+s16(imm16), 32); if(!res) { return; } cpu.r[t] = s32(res); }; // LW
 	case 0x24: return INSTR { ITYPE; auto res = cpu.read(cpu.r[s] + s16(imm16), 8); if( !res ) return; cpu.r[t] = u8(res); }; // LBU	
 	case 0x25: return INSTR { ITYPE; auto res = cpu.read(cpu.r[s] + s16(imm16), 16); if( !res ) return; cpu.r[t] = u16(res); }; // LHU
 	case 0x26: // LWR
@@ -462,15 +469,14 @@ vr4300_instr decode_regular(VR4300&, u32 opcode)
 	case 0x2C: // SDL
 		//todo: there's only 1 actual bus transaction in these
 		//	will need to do a more raw, tlb translation + physical access here
-		printf("SDL!\n");
-		exit(1);
 		return INSTR
 		{
 			ITYPE;
 			u64 addr = cpu.r[s] + s16(imm16);
 			auto mem = cpu.read(addr&~7, 64);
 			if( !mem ) return;
-			cpu.write(addr&~7, (cpu.r[t] >> ((addr&7)*8)) | (mem & ~((1ull<<(64-((addr&7)*8)))-1)), 64);
+			const u64 mask = (addr&7) ? ~((1ull<<(64-((addr&7)*8)))-1) : 0;
+			cpu.write(addr&~7, ((cpu.r[t] >> ((addr&7)*8))) | (mem & mask), 64);
 		};
 	case 0x2D: // SDR
 		//todo: there's only 1 actual bus transaction in these
@@ -565,7 +571,7 @@ vr4300_instr decode_regular(VR4300&, u32 opcode)
 	return nullptr;
 }
 
-extern u32 mimask, miirq;
+//extern u32 mimask, miirq;
 
 void VR4300::step()
 {
@@ -582,13 +588,13 @@ void VR4300::step()
 	
 	if( ((STATUS&7)==1) && (STATUS & CAUSE & 0xff00) )
 	{       // exception() will set npc
-		printf("interrupt: mask=$%X, intr=$%X\n", mimask, miirq);
+		//printf("interrupt: mask=$%X, intr=$%X\n", mimask, miirq);
 		exception(0);
 	} else if( !(opc = read(pc, 32)) ) {
 		// if an exception happened on opcode fetch, exception() will already have been called
 		// nothing else to be done here other than skip to pc pipeline advance
 		printf("Exception reading opcode from $%X\n", u32(pc));
-		exit(1);
+		//exit(1);
 	} else {
 		if( (opc >> 26) == 0 )
 		{
@@ -599,6 +605,8 @@ void VR4300::step()
 			decode_regular(*this, opc)(*this, opc);
 		}
 	}
+	
+	//if( u32(pc) >= 0x80000000u && u32(pc) < 0xa0000000u ) printf("$%lX: opc = $%X\n", pc, u32(opc));
 		
 	pc = npc;
 	npc = nnpc;
@@ -630,13 +638,18 @@ void VR4300::exception(u32 ec, u32 vector)
 	{
 		CAUSE |= BIT(31);
 		EPC = pc - 4;
-		delay = false;
+		delay = ndelay = false;
 	} else {
 		EPC = pc;
 	}
 	CAUSE |= ec<<2;
 	STATUS |= STATUS_EXL;
 	
+	if( ec != 11 ) CAUSE &= ~(BIT(28)|BIT(29));
+	
+	//printf("Exception! code = %i\n", ec);
+	//printf("EPC = $%lX\n", EPC);
+	//printf("CAUSE = $%X\n", u32(CAUSE));
 	npc = s32(vector);
 	nnpc = npc + 4;
 }
@@ -652,7 +665,8 @@ void VR4300::reset()
 	c[15] = 0x00000B22;
 	WIRED = 0;
 	RANDOM = 31;
-
+	CONFIG = 0x7006E463;
+	
 	pc = 0xbfc00000;
 	npc = pc + 4;
 	nnpc = npc + 4;
@@ -664,8 +678,11 @@ BusResult VR4300::read(u64 addr, int size)
 	if( (size == 64 && (addr&7)) || (size == 32 && (addr&3)) || (size == 16 && (addr&1)) ) 
 	{
 		BADVADDR = addr;
-		CONTEXT &= ~0x7fFFff;
+		CONTEXT &= ~0x7fFFf0;
 		CONTEXT |= (u32(addr)>>9);
+		CONTEXT &= ~15;
+		XCONTEXT = (addr>>9);
+		XCONTEXT &= 0x1fffffff0ull;
 		address_error(false); 
 		return BusResult::exception(1); 
 	}
@@ -683,8 +700,11 @@ BusResult VR4300::write(u64 addr, u64 v, int size)
 	if( (size == 64 && (addr&7)) || (size == 32 && (addr&3)) || (size == 16 && (addr&1)) ) 
 	{
 		BADVADDR = addr;
-		CONTEXT &= ~0x7fFFff;
+		CONTEXT &= ~0x7fFFf0;
 		CONTEXT |= (u32(addr)>>9);
+		CONTEXT &= ~15;
+		XCONTEXT = (addr>>9);
+		XCONTEXT &= 0x1fffffff0ull;
 		address_error(true); 
 		return BusResult::exception(1); 
 	}
@@ -700,11 +720,13 @@ BusResult VR4300::write(u64 addr, u64 v, int size)
 
 u32 VR4300::c0_read32(u32 reg)
 {
+	//fprintf(stderr, "cop0 read32 c%i = $%lX\n", reg, s64(s32(c[reg])));
 	return c0_read64(reg);
 }
 
 u64 VR4300::c0_read64(u32 reg)
 {
+	//fprintf(stderr, "cop0 read64 c%i = $%lX\n", reg, c[reg]);
 	switch( reg )
 	{
 	case 9: return u32(COUNT>>1);
@@ -716,27 +738,39 @@ u64 VR4300::c0_read64(u32 reg)
 // c0_write32 is implemented as the full 64bits for now. 
 // according to discord posts MTC0 is the same as DMTC0
 // but mFc0 is not the same as DmFc0.
-void VR4300::c0_write32(u32 reg, u64 v)
+void VR4300::c0_write64(u32 reg, u64 v)
 {
+	//fprintf(stderr, "cop0 write32 c%i = $%X\n", reg, u32(v));
 	switch( reg )
 	{
-	//case 1: RANDOM &= ~BIT(5); RANDOM |= v & BIT(5); return;
+	case 0: INDEX = v&0x8000003Fu; return;
+	case 4: CONTEXT &= ((1ull<<23)-1); CONTEXT |= v&~((1ull<<23)-1); CONTEXT &= ~15; return;
+	
 	case 6: WIRED = v & 0x3F; RANDOM = 31; return;
-	case 9: COUNT = (v&0xffffFFFFull)<<1; return;
-	case 11: CAUSE &= ~BIT(15); COMPARE = u32(v); printf("COMPARE = $%X\n", u32(COMPARE)); return;
-	case 12: STATUS = u32(v); cop1_half_mode = !(STATUS & BIT(26)); return;
+	case 9: COUNT = u32(v); COUNT <<= 1; return;
+	case 11: CAUSE &= ~BIT(15); COMPARE = u32(v); return;
+	case 12: STATUS = u32(v); STATUS &= ~BITL(19); cop1_half_mode = !(STATUS & BIT(26)); return;
 	case 13: CAUSE &= ~(BIT(8)|BIT(9)); CAUSE |= v & (BIT(8)|BIT(9)); return;
 	
+	case 16: v &= 0x0f008000fu; CONFIG = v; CONFIG |= 0x7006E460; return;
+	
+	case 17: LL_ADDR = u32(v); return;
+	
+	case 26: c[26] = v&0xff; return;
+	
 	case  1: return;  // Random is read-only
+	case  8: return;  // badvaddr is read-only
 	case 15: return;  // PRid is read-only
+	case 27: return;  // CacheError is read-only
 	default: break;
 	}
 	c[reg] = v;
 	return;
 }
 
-void VR4300::c0_write64(u32 reg, u64 v)
+void VR4300::c0_write32(u32 reg, u64 v)
 {
-	c0_write32(reg, v);
+	//fprintf(stderr, "cop0 write64 c%i = $%lX\n", reg, v);
+	c0_write64(reg, s32(u32(v)));
 }
 
