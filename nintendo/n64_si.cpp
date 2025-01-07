@@ -34,9 +34,9 @@ void n64::pif_run()
 		if( cmd == 0 || cmd == 0xff )
 		{
 			i += tx;
-			pifram[i] = 5;
-			pifram[i+1] = 0;
-			pifram[i+2] = 2;
+			pifram[i] = 0xff;
+			pifram[i+1] = 0xff;
+			pifram[i+2] = 0xff;
 			i += rx-1;
 			chan+=1;
 			continue;
@@ -45,10 +45,10 @@ void n64::pif_run()
 		{
 			auto keys = SDL_GetKeyboardState(nullptr);
 			i += tx;
-			pifram[i] = 0xff ^ (keys[SDL_SCANCODE_Z]?0x40:0);
-			pifram[i+1] = 0xff;
-			pifram[i+2] = 0xff;
-			pifram[i+3] = 0xff;
+			pifram[i] = 0 ^ (keys[SDL_SCANCODE_Z]?0x40:0);
+			pifram[i+1] = 0;
+			pifram[i+2] = 0;
+			pifram[i+3] = 0;
 			i += rx-1;
 			chan+=1;
 			continue;

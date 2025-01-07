@@ -8,10 +8,11 @@ void n64::pi_dma(bool write)
 		u32 cart = PI_CART_ADDR - 0x10000000;
 		if( cart >= ROM.size() ) return;
 		u32 ramaddr = (PI_DRAM_ADDR & 0x7ffffe);
-		//printf("PI DMA: cart $%X, ram $%X, len $%X\n", cart, ramaddr, PI_WR_LEN+1);
-		memcpy(mem.data()+ramaddr, ROM.data()+cart, (PI_WR_LEN&0xffFFff)+1);
-		PI_CART_ADDR += (PI_WR_LEN+1);
-		PI_DRAM_ADDR += (PI_WR_LEN+1);
+		fprintf(stderr, "PI DMA: cart $%X, ram $%X, len $%X\n", cart, ramaddr, PI_WR_LEN+1);
+		u32 len = (PI_WR_LEN & 0xffFFff)+1;
+		memcpy(mem.data()+ramaddr, ROM.data()+cart, len);
+		PI_CART_ADDR += (len+1)&~1;
+		PI_DRAM_ADDR += (len+7)&~7;
 	} else {
 		//todo: writing from RAM to cart's save ram
 	}

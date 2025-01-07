@@ -54,6 +54,8 @@ public:
 	u64& LL_ADDR = c[17];
 	u64& XCONTEXT = c[20];
 	u64& ErrorEPC = c[30];
+	
+	u32 FCSR;
 		
 	u64 r[32];
 	u64 c[32];

@@ -83,6 +83,11 @@ u64 n64::read(u32 addr, int size)
 		
 	if( addr >= 0x10000000 && addr < (0x10000000 + ROM.size()) )
 	{
+		if( size != 32 )
+		{
+			printf("%ibit read from cart!\n", size);
+			exit(1);
+		}
 		return __builtin_bswap32(*(u32*)&ROM[addr-0x10000000]);
 	}
 	

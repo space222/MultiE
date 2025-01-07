@@ -665,7 +665,7 @@ void VR4300::reset()
 	c[15] = 0x00000B22;
 	WIRED = 0;
 	RANDOM = 31;
-	CONFIG = 0x7006E463;
+	CONFIG = 0x7006e463;
 	
 	pc = 0xbfc00000;
 	npc = pc + 4;
@@ -752,9 +752,12 @@ void VR4300::c0_write64(u32 reg, u64 v)
 	case 12: STATUS = u32(v); STATUS &= ~BITL(19); cop1_half_mode = !(STATUS & BIT(26)); return;
 	case 13: CAUSE &= ~(BIT(8)|BIT(9)); CAUSE |= v & (BIT(8)|BIT(9)); return;
 	
-	case 16: v &= 0x0f008000fu; CONFIG = v; CONFIG |= 0x7006E460; return;
+	case 16: CONFIG = v; CONFIG = (CONFIG & 0x7F00800F) | 0x70066460; return;
 	
 	case 17: LL_ADDR = u32(v); return;
+	
+	case 20: v&=~0x1ffffFFFFull; XCONTEXT&=0x1ffffFFFFull; XCONTEXT|=v; return;
+	
 	
 	case 26: c[26] = v&0xff; return;
 	
