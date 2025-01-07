@@ -1,3 +1,4 @@
+#include <cstring>
 #include <cstdio>
 #include <cstdlib>
 #include "VR4300.h"
@@ -333,6 +334,8 @@ vr4300_instr decode_regular(VR4300& proc, u32 opcode)
 		}
 	case 0x11: return cop1(proc, opcode); // COP1 / FPU todo
 	case 0x12: return INSTR { cpu.CAUSE &= ~(BIT(28)|BIT(29)); cpu.CAUSE |= BIT(29); cpu.exception(11); }; // COP2??		
+	case 0x13: return INSTR { cpu.CAUSE &= ~(BIT(28)|BIT(29)); cpu.CAUSE |= BIT(28)|BIT(29); cpu.exception(11); }; // COP3??		
+	
 	case 0x14:  // BEQL 
 		return INSTR {
 			ITYPE;
@@ -515,7 +518,14 @@ vr4300_instr decode_regular(VR4300& proc, u32 opcode)
 		};
 
 	case 0x31: // LWC1
-		return INSTR {};
+		return INSTR {
+			ITYPE;
+			if( cpu.COPUnusable(1) ) return;
+			auto res = cpu.read(cpu.r[s]+s16(imm16), 32);
+			if( !res ) { return; }
+			u32 a = res;
+			memcpy(&cpu.f[t<<3], &a, 4);
+		};
 
 	case 0x34: // LLD
 		return INSTR
@@ -527,8 +537,15 @@ vr4300_instr decode_regular(VR4300& proc, u32 opcode)
 			cpu.LLbit = true;
 			cpu.r[t] = res;			
 		};
-	case 0x35: return INSTR {}; // LDC1
-	
+	case 0x35: // LDC1
+		return INSTR {
+			ITYPE;
+			if( cpu.COPUnusable(1) ) return;
+			auto res = cpu.read(cpu.r[s]+s16(imm16), 64);
+			if( !res ) { return; }
+			u64 a = res;
+			memcpy(&cpu.f[t<<3], &a, 8);
+		};
 	case 0x37: // LD
 		return INSTR 
 		{ 
@@ -549,8 +566,14 @@ vr4300_instr decode_regular(VR4300& proc, u32 opcode)
 				cpu.r[t] = 0;
 			}		
 		};
-	case 0x39: return INSTR {}; // SWC1
-		
+	case 0x39: // SWC1
+		return INSTR {
+			ITYPE;
+			if( cpu.COPUnusable(1) ) return;
+			u32 a = 0;
+			memcpy(&a, &cpu.f[t<<3], 4);
+			cpu.write(cpu.r[s] + s16(imm16), a, 32);
+		};
 	case 0x3C: // SCD
 		return INSTR
 		{
@@ -563,7 +586,14 @@ vr4300_instr decode_regular(VR4300& proc, u32 opcode)
 				cpu.r[t] = 0;
 			}		
 		};
-	case 0x3D: return INSTR {}; // SCD1 ??
+	case 0x3D: // SCD1
+		return INSTR {
+			ITYPE;
+			if( cpu.COPUnusable(1) ) return;
+			u64 a = 0;
+			memcpy(&a, &cpu.f[t<<3], 8);
+			cpu.write(cpu.r[s] + s16(imm16), a, 64);
+		};
 	
 	case 0x3F: return INSTR { ITYPE; cpu.write(cpu.r[s] + s16(imm16), cpu.r[t], 64); }; // SD
 	default: printf("VR4300: unimpl regular opc $%X\n", opcode>>26); exit(1);
@@ -775,5 +805,14 @@ void VR4300::c0_write32(u32 reg, u64 v)
 {
 	//fprintf(stderr, "cop0 write64 c%i = $%lX\n", reg, v);
 	c0_write64(reg, s32(u32(v)));
+}
+
+bool VR4300::COPUnusable(u32 cop)
+{
+	if( STATUS & BIT(28+cop) ) return false;
+	exception(11);
+	CAUSE &= ~(BIT(28)|BIT(29));
+	CAUSE |= cop<<28;
+	return true;
 }
 

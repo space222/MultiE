@@ -31,6 +31,8 @@ public:
 	void c0_write32(u32 reg, u64 v);
 	void c0_write64(u32 reg, u64 v);
 	
+	bool COPUnusable(u32 cop);
+	
 	BusResult read(u64, int);
 	BusResult write(u64, u64, int);
 	

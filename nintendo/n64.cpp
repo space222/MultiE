@@ -76,6 +76,8 @@ u64 n64::read(u32 addr, int size)
 		if( addr == 0x0410000C ) return 0;
 		if( addr == 0x0470000C ) return 0x14;
 		if( addr == 0x04080000 ) return 0;
+		
+		printf("N64: Unhandled RCP Read%i <$%X\n", size, addr);
 		return 0;
 	}
 	
@@ -139,6 +141,8 @@ void n64::write(u32 addr, u64 v, int size)
 		if( addr >= 0x04500000 && addr < 0x04600000 ) { ai_write(addr, v); return; }
 		if( addr >= 0x04600000 && addr < 0x04700000 ) { pi_write(addr, v); return; }
 		if( addr >= 0x04800000 && addr < 0x04900000 ) { si_write(addr, v); return; }
+		
+		printf("N64: Unhandled RCP Write%i $%X = $%X\n", size, addr, u32(v));
 		return;
 	}
 	
@@ -329,6 +333,7 @@ void n64::reset()
 
 void n64::raise_mi_bit(u32 b)
 {
+	printf("MI IRQ raised, intr bit %i\n", b);
 	MI_INTERRUPT |= BIT(b);
 	if( MI_INTERRUPT & MI_MASK & 0x3F )
 	{
