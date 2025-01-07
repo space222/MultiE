@@ -333,7 +333,7 @@ void n64::reset()
 
 void n64::raise_mi_bit(u32 b)
 {
-	printf("MI IRQ raised, intr bit %i\n", b);
+	if( b != 3 ) printf("MI IRQ raised, intr bit %i\n", b);
 	MI_INTERRUPT |= BIT(b);
 	if( MI_INTERRUPT & MI_MASK & 0x3F )
 	{
