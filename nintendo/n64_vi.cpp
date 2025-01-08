@@ -22,7 +22,7 @@ void n64::vi_draw_frame()
 	if( type == 2 )
 	{
 		u32 stride = VI_WIDTH*2;	
-		u32 offset = (VI_ORIGIN&0x1FFFffff) + (VI_WIDTH - width)*2;
+		u32 offset = (VI_ORIGIN&0x1FFFffff);
 		for(u32 line = 0; line < height && offset < 8*1024*1024; ++line, offset+=stride)
 		{
 			for(u32 i = 0; i < width; ++i)
