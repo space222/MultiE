@@ -238,14 +238,18 @@ Status: Boots and displays mouse cursor + floppy question mark.
 Nintendo 64 Todo List
 ------------------------
 Overall:
-1. Continue systemtest, hopefully find out what Namco's problem is along the way.
+1. Start RSP and get DMA + memory tests working in systemtest, then start the RSP's scalar unit.
 2. Write own disassembler or build a toolchain to get objdump. Disassemble a libdragon demo (they all die reading from TLB regions).
+3. RDP? It kind of does it's own thing in isolation, so don't really have to wait, but there's tests for the RSP. Decisions...
 VR4300:
-1. Continue FPU instructions (while ignoring 16v32 reg mode)
-
+1. Continue to improve FPU instructions. 
+	There's zero chance the various NaNs and the right exceptions are anywhere near correct.
+2. Fill in traps and overflows and pass the systemtest for those.
+3. TLB?
 RCP:
 1. VI is currently just all registers being r/w so I can display output. Actually do things per-line and v-int.
-2. PIF: controller comms still need doing, but the necessary commands to make it thru IPL1/2/3 are done.
+2. PIF: one controller and only D-pad + a/b/z/start currently implemented and working in namco.
+	If the cmd byte in pifram gets the bit zero cleared, namco stops getting input.
 3. RI: RI_SELECT returns 0x14 to help skip other setup in IPL, but should make all regs r/w.
 4. SP: I/DMEM work for 32bit r/w. The rest of the regs are stubbed so IPL works.
 5. DP: Don't need it for now. Texture cmds still used even if doing HLE.
