@@ -68,28 +68,34 @@ public:
 	const u64 STATUS_EXL = 2;
 	const u64 STATUS_ERL = 4;
 	
-	void signal_fpu(int sig)
+	bool signal_fpu(int sig)
 	{
 		if( sig == FPU_UNIMPL )
 		{
 			FCSR |= BIT(17);
 			exception(15);
-			return;
+			return true;
 		}
 		
-		if( FCSR & BIT(7+sig) )
+		FCSR |= sig<<12;
+		if( (FCSR>>7) & sig & 0x1F )
 		{
-			FCSR |= BIT(12+sig);
 			exception(15);
-			return;
+			return true;
 		}
 		
-		FCSR |= BIT(2+sig);	
+		FCSR |= sig<<2;
+		return false;
 	}
 	
-	const int FPU_DIVZERO = 3;
-	const int FPU_INVALID = 4;
-	const int FPU_UNIMPL = 5;	
+	const int FPU_INEXACT = 1;
+	const int FPU_UNDERFLOW = 2;
+	const int FPU_OVERFLOW = 4;
+	const int FPU_DIVZERO = 8;
+	const int FPU_INVALID = 0x10;
+	const int FPU_UNIMPL = 0x20;
+	
+	bool fpu_cond;
 	
 	bool isQNaN_f(float);
 	bool isQNaN_d(double);

@@ -263,7 +263,7 @@ void n64::run_frame()
 						if( ai_buf[0].valid )
 						{
 							raise_mi_bit(MI_INTR_AI_BIT);
-							printf("N64: AI interrupt 2\n");
+							//printf("N64: AI interrupt 2\n");
 						}
 					}
 					
@@ -274,7 +274,7 @@ void n64::run_frame()
 			ai_output_cycles += 1;
 			if( ai_output_cycles >= (93750000/44100) )
 			{
-				ai_output_cycles -= (93750000/44100);
+				ai_output_cycles = 0; // -= (93750000/44100);
 				audio_add(ai_L, ai_R);
 			}
 		}
@@ -404,15 +404,15 @@ void n64::mi_write(u32 r, u32 v)
 		}	
 		if( pi == 1 )
 		{
-			MI_MASK &= ~8;
+			MI_MASK &= ~16;
 		} else if( pi == 2 ) {
-			MI_MASK |= 8;
+			MI_MASK |= 16;
 		}
 		if( dp == 1 )
 		{
-			MI_MASK &= ~16;
+			MI_MASK &= ~32;
 		} else if( dp == 2 ) {
-			MI_MASK |= 16;
+			MI_MASK |= 32;
 		}
 		
 		//printf("N64: MI_MASK = $%X, v = $%X\n", MI_MASK, u32(v));

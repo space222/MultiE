@@ -145,7 +145,7 @@ vr4300_instr decode_special(VR4300& proc, u32 opcode)
 		return INSTR { 
 			RTYPE; 
 			s32 v = s32(cpu.r[t])+s32(cpu.r[s]);
-			if( OVERFLOW32(v, s32(cpu.r[t]), s32(cpu.r[s])) ) 
+			if( 0 ) //OVERFLOW32(v, s32(cpu.r[t]), s32(cpu.r[s])) ) 
 			{ 
 				cpu.overflow(); 
 			} else { 
@@ -176,7 +176,7 @@ vr4300_instr decode_special(VR4300& proc, u32 opcode)
 		return INSTR { 
 			RTYPE; 
 			u64 v = cpu.r[s] + cpu.r[t];
-			if( OVERFLOW64(v, cpu.r[s], cpu.r[t]) )
+			if( 0 ) //OVERFLOW64(v, cpu.r[s], cpu.r[t]) )
 			{
 				cpu.overflow();
 			} else {
@@ -198,7 +198,7 @@ vr4300_instr decode_special(VR4300& proc, u32 opcode)
 		};
 	case 0x2F: return INSTR { RTYPE; cpu.r[d] = cpu.r[s] - cpu.r[t]; }; // DSUBU
 
-	case 0x34: return INSTR { fprintf(stderr, "Trap $34\n"); }; // traps?
+	case 0x34: return INSTR { RTYPE; if( cpu.r[s] == cpu.r[t] ) { cpu.exception(13); } }; // TEQ
 
 	case 0x38: return INSTR { RTYPE; cpu.r[d] = cpu.r[t] << sa; }; // DSLL
 	
@@ -290,7 +290,7 @@ vr4300_instr decode_regular(VR4300& proc, u32 opcode)
 			ITYPE; 
 			s32 temp = s16(imm16); 
 			s32 v = s32(cpu.r[s]) + s16(imm16); 
-			if( OVERFLOW32(v, u32(cpu.r[s]), temp) )
+			if( 0 ) //OVERFLOW32(v, u32(cpu.r[s]), temp) )
 			{
 				cpu.overflow();
 			} else {
@@ -382,7 +382,7 @@ vr4300_instr decode_regular(VR4300& proc, u32 opcode)
 			ITYPE; 
 			u64 temp = s64(s16(imm16)); 
 			u64 v = cpu.r[s] + temp; 
-			if( OVERFLOW64(v, cpu.r[s], temp) )
+			if( 0 ) //OVERFLOW64(v, cpu.r[s], temp) )
 			{
 				cpu.overflow();
 			} else {
@@ -524,6 +524,7 @@ vr4300_instr decode_regular(VR4300& proc, u32 opcode)
 			auto res = cpu.read(cpu.r[s]+s16(imm16), 32);
 			if( !res ) { return; }
 			u32 a = res;
+			//printf("LWC1 got %f\n", std::bit_cast<float>(a));
 			memcpy(&cpu.f[t<<3], &a, 4);
 		};
 
@@ -611,7 +612,7 @@ void VR4300::step()
 	BusResult opc;
 	
 	COUNT += 1;
-	if( u32(COUNT>>1) == u32(COMPARE) )
+	if( u32(COUNT>>1) == u32(COMPARE>>1) )
 	{
 		CAUSE |= BIT(15);
 	}
@@ -696,6 +697,7 @@ void VR4300::reset()
 	WIRED = 0;
 	RANDOM = 31;
 	CONFIG = 0x7006e463;
+	fpu_cond = false;
 	
 	pc = 0xbfc00000;
 	npc = pc + 4;
@@ -718,7 +720,7 @@ BusResult VR4300::read(u64 addr, int size)
 	}
 	if( u32(addr) < 0x8000'0000u || u32(addr) >= 0xc000'0000u )
 	{
-		printf("VR4300: tlb not yet supported, read%i <$%lX\n", size, addr);
+		printf("VR4300:$%X: tlb not yet supported, read%i <$%lX\n", u32(pc), size, addr);
 		exit(1);
 	}
 	u32 phys_addr = addr&0x1FFFffff;
@@ -740,7 +742,7 @@ BusResult VR4300::write(u64 addr, u64 v, int size)
 	}
 	if( u32(addr) < 0x8000'0000u || u32(addr) >= 0xc000'0000u )
 	{
-		printf("VR4300: tlb not yet supported, write%i $%lX = $%lX\n", size, addr, v);
+		printf("VR4300:$%X: tlb not yet supported, write%i $%lX = $%lX\n", u32(pc), size, addr, v);
 		exit(1);
 	}
 	u32 phys_addr = addr&0x1FFFffff;
@@ -760,6 +762,7 @@ u64 VR4300::c0_read64(u32 reg)
 	switch( reg )
 	{
 	case 9: return u32(COUNT>>1);
+	case 11: return u32(COMPARE>>1);
 	default: break;
 	}
 	return c[reg];
@@ -778,7 +781,7 @@ void VR4300::c0_write64(u32 reg, u64 v)
 	
 	case 6: WIRED = v & 0x3F; RANDOM = 31; return;
 	case 9: COUNT = u32(v); COUNT <<= 1; return;
-	case 11: CAUSE &= ~BIT(15); COMPARE = u32(v); return;
+	case 11: CAUSE &= ~BIT(15); COMPARE = u32(v); COMPARE <<= 1; return;
 	case 12: STATUS = u32(v); STATUS &= ~BITL(19); cop1_half_mode = !(STATUS & BIT(26)); return;
 	case 13: CAUSE &= ~(BIT(8)|BIT(9)); CAUSE |= v & (BIT(8)|BIT(9)); return;
 	

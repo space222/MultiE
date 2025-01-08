@@ -239,13 +239,10 @@ Nintendo 64 Todo List
 ------------------------
 Overall:
 1. Continue systemtest, hopefully find out what Namco's problem is along the way.
-2. Write own disassembler or build a toolchain to get objdump. Disassemble a libdragon demo.
+2. Write own disassembler or build a toolchain to get objdump. Disassemble a libdragon demo (they all die reading from TLB regions).
 VR4300:
-1. Begin actual FPU instructions (while ignoring 16v32 reg mode)
-2. Continue filling in the functions for MTC0 and friends. (will need systemtest for some of the masks)
-3. TLB, if I support 64bit addresss mode, this is different between the two. 
-4. Try to figure out the ordering for what exceptional conditions get checked in what order
-	for unaligned load/store (address error vs TLB stuff) and what kind of memory accesses actually happen.
+1. Continue FPU instructions (while ignoring 16v32 reg mode)
+
 RCP:
 1. VI is currently just all registers being r/w so I can display output. Actually do things per-line and v-int.
 2. PIF: controller comms still need doing, but the necessary commands to make it thru IPL1/2/3 are done.

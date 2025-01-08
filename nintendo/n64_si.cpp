@@ -34,9 +34,9 @@ void n64::pif_run()
 		if( cmd == 0 || cmd == 0xff )
 		{
 			i += tx;
-			pifram[i] = 0xff;
-			pifram[i+1] = 0xff;
-			pifram[i+2] = 0xff;
+			pifram[i] = 5;
+			pifram[i+1] = 0;
+			pifram[i+2] = 2;
 			i += rx-1;
 			chan+=1;
 			continue;
@@ -45,10 +45,10 @@ void n64::pif_run()
 		{
 			auto keys = SDL_GetKeyboardState(nullptr);
 			i += tx;
-			pifram[i] = 0 ^ (keys[SDL_SCANCODE_Z]?0x40:0);
-			pifram[i+1] = 0;
-			pifram[i+2] = 0;
-			pifram[i+3] = 0;
+			pifram[i] = 0xff ^ (keys[SDL_SCANCODE_Z]?0x40:0);
+			pifram[i+1] = 0xff;
+			pifram[i+2] = 0xff;
+			pifram[i+3] = 0xff;
 			i += rx-1;
 			chan+=1;
 			continue;
@@ -71,7 +71,7 @@ void n64::si_write(u32 addr, u32 v)
 	if( addr > 6 ) return;
 	if( addr == 6 )
 	{	// SI_STATUS: writing clears interrupt
-		si_regs[5] = 0;
+		si_regs[6] = 0;
 		clear_mi_bit(MI_INTR_SI_BIT);
 		printf("N64: SI irq cleared\n");
 		return;
@@ -85,7 +85,7 @@ void n64::si_write(u32 addr, u32 v)
 		memcpy(mem.data()+(si_regs[0]&0x7fffff), pifram, 64);
 		raise_mi_bit(MI_INTR_SI_BIT);
 		si_regs[6] |= BIT(12);
-		si_regs[0] += 60;  // "points to last word written to" ?
+		//si_regs[0] += 60;  // "points to last word written to" ?
 		return;
 	}
 	
@@ -93,7 +93,8 @@ void n64::si_write(u32 addr, u32 v)
 	{	// SI_PIF_AD_WR64B
 		memcpy(pifram, mem.data()+(si_regs[0]&0x7fffff), 64);
 		raise_mi_bit(MI_INTR_SI_BIT);
-		si_regs[0] += 60; // ??
+		si_regs[6] |= BIT(12);
+		//si_regs[0] += 60; // ??
 		return;
 	}	
 }
@@ -101,7 +102,7 @@ void n64::si_write(u32 addr, u32 v)
 u32 n64::si_read(u32 addr)
 {
 	addr = (addr&0x1F)>>2;
-	if( addr > 6 ) return 0;
+	//if( addr > 6 ) return 0;
 	return si_regs[addr];
 }
 
