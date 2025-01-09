@@ -240,6 +240,7 @@ Nintendo 64 Todo List
 Overall:
 1. Start RSP and get DMA + memory tests working in systemtest, then start the RSP's scalar unit.
 2. Write own disassembler or build a toolchain to get objdump. Disassemble a libdragon demo (they all die reading from TLB regions).
+	Sometimes they don't, but still blackscreen. Sometimes everything starts blackscreening.
 3. RDP? It kind of does it's own thing in isolation, so don't really have to wait, but there's tests for the RSP. Decisions...
 VR4300:
 1. Continue to improve FPU instructions. 

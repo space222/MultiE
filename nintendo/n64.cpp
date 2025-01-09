@@ -64,6 +64,7 @@ u64 n64::read(u32 addr, int size)
 			return __builtin_bswap32(*(u32*)&IMEM[addr&0xfff]);
 		}
 		//printf("N64:$%X: r%i <$%X\n", u32(cpu.pc), size, addr);
+		if( addr >= 0x04100000 && addr < 0x04200000 ) return dp_read(addr);
 		if( addr >= 0x04300000 && addr < 0x04400000 ) return mi_read(addr);
 		if( addr >= 0x04400000 && addr < 0x04500000 ) return vi_read(addr);
 		if( addr >= 0x04500000 && addr < 0x04600000 ) return ai_read(addr);
@@ -136,6 +137,7 @@ void n64::write(u32 addr, u64 v, int size)
 			*(u32*)&IMEM[addr&0xfff] = __builtin_bswap32(u32(v));
 			return;
 		}
+		if( addr >= 0x04100000 && addr < 0x04200000 ) { dp_write(addr, v); return; }
 		if( addr >= 0x04300000 && addr < 0x04400000 ) { mi_write(addr, v); return; }
 		if( addr >= 0x04400000 && addr < 0x04500000 ) { vi_write(addr, v); return; }
 		if( addr >= 0x04500000 && addr < 0x04600000 ) { ai_write(addr, v); return; }
@@ -300,6 +302,11 @@ void n64::reset()
 	MI_INTERRUPT = 0;
 	MI_MASK = 0;
 	
+	RDP.rdp_irq = [&](){ raise_mi_bit(MI_INTR_DP_BIT); };
+	RDP.rdram = mem.data();
+	
+	memset(pifram, 0, 64);
+	
 	if( do_boot_hle )
 	{
 	
@@ -326,6 +333,7 @@ void n64::reset()
 	
 	ai_buf[0].valid = false;
 	ai_buf[1].valid = false;
+	ai_buf[0].length = ai_buf[1].length = 0;
 	ai_dma_enabled = false;
 	ai_cycles_per_sample = 800;
 	ai_cycles = ai_output_cycles = 0;

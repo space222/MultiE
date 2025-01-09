@@ -1,6 +1,7 @@
 #pragma once
 #include "console.h"
 #include "VR4300.h"
+#include "n64_rdp.h"
 
 class n64 : public console
 {
@@ -107,5 +108,14 @@ public:
 	u8 IMEM[0x1000];
 	u32 sp_read(u32);
 	void sp_write(u32, u32);
+	
+	u32 dp_regs[8];
+	u32& DP_START = dp_regs[0];
+	u32& DP_END = dp_regs[1];
+	u32& DP_CURRENT = dp_regs[2];
+	u32& DP_STATUS = dp_regs[3];
+	u32 dp_read(u32);
+	void dp_write(u32, u32);
+	n64_rdp RDP;
 };
 

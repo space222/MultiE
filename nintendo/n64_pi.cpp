@@ -10,7 +10,14 @@ void n64::pi_dma(bool write)
 		u32 ramaddr = (PI_DRAM_ADDR & 0x7ffffe);
 		fprintf(stderr, "PI DMA: cart $%X, ram $%X, len $%X\n", cart, ramaddr, PI_WR_LEN+1);
 		u32 len = (PI_WR_LEN & 0xffFFff)+1;
-		memcpy(mem.data()+ramaddr, ROM.data()+cart, len);
+		if( cart + len < ROM.size() )
+		{
+			memcpy(mem.data()+ramaddr, ROM.data()+cart, len);
+		} else {
+			memset(mem.data()+ramaddr, 0, len);
+			//fprintf(stderr, "PI DMA: dma included data past ROM size of %i bytes\n", int(ROM.size()));
+			memcpy(mem.data()+ramaddr, ROM.data()+cart, ROM.size()-cart);
+		}
 		PI_CART_ADDR += (len+1)&~1;
 		PI_DRAM_ADDR += (len+7)&~7;
 	} else {

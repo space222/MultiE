@@ -687,6 +687,7 @@ void VR4300::exception(u32 ec, u32 vector)
 
 void VR4300::reset()
 {
+	for(u32 i = 0; i < 32; ++i) c[i] = 0;
 	STATUS = 0;
 	CAUSE = 0;
 	COUNT = 0x80000000u;
