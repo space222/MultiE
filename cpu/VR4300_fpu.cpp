@@ -33,28 +33,32 @@ bool VR4300::isQNaN_f(float a)
 {
 	u32 v;
 	memcpy(&v, &a, 4);
-	return ((v & 0x7FC00000) == 0x7FC00000) && ((v & 0x3FFFFF) != 0);
+	return isNaN_f(a) && (v & BIT(22));
 }
 
 bool VR4300::isQNaN_d(double a)
 {
 	u64 v;
 	memcpy(&v, &a, 8);
-	return ((v & 0x7FFC0000'00000000ull) == 0x7FFC0000'00000000ull) && ((v & 0x3FFFF'FFFFFFFFull) != 0);
+	return isNaN_d(a) && (v & BITL(51));
 }
 
-bool VR4300::isSNaN_f(float a)
+bool VR4300::isNaN_f(float a)
 {
 	u32 v;
 	memcpy(&v, &a, 4);
-	return ((v & 0x7F800000) == 0x7F800000) && ((v & 0x7FFFFF) != 0);
+	u32 exp = (v >> 23)&0xff;
+	u32 mant = v & (BIT(23)-1);
+	return (exp == 0xff) && (mant != 0);
 }
 
-bool VR4300::isSNaN_d(double a)
+bool VR4300::isNaN_d(double a)
 {
 	u64 v;
 	memcpy(&v, &a, 8);
-	return ((v & 0x7FF80000'00000000ull) == 0x7FF80000'00000000ull) && ((v & 0x7FFFF'FFFFFFFFull) != 0);
+	u32 exp = (v >> 52) & 0x7ff;
+	u64 mant = v & (BITL(52)-1);
+	return (exp == 0x7ff) && (mant != 0);
 }
 
 bool VR4300::isSubnormf(float a)
@@ -80,22 +84,7 @@ vr4300_instr cop1_d(VR4300& proc, u32 opcode)
 			double a, b;
 			memcpy(&a, &cpu.f[fs<<3], 8);
 			memcpy(&b, &cpu.f[ft<<3], 8);
-			if( cpu.isQNaN_d(a) || cpu.isQNaN_d(b) )
-			{
-				cpu.fpu_cond = (opc & 1);
-				cpu.FCSR &= ~BIT(23);
-				if( cpu.fpu_cond ) cpu.FCSR |= BIT(23);
-				cpu.signal_fpu(cpu.FPU_INVALID);
-				return;
-			}
-			bool isnan = (cpu.isSNaN_d(a) || cpu.isSNaN_d(b));
-			if( (opc & 0x8) && isnan && cpu.signal_fpu(cpu.FPU_INVALID) )
-			{
-				cpu.fpu_cond = true;
-				cpu.FCSR |= BIT(23);
-				return;
-			}
-			bool res = (opc & 1) && isnan;
+			bool res = false; //(opc & 1) && isnan;
 			res = res || ((opc & 2) && (a==b));
 			res = res || ((opc & 4) && (a <b));
 			cpu.fpu_cond = res;
@@ -113,23 +102,7 @@ vr4300_instr cop1_d(VR4300& proc, u32 opcode)
 			double a, b, c;
 			memcpy(&a, &cpu.f[fs<<3], 8);
 			memcpy(&b, &cpu.f[ft<<3], 8);
-			if( cpu.isSNaN_d(a) || cpu.isSNaN_d(b) || cpu.isSubnormd(a) || cpu.isSubnormd(b) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
-				return;
-			}
-			if( cpu.isQNaN_d(a) || cpu.isQNaN_d(b) || std::isinf(a) || std::isinf(b) ) 
-			{
-				memcpy(&c, &dnan, 8);
-				memcpy(&cpu.f[fd<<3], &dnan, 8);
-				if( cpu.signal_fpu(cpu.FPU_INVALID) ) return;
-			} else {
-				c = a + b;
-			}
-			if( std::isinf(c) && cpu.signal_fpu(cpu.FPU_OVERFLOW|cpu.FPU_INEXACT) )
-			{
-				return;
-			}
+			c = a + b;
 			memcpy(&cpu.f[fd<<3], &c, 8);
 		};	
 	case 1: // SUB.D
@@ -138,17 +111,6 @@ vr4300_instr cop1_d(VR4300& proc, u32 opcode)
 			double a, b, c;
 			memcpy(&a, &cpu.f[fs<<3], 8);
 			memcpy(&b, &cpu.f[ft<<3], 8);
-			if( cpu.isSNaN_d(a) || cpu.isSNaN_d(b) || cpu.isSubnormd(a) || cpu.isSubnormd(b) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
-				return;
-			}
-			if( cpu.isQNaN_d(a) || cpu.isQNaN_d(b) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_INVALID);
-				memcpy(&cpu.f[fd<<3], &dnan, 8);
-				return;
-			}
 			c = a - b;
 			memcpy(&cpu.f[fd<<3], &c, 8);
 		};
@@ -158,17 +120,6 @@ vr4300_instr cop1_d(VR4300& proc, u32 opcode)
 			double a, b, c;
 			memcpy(&a, &cpu.f[fs<<3], 8);
 			memcpy(&b, &cpu.f[ft<<3], 8);
-			if( cpu.isSNaN_d(a) || cpu.isSNaN_d(b) || cpu.isSubnormd(a) || cpu.isSubnormd(b) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
-				return;
-			}
-			if( cpu.isQNaN_d(a) || cpu.isQNaN_d(b) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_INVALID);
-				memcpy(&cpu.f[fd<<3], &dnan, 8);
-				return;
-			}
 			c = a * b;
 			memcpy(&cpu.f[fd<<3], &c, 8);
 		};
@@ -178,18 +129,7 @@ vr4300_instr cop1_d(VR4300& proc, u32 opcode)
 			double a, b, c;
 			memcpy(&a, &cpu.f[fs<<3], 8);
 			memcpy(&b, &cpu.f[ft<<3], 8);
-			if( cpu.isSNaN_d(a) || cpu.isSNaN_d(b) || cpu.isSubnormd(a) || cpu.isSubnormd(b) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
-				return;
-			}
-			if( cpu.isQNaN_d(a) || cpu.isQNaN_d(b) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_INVALID);
-				memcpy(&cpu.f[fd<<3], &dnan, 8);
-				return;
-			}
-			if( std::abs(b) < std::numeric_limits<double>::epsilon() ) { cpu.signal_fpu(cpu.FPU_DIVZERO); return; }
+			if( b == 0 ) { cpu.signal_fpu(cpu.FPU_DIVZERO); return; }
 			c = a / b;
 			memcpy(&cpu.f[fd<<3], &c, 8);
 		};
@@ -198,18 +138,16 @@ vr4300_instr cop1_d(VR4300& proc, u32 opcode)
 			FITYPE;
 			double a, c;
 			memcpy(&a, &cpu.f[fs<<3], 8);
-			if( cpu.isSNaN_d(a) || cpu.isSubnormd(a) ) 
+			if( a < 0 )
 			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
+				if( !cpu.signal_fpu(cpu.FPU_INVALID) )
+				{
+					memcpy(&cpu.f[fd<<3], &dnan, 8);
+				}
 				return;
+			} else {
+				c = sqrt(a);
 			}
-			if( cpu.isQNaN_d(a) || a < 0 ) 
-			{
-				cpu.signal_fpu(cpu.FPU_INVALID);
-				memcpy(&cpu.f[fd<<3], &dnan, 8);
-				return;
-			}
-			c = sqrt(a);
 			memcpy(&cpu.f[fd<<3], &c, 8);
 		};
 	case 5: // ABS.D
@@ -217,17 +155,6 @@ vr4300_instr cop1_d(VR4300& proc, u32 opcode)
 			FITYPE;
 			double a, c;
 			memcpy(&a, &cpu.f[fs<<3], 8);
-			if( cpu.isSNaN_d(a) || cpu.isSubnormd(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
-				return;
-			}
-			if( cpu.isQNaN_d(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_INVALID);
-				memcpy(&cpu.f[fd<<3], &dnan, 8);
-				return;
-			}
 			c = (a < 0) ? -a : a;
 			memcpy(&cpu.f[fd<<3], &c, 8);
 		};
@@ -243,17 +170,6 @@ vr4300_instr cop1_d(VR4300& proc, u32 opcode)
 			FITYPE;
 			double a, c;
 			memcpy(&a, &cpu.f[fs<<3], 8);
-			if( cpu.isSNaN_d(a) || cpu.isSubnormd(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
-				return;
-			}
-			if( cpu.isQNaN_d(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_INVALID);
-				memcpy(&cpu.f[fd<<3], &dnan, 8);
-				return;
-			}
 			c = -a;
 			memcpy(&cpu.f[fd<<3], &c, 8);
 		};
@@ -262,17 +178,6 @@ vr4300_instr cop1_d(VR4300& proc, u32 opcode)
 			FITYPE;
 			double a;
 			memcpy(&a, &cpu.f[fs<<3], 8);
-			if( cpu.isSNaN_d(a) || cpu.isSubnormd(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
-				return;
-			}
-			if( cpu.isQNaN_d(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_INVALID);
-				memcpy(&cpu.f[fd<<3], &dnan, 8);
-				return;
-			}
 			u64 c = llround(a);
 			memcpy(&cpu.f[fd<<3], &c, 8);
 		};
@@ -281,17 +186,6 @@ vr4300_instr cop1_d(VR4300& proc, u32 opcode)
 			FITYPE;
 			double a;
 			memcpy(&a, &cpu.f[fs<<3], 8);
-			if( cpu.isSNaN_d(a) || cpu.isSubnormd(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
-				return;
-			}
-			if( cpu.isQNaN_d(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_INVALID);
-				memcpy(&cpu.f[fd<<3], &dnan, 8);
-				return;
-			}
 			u64 c = trunc(a);
 			memcpy(&cpu.f[fd<<3], &c, 8);
 		};
@@ -300,17 +194,6 @@ vr4300_instr cop1_d(VR4300& proc, u32 opcode)
 			FITYPE;
 			double a;
 			memcpy(&a, &cpu.f[fs<<3], 8);
-			if( cpu.isSNaN_d(a) || cpu.isSubnormd(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
-				return;
-			}
-			if( cpu.isQNaN_d(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_INVALID);
-				memcpy(&cpu.f[fd<<3], &dnan, 8);
-				return;
-			}
 			u64 c = ceil(a);
 			memcpy(&cpu.f[fd<<3], &c, 8);
 		};
@@ -319,17 +202,6 @@ vr4300_instr cop1_d(VR4300& proc, u32 opcode)
 			FITYPE;
 			double a;
 			memcpy(&a, &cpu.f[fs<<3], 8);
-			if( cpu.isSNaN_d(a) || cpu.isSubnormd(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
-				return;
-			}
-			if( cpu.isQNaN_d(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_INVALID);
-				memcpy(&cpu.f[fd<<3], &dnan, 8);
-				return;
-			}
 			u64 c = floor(a);
 			memcpy(&cpu.f[fd<<3], &c, 8);
 		};
@@ -338,17 +210,6 @@ vr4300_instr cop1_d(VR4300& proc, u32 opcode)
 			FITYPE;
 			double a;
 			memcpy(&a, &cpu.f[fs<<3], 8);
-			if( cpu.isSNaN_d(a) || cpu.isSubnormd(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
-				return;
-			}
-			if( cpu.isQNaN_d(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_INVALID);
-				memcpy(&cpu.f[fd<<3], &dnan, 8);
-				return;
-			}
 			u32 c = round(a);
 			memcpy(&cpu.f[fd<<3], &c, 4);
 		};
@@ -357,17 +218,6 @@ vr4300_instr cop1_d(VR4300& proc, u32 opcode)
 			FITYPE;
 			double a;
 			memcpy(&a, &cpu.f[fs<<3], 8);
-			if( cpu.isSNaN_d(a) || cpu.isSubnormd(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
-				return;
-			}
-			if( cpu.isQNaN_d(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_INVALID);
-				memcpy(&cpu.f[fd<<3], &dnan, 8);
-				return;
-			}
 			u32 c = trunc(a);
 			memcpy(&cpu.f[fd<<3], &c, 4);
 		};
@@ -376,17 +226,6 @@ vr4300_instr cop1_d(VR4300& proc, u32 opcode)
 			FITYPE;
 			double a;
 			memcpy(&a, &cpu.f[fs<<3], 8);
-			if( cpu.isSNaN_d(a) || cpu.isSubnormd(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
-				return;
-			}
-			if( cpu.isQNaN_d(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_INVALID);
-				memcpy(&cpu.f[fd<<3], &dnan, 8);
-				return;
-			}
 			u32 c = ceil(a);
 			memcpy(&cpu.f[fd<<3], &c, 4);
 		};
@@ -395,17 +234,6 @@ vr4300_instr cop1_d(VR4300& proc, u32 opcode)
 			FITYPE;
 			double a;
 			memcpy(&a, &cpu.f[fs<<3], 8);
-			if( cpu.isSNaN_d(a) || cpu.isSubnormd(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
-				return;
-			}
-			if( cpu.isQNaN_d(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_INVALID);
-				memcpy(&cpu.f[fd<<3], &dnan, 8);
-				return;
-			}
 			u32 c = floor(a);
 			memcpy(&cpu.f[fd<<3], &c, 4);
 		};
@@ -415,16 +243,6 @@ vr4300_instr cop1_d(VR4300& proc, u32 opcode)
 			FITYPE;
 			double a;
 			memcpy(&a, &cpu.f[fs<<3], 8);
-			if( cpu.isSNaN_f(a) || cpu.isSubnormf(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
-				return;
-			}
-			if( cpu.isQNaN_f(a) )
-			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
-				return;
-			}
 			float b = a;
 			memcpy(&cpu.f[fd<<3], &b, 4);		
 		};
@@ -434,16 +252,6 @@ vr4300_instr cop1_d(VR4300& proc, u32 opcode)
 			FITYPE;
 			double a;
 			memcpy(&a, &cpu.f[fs<<3], 8);
-			if( cpu.isSNaN_d(a) || cpu.isSubnormd(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
-				return;
-			}
-			if( cpu.isQNaN_d(a) )
-			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
-				return;
-			}
 			s32 b = a;
 			memcpy(&cpu.f[fd<<3], &b, 4);		
 		};
@@ -452,16 +260,6 @@ vr4300_instr cop1_d(VR4300& proc, u32 opcode)
 			FITYPE;
 			double a;
 			memcpy(&a, &cpu.f[fs<<3], 8);
-			if( cpu.isSNaN_d(a) || cpu.isSubnormd(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
-				return;
-			}
-			if( cpu.isQNaN_d(a) )
-			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
-				return;
-			}
 			s64 b = a;
 			memcpy(&cpu.f[fd<<3], &b, 8);		
 		};
@@ -478,23 +276,8 @@ vr4300_instr cop1_s(VR4300& proc, u32 opcode)
 			float a, b;
 			memcpy(&a, &cpu.f[fs<<3], 4);
 			memcpy(&b, &cpu.f[ft<<3], 4);
-			if( cpu.isQNaN_f(a) || cpu.isQNaN_f(b) )
-			{
-				cpu.fpu_cond = (opc & 1);
-				cpu.FCSR &= ~BIT(23);
-				if( cpu.fpu_cond ) cpu.FCSR |= BIT(23);
-				cpu.signal_fpu(cpu.FPU_INVALID);
-				return;
-			}
-			if( (opc & 0x8) && (cpu.isSNaN_f(a) || cpu.isSNaN_f(b)) )
-			{
-				cpu.fpu_cond = true;
-				cpu.FCSR |= BIT(23);
-				cpu.signal_fpu(cpu.FPU_INVALID);
-				return;
-			}
 			bool res = false;
-			res = res || ((opc & 1) && (cpu.isQNaN_f(a)||cpu.isSNaN_f(a)||cpu.isQNaN_f(b)||cpu.isSNaN_f(b)));
+			//res = res || ((opc & 1) && (cpu.isQNaN_f(a)||cpu.isSNaN_f(a)||cpu.isQNaN_f(b)||cpu.isSNaN_f(b)));
 			res = res || ((opc & 2) && (a==b));
 			res = res || ((opc & 4) && (a <b));
 			cpu.fpu_cond = res;
@@ -511,22 +294,7 @@ vr4300_instr cop1_s(VR4300& proc, u32 opcode)
 			float a, b, c;
 			memcpy(&a, &cpu.f[fs<<3], 4);
 			memcpy(&b, &cpu.f[ft<<3], 4);
-			if( cpu.isSNaN_f(a) || cpu.isSNaN_f(b) || cpu.isSubnormf(a) || cpu.isSubnormf(b) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
-				return;
-			}
-			if( cpu.isQNaN_f(a) || cpu.isQNaN_f(b) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_INVALID);
-				memcpy(&cpu.f[fd<<3], &fnan, 4);
-				return;
-			}
 			c = a + b;
-			if( std::isinf(c) && cpu.signal_fpu(cpu.FPU_OVERFLOW|cpu.FPU_INEXACT) )
-			{
-				return;
-			}
 			memcpy(&cpu.f[fd<<3], &c, 4);
 		};
 	case 1: // SUB.S
@@ -535,17 +303,6 @@ vr4300_instr cop1_s(VR4300& proc, u32 opcode)
 			float a, b, c;
 			memcpy(&a, &cpu.f[fs<<3], 4);
 			memcpy(&b, &cpu.f[ft<<3], 4);
-			if( cpu.isSNaN_f(a) || cpu.isSNaN_f(b) || cpu.isSubnormf(a) || cpu.isSubnormf(b) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
-				return;
-			}
-			if( cpu.isQNaN_f(a) || cpu.isQNaN_f(b) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_INVALID);
-				memcpy(&cpu.f[fd<<3], &fnan, 4);
-				return;
-			}
 			c = a - b;
 			memcpy(&cpu.f[fd<<3], &c, 4);
 		};
@@ -555,17 +312,6 @@ vr4300_instr cop1_s(VR4300& proc, u32 opcode)
 			float a, b, c;
 			memcpy(&a, &cpu.f[fs<<3], 4);
 			memcpy(&b, &cpu.f[ft<<3], 4);
-			if( cpu.isSNaN_f(a) || cpu.isSNaN_f(b) || cpu.isSubnormf(a) || cpu.isSubnormf(b) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
-				return;
-			}
-			if( cpu.isQNaN_f(a) || cpu.isQNaN_f(b) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_INVALID);
-				memcpy(&cpu.f[fd<<3], &fnan, 4);
-				return;
-			}
 			c = a * b;
 			memcpy(&cpu.f[fd<<3], &c, 4);
 		};
@@ -575,18 +321,7 @@ vr4300_instr cop1_s(VR4300& proc, u32 opcode)
 			float a, b, c;
 			memcpy(&a, &cpu.f[fs<<3], 4);
 			memcpy(&b, &cpu.f[ft<<3], 4);
-			if( cpu.isSNaN_f(a) || cpu.isSNaN_f(b) || cpu.isSubnormf(a) || cpu.isSubnormf(b) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
-				return;
-			}
-			if( cpu.isQNaN_f(a) || cpu.isQNaN_f(b) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_INVALID);
-				memcpy(&cpu.f[fd<<3], &fnan, 4);
-				return;
-			}
-			if( std::abs(b) < std::numeric_limits<float>::epsilon() ) { cpu.signal_fpu(cpu.FPU_DIVZERO); return; }
+			if( b == 0 && cpu.signal_fpu(cpu.FPU_DIVZERO) ) { return; }
 			c = a / b;
 			memcpy(&cpu.f[fd<<3], &c, 4);
 		};
@@ -595,17 +330,6 @@ vr4300_instr cop1_s(VR4300& proc, u32 opcode)
 			FITYPE;
 			float a, c;
 			memcpy(&a, &cpu.f[fs<<3], 4);
-			if( cpu.isSNaN_f(a) || cpu.isSubnormf(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
-				return;
-			}
-			if( cpu.isQNaN_f(a) || a < 0 ) 
-			{
-				cpu.signal_fpu(cpu.FPU_INVALID);
-				memcpy(&cpu.f[fd<<3], &fnan, 4);
-				return;
-			}
 			c = sqrt(a);
 			memcpy(&cpu.f[fd<<3], &c, 4);
 		};
@@ -614,17 +338,6 @@ vr4300_instr cop1_s(VR4300& proc, u32 opcode)
 			FITYPE;
 			float a, c;
 			memcpy(&a, &cpu.f[fs<<3], 4);
-			if( cpu.isSNaN_f(a) || cpu.isSubnormf(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
-				return;
-			}
-			if( cpu.isQNaN_f(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_INVALID);
-				memcpy(&cpu.f[fd<<3], &fnan, 4);
-				return;
-			}
 			c = (a < 0) ? -a : a;
 			memcpy(&cpu.f[fd<<3], &c, 4);
 		};
@@ -640,17 +353,6 @@ vr4300_instr cop1_s(VR4300& proc, u32 opcode)
 			FITYPE;
 			float a, c;
 			memcpy(&a, &cpu.f[fs<<3], 4);
-			if( cpu.isSNaN_f(a) || cpu.isSubnormf(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
-				return;
-			}
-			if( cpu.isQNaN_f(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_INVALID);
-				memcpy(&cpu.f[fd<<3], &fnan, 4);
-				return;
-			}		
 			c = -a;
 			memcpy(&cpu.f[fd<<3], &c, 4);
 		};
@@ -659,17 +361,6 @@ vr4300_instr cop1_s(VR4300& proc, u32 opcode)
 			FITYPE;
 			float a;
 			memcpy(&a, &cpu.f[fs<<3], 4);
-			if( cpu.isSNaN_f(a) || cpu.isSubnormf(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
-				return;
-			}
-			if( cpu.isQNaN_f(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_INVALID);
-				memcpy(&cpu.f[fd<<3], &fnan, 4);
-				return;
-			}
 			u64 c = llround(a);
 			memcpy(&cpu.f[fd<<3], &c, 8);
 		};
@@ -678,17 +369,6 @@ vr4300_instr cop1_s(VR4300& proc, u32 opcode)
 			FITYPE;
 			float a;
 			memcpy(&a, &cpu.f[fs<<3], 4);
-			if( cpu.isSNaN_f(a) || cpu.isSubnormf(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
-				return;
-			}
-			if( cpu.isQNaN_f(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_INVALID);
-				memcpy(&cpu.f[fd<<3], &fnan, 4);
-				return;
-			}
 			u64 c = trunc(a);
 			memcpy(&cpu.f[fd<<3], &c, 8);
 		};
@@ -697,17 +377,6 @@ vr4300_instr cop1_s(VR4300& proc, u32 opcode)
 			FITYPE;
 			float a;
 			memcpy(&a, &cpu.f[fs<<3], 4);
-			if( cpu.isSNaN_f(a) || cpu.isSubnormf(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
-				return;
-			}
-			if( cpu.isQNaN_f(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_INVALID);
-				memcpy(&cpu.f[fd<<3], &fnan, 4);
-				return;
-			}
 			u64 c = ceil(a);
 			memcpy(&cpu.f[fd<<3], &c, 8);
 		};
@@ -716,17 +385,6 @@ vr4300_instr cop1_s(VR4300& proc, u32 opcode)
 			FITYPE;
 			float a;
 			memcpy(&a, &cpu.f[fs<<3], 4);
-			if( cpu.isSNaN_f(a) || cpu.isSubnormf(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
-				return;
-			}
-			if( cpu.isQNaN_f(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_INVALID);
-				memcpy(&cpu.f[fd<<3], &fnan, 4);
-				return;
-			}
 			u64 c = floor(a);
 			memcpy(&cpu.f[fd<<3], &c, 8);
 		};
@@ -735,17 +393,6 @@ vr4300_instr cop1_s(VR4300& proc, u32 opcode)
 			FITYPE;
 			float a;
 			memcpy(&a, &cpu.f[fs<<3], 4);
-			if( cpu.isSNaN_f(a) || cpu.isSubnormf(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
-				return;
-			}
-			if( cpu.isQNaN_f(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_INVALID);
-				memcpy(&cpu.f[fd<<3], &fnan, 4);
-				return;
-			}
 			u32 c = round(a);
 			memcpy(&cpu.f[fd<<3], &c, 4);
 		};
@@ -754,17 +401,6 @@ vr4300_instr cop1_s(VR4300& proc, u32 opcode)
 			FITYPE;
 			float a;
 			memcpy(&a, &cpu.f[fs<<3], 4);
-			if( cpu.isSNaN_f(a) || cpu.isSubnormf(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
-				return;
-			}
-			if( cpu.isQNaN_f(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_INVALID);
-				memcpy(&cpu.f[fd<<3], &fnan, 4);
-				return;
-			}
 			u32 c = trunc(a);
 			memcpy(&cpu.f[fd<<3], &c, 4);
 		};
@@ -773,17 +409,6 @@ vr4300_instr cop1_s(VR4300& proc, u32 opcode)
 			FITYPE;
 			float a;
 			memcpy(&a, &cpu.f[fs<<3], 4);
-			if( cpu.isSNaN_f(a) || cpu.isSubnormf(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
-				return;
-			}
-			if( cpu.isQNaN_f(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_INVALID);
-				memcpy(&cpu.f[fd<<3], &fnan, 4);
-				return;
-			}
 			u32 c = ceil(a);
 			memcpy(&cpu.f[fd<<3], &c, 4);
 		};
@@ -792,17 +417,6 @@ vr4300_instr cop1_s(VR4300& proc, u32 opcode)
 			FITYPE;
 			float a;
 			memcpy(&a, &cpu.f[fs<<3], 4);
-			if( cpu.isSNaN_f(a) || cpu.isSubnormf(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
-				return;
-			}
-			if( cpu.isQNaN_f(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_INVALID);
-				memcpy(&cpu.f[fd<<3], &fnan, 4);
-				return;
-			}
 			u32 c = floor(a);
 			memcpy(&cpu.f[fd<<3], &c, 4);
 		};
@@ -812,16 +426,6 @@ vr4300_instr cop1_s(VR4300& proc, u32 opcode)
 			FITYPE;
 			float a;
 			memcpy(&a, &cpu.f[fs<<3], 4);
-			if( cpu.isSNaN_f(a) || cpu.isSubnormf(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
-				return;
-			}
-			if( cpu.isQNaN_f(a) )
-			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
-				return;
-			}
 			double b = a;
 			memcpy(&cpu.f[fd<<3], &b, 8);		
 		};
@@ -831,16 +435,6 @@ vr4300_instr cop1_s(VR4300& proc, u32 opcode)
 			FITYPE;
 			float a;
 			memcpy(&a, &cpu.f[fs<<3], 4);
-			if( cpu.isSNaN_f(a) || cpu.isSubnormf(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
-				return;
-			}
-			if( cpu.isQNaN_f(a) )
-			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
-				return;
-			}
 			s32 b = a;
 			memcpy(&cpu.f[fd<<3], &b, 4);		
 		};
@@ -849,16 +443,6 @@ vr4300_instr cop1_s(VR4300& proc, u32 opcode)
 			FITYPE;
 			float a;
 			memcpy(&a, &cpu.f[fs<<3], 4);
-			if( cpu.isSNaN_f(a) || cpu.isSubnormf(a) ) 
-			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
-				return;
-			}
-			if( cpu.isQNaN_f(a) )
-			{
-				cpu.signal_fpu(cpu.FPU_UNIMPL);
-				return;
-			}
 			s64 b = a;
 			memcpy(&cpu.f[fd<<3], &b, 8);		
 		};
@@ -929,6 +513,7 @@ vr4300_instr cop1(VR4300& proc, u32 opcode)
 					case 3: fesetround(FE_DOWNWARD); break;
 					}
 				}
+				cpu.fpu_cond = cpu.FCSR & BIT(23);
 			}
 		};
 	case 8: // BC

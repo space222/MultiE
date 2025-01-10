@@ -23,10 +23,29 @@ public:
 
 private:
 	void fill_rect(u64);
+	void set_tile(u64);
+	void load_tile(u64);
+	void texture_rect(u64,u64);
+	void texture_rect_flip(u64,u64);
+	u32 tex_sample(u32 tile, u32 bpp, s32 s, s32 t);
 	
 	struct {
 		u32 addr, width, bpp, format;
 	} cimg, teximg;
+	
+	struct {
+		u32 shiftS, maskS, mirrorS, clampS;
+		u32 shiftT, maskT, mirrorT, clampT;
+		u32 palette;
+		u32 addr, line;
+		u32 bpp, format;
+	} tiles[8];
+	
+	struct {
+		u32 cycle_type;
+		u32 alpha_compare_en;
+	} other;
+
 	u32 depth_image;
 	u32 fill_color;
 };

@@ -50,20 +50,24 @@ u64 n64::read(u32 addr, int size)
 	if( addr < 8*1024*1024 ) return sized_read(mem.data(), addr, size);
 	if( addr >= 0x04000000 && addr < 0x05000000 )
 	{
-		if( size != 32 )
+		if( size == 8 )
 		{
-			printf("%ibit read from RCP area $%X\n", size, addr);
-			exit(1);
+			u32 val = read(addr&~3, 32);
+			return val >> (8*(3-(addr&3)));
+		} else if( size == 16 ) {
+			u32 val = read(addr&~3, 32);
+			return (addr&2) ? (val&0xffff) : (val>>16);
 		}
-		if( addr >= 0x04000000 && addr < 0x04001000 )
+		if( addr < 0x04040000 )
 		{
+			if( addr & 0x1000 )
+			{
+				return __builtin_bswap32(*(u32*)&IMEM[addr&0xfff]);
+			}
 			return __builtin_bswap32(*(u32*)&DMEM[addr&0xfff]);
 		}
-		if( addr >= 0x04001000 && addr < 0x04002000 )
-		{
-			return __builtin_bswap32(*(u32*)&IMEM[addr&0xfff]);
-		}
 		//printf("N64:$%X: r%i <$%X\n", u32(cpu.pc), size, addr);
+		if( addr < 0x04100000 ) { return sp_read(addr); }
 		if( addr >= 0x04100000 && addr < 0x04200000 ) return dp_read(addr);
 		if( addr >= 0x04300000 && addr < 0x04400000 ) return mi_read(addr);
 		if( addr >= 0x04400000 && addr < 0x04500000 ) return vi_read(addr);
@@ -71,9 +75,6 @@ u64 n64::read(u32 addr, int size)
 		if( addr >= 0x04600000 && addr < 0x04700000 ) return pi_read(addr);
 		if( addr >= 0x04800000 && addr < 0x04900000 ) return si_read(addr);
 		
-		if( addr == 0x04040010 ) return 1;
-		if( addr == 0x04040014 ) return 0;
-		if( addr == 0x04040018 ) return 0;
 		if( addr == 0x0410000C ) return 0;
 		if( addr == 0x0470000C ) return 0x14;
 		if( addr == 0x04080000 ) return 0;
@@ -122,21 +123,27 @@ void n64::write(u32 addr, u64 v, int size)
 	if( addr < 8*1024*1024 ) { sized_write(mem.data(), addr, v, size); return; }
 	if( addr >= 0x04000000 && addr < 0x05000000 )
 	{
-		if( size != 32 )
+		if( size == 8 )
 		{
-			printf("%ibit write to RCP area $%X = $%X\n", size, addr, u32(v));
-			exit(1);
+			v <<= 8*(3-(addr&3));
+			addr &= ~3;
+		} else if( size == 16 ) {
+			if( !(addr & 2) ) { v <<= 16; }
+			addr &= ~3;
+		} else if( size == 64 ) {
+			v >>= 32;
 		}
-		if( addr >= 0x04000000 && addr < 0x04001000 )
+		if( addr < 0x04040000 )
 		{
-			*(u32*)&DMEM[addr&0xfff] = __builtin_bswap32(u32(v));
+			if( addr & 0x1000 )
+			{
+				*(u32*)&IMEM[addr&0xfff] = __builtin_bswap32(u32(v));
+			} else {
+				*(u32*)&DMEM[addr&0xfff] = __builtin_bswap32(u32(v));
+			}
 			return;
 		}
-		if( addr >= 0x04001000 && addr < 0x04002000 )
-		{
-			*(u32*)&IMEM[addr&0xfff] = __builtin_bswap32(u32(v));
-			return;
-		}
+		if( addr < 0x04100000 ) { sp_write(addr, v); return; }
 		if( addr >= 0x04100000 && addr < 0x04200000 ) { dp_write(addr, v); return; }
 		if( addr >= 0x04300000 && addr < 0x04400000 ) { mi_write(addr, v); return; }
 		if( addr >= 0x04400000 && addr < 0x04500000 ) { vi_write(addr, v); return; }
@@ -247,6 +254,7 @@ void n64::run_frame()
 		for(u32 i = 0; i < 5725; ++i)
 		{
 			cpu.step();
+			if( !(SP_STATUS & 1) ) RSP.step();
 			if( ai_dma_enabled && ai_buf[0].valid )
 			{
 				ai_cycles += 1;
@@ -304,6 +312,14 @@ void n64::reset()
 	
 	RDP.rdp_irq = [&](){ raise_mi_bit(MI_INTR_DP_BIT); };
 	RDP.rdram = mem.data();
+	
+	for(u32 i = 0; i < 8; ++i) sp_regs[i] = 0;
+	SP_STATUS |= 1;
+	RSP.broke = [&]() { if( SP_STATUS & BIT(6) ) { raise_mi_bit(MI_INTR_SP_BIT); } SP_STATUS |= 3; };
+	RSP.IMEM = IMEM;
+	RSP.DMEM = DMEM;
+	
+	*(u32*)&mem[0x318] = __builtin_bswap32(0x800000);
 	
 	memset(pifram, 0, 64);
 	

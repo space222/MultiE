@@ -1,6 +1,7 @@
 #pragma once
 #include "console.h"
 #include "VR4300.h"
+#include "n64_rsp.h"
 #include "n64_rdp.h"
 
 class n64 : public console
@@ -106,8 +107,18 @@ public:
 	
 	u8 DMEM[0x1000];
 	u8 IMEM[0x1000];
+	u32 sp_regs[8];
+	u32& SP_DMA_SPADDR = sp_regs[0];
+	u32& SP_DMA_RAMADDR = sp_regs[1];
+	u32& SP_DMA_RDLEN = sp_regs[2];
+	u32& SP_DMA_WRLEN = sp_regs[3];
+	u32& SP_STATUS = sp_regs[4];
+	u32& SP_SEMA = sp_regs[7];
 	u32 sp_read(u32);
 	void sp_write(u32, u32);
+	void sp_read_dma();
+	void sp_write_dma();
+	n64_rsp RSP;
 	
 	u32 dp_regs[8];
 	u32& DP_START = dp_regs[0];

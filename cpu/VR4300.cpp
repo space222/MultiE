@@ -199,6 +199,7 @@ vr4300_instr decode_special(VR4300& proc, u32 opcode)
 	case 0x2F: return INSTR { RTYPE; cpu.r[d] = cpu.r[s] - cpu.r[t]; }; // DSUBU
 
 	case 0x34: return INSTR { RTYPE; if( cpu.r[s] == cpu.r[t] ) { cpu.exception(13); } }; // TEQ
+	case 0x36: return INSTR { RTYPE; if( cpu.r[s] != cpu.r[t] ) { cpu.exception(13); } }; // TNE
 
 	case 0x38: return INSTR { RTYPE; cpu.r[d] = cpu.r[t] << sa; }; // DSLL
 	
@@ -297,7 +298,7 @@ vr4300_instr decode_regular(VR4300& proc, u32 opcode)
 				cpu.r[t] = v;
 			}			
 		};
-	case 0x09: return INSTR { ITYPE; cpu.r[t] = s32(cpu.r[s]) + s32(s16(imm16)); }; // ADDIU
+	case 0x09: return INSTR { ITYPE; cpu.r[t] = s32(cpu.r[s] + s16(imm16)); }; // ADDIU
 	case 0x0A: return INSTR { ITYPE; cpu.r[t] = s64(cpu.r[s]) < s64(s16(imm16)); }; // SLTI
 	case 0x0B: return INSTR { ITYPE; cpu.r[t] = cpu.r[s] < u64(s16(imm16)); }; // SLTIU
 	case 0x0C: return INSTR { ITYPE; cpu.r[t] = cpu.r[s] & imm16; }; // ANDI
@@ -637,7 +638,7 @@ void VR4300::step()
 		}
 	}
 	
-	//if( u32(pc) >= 0x80000000u && u32(pc) < 0xa0000000u ) printf("$%lX: opc = $%X\n", pc, u32(opc));
+	//if( u32(pc) >= 0x80000400u && u32(pc) < 0xa0000000u ) printf("$%lX: opc = $%X\n", pc, u32(opc));
 		
 	pc = npc;
 	npc = nnpc;

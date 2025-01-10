@@ -99,8 +99,8 @@ public:
 	
 	bool isQNaN_f(float);
 	bool isQNaN_d(double);
-	bool isSNaN_f(float);
-	bool isSNaN_d(double);
+	bool isNaN_f(float);
+	bool isNaN_d(double);
 	bool isSubnormf(float);
 	bool isSubnormd(double);
 };
