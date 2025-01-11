@@ -28,6 +28,7 @@ private:
 	void texture_rect(u64,u64);
 	void texture_rect_flip(u64,u64);
 	void set_tile_size(u64);
+	void flat_triangle(u64,u64,u64,u64);
 	
 	u32 tex_sample(u32 tile, u32 bpp, s32 s, s32 t);
 	

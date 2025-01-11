@@ -15,7 +15,12 @@ void n64_rdp::run_commands(u64* list, u32 num)
 		
 		switch( (cmd>>56)&0x3F )
 		{
-
+		case 0x08:{ // basic non-anything flat triangle
+			u64 cmd1 = __builtin_bswap64(list[i++]);
+			u64 cmd2 = __builtin_bswap64(list[i++]);
+			u64 cmd3 = __builtin_bswap64(list[i++]);
+			flat_triangle(cmd, cmd1, cmd2, cmd3);
+			}break;
 		case 0x24: // texture rectangle
 			texture_rect(cmd, __builtin_bswap64(list[i++]));
 			break;
@@ -195,12 +200,12 @@ void n64_rdp::set_tile(u64 cmd)
 	T.bpp = imgbpp[(cmd>>51)&3];
 	T.line = (cmd>>41)&0x1ff;
 	
-	T.clampT = (cmd&BIT(19));
-	T.mirrorT = (cmd&BIT(18));
+	T.clampT = (cmd&BITL(19));
+	T.mirrorT = (cmd&BITL(18));
 	T.maskT = (cmd>>14)&0xf;
 	T.shiftT = (cmd>>10)&0xf;
-	T.clampS = cmd&BIT(9);
-	T.mirrorS = cmd&BIT(8);
+	T.clampS = cmd&BITL(9);
+	T.mirrorS = cmd&BITL(8);
 	T.maskS = (cmd>>4)&0xf;
 	T.shiftS = cmd&0xf;
 	
@@ -335,4 +340,42 @@ u32 n64_rdp::tex_sample(u32 tile, u32 bpp, s32 s, s32 t)
 	return ( __builtin_bswap16(res.to16()) );
 }
 
+void n64_rdp::flat_triangle(u64 cmd0, u64 cmd1, u64 cmd2, u64 cmd3)
+{
+	//todo: actually use the settings to determine color outside fill mode
+	dc flat_color = (other.cycle_type == CYCLE_TYPE_FILL) ? dc::from32(fill_color) : blend_color;
+	bool left = cmd0 & BITL(55);
+	s64 Y3 = s32(((cmd0>>32)&0x3FFF) << 19); Y3 >>= 5;
+	s64 Y2 = s32(((cmd0>>16)&0x3FFF) << 19); Y2 >>= 5;
+	s64 Y1 = s32((cmd0&0x3FFF) << 19); Y1 >>= 5;
+	//printf("flattri %f, %f, %f\n", Y1/65536.f, Y2/65536.f, Y3/65536.f);
+		
+	s64 XL = s32((cmd1>>32)<<4); XL >>= 4;
+	s64 ISL = s32((cmd1<<2)); ISL >>= 2;
+	s64 XH = s32((cmd2>>32)<<4); XH >>= 4;
+	s64 ISH = s32((cmd2<<2)); ISH >>= 2;
+	s64 XM = s32((cmd3>>32)<<4); XM >>= 4;
+	s64 ISM = s32((cmd3<<2)); ISM >>= 2;
+	
+	if( !left ) { std::swap(XH, XM); std::swap(ISH, ISM); }
+	
+	s64 X1 = XH;
+	s64 X2 = XM;
+	for(s64 Y = Y1>>16; Y <= Y3>>16; ++Y)
+	{
+		for(s64 X = X1>>16; X <= X2>>16; ++X)
+		{
+			if( X < 0 || X >= 256 ) continue;
+			if( cimg.bpp == 16 )
+			{
+				*(u16*)&rdram[cimg.addr + (Y*cimg.width*2) + X*2] = __builtin_bswap16(flat_color.to16());
+			} else {
+				*(u32*)&rdram[cimg.addr + (Y*cimg.width*4) + X*4] = __builtin_bswap32(flat_color.to32());
+			}
+		}
+		X1 += ISH;
+		X2 += ISM;
+		if( Y == Y2>>16 ) { if( left ) { X2 = XL; ISM = ISL; } else { X1 = XL; ISH=ISL; } }
+	}
+}
 

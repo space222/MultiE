@@ -238,8 +238,8 @@ Status: Boots and displays mouse cursor + floppy question mark.
 Nintendo 64 Todo List
 ------------------------
 Overall:
-1. bang out a simple triangle to watch NICCC.
-2. then nowhere to go but vectorland
+1. try/implement more of krom's rdp tests
+2. nowhere to go but vectorland
 VR4300:
 1. Continue to improve FPU instructions. Had some NaN handling but it wasn't good, so I've stripped out FPU exceptions for now.
 2. TLB?
@@ -263,7 +263,7 @@ Notes:
 crash trying to set up the stack at end of RAM.
 	Flappy Bird's pipes use texcoords masks. It doesn't depend on Tile Size. I'm still unclear on how Tile Size and
 all the shift/clamp/mask and what order those happen.
-	Commit that implemented traps and non32bit PIF-RAM access made Namco's DigDug blackscreen.
+	Commit that implemented traps and non32bit PIF-RAM access made Namco's DigDug blackscreen (sometimes it still works??).
 
 
 
