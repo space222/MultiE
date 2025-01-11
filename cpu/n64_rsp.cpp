@@ -251,7 +251,11 @@ rsp_instr rsp_regular(n64_rsp&, u32 opcode)
 			cpu.DMEM[(addr+2)&0xfff] = cpu.r[t]>>8;
 			cpu.DMEM[(addr+3)&0xfff] = cpu.r[t];
 		};
-	default: printf("VR4300: unimpl regular opc $%X\n", opcode>>26); exit(1);
+		
+	case 0x32: // LWC2
+		printf("LWC2\n");
+		return INSTR {};
+	default: printf("RSP: unimpl regular opc $%X\n", opcode>>26); exit(1);
 	}
 }
 

@@ -238,32 +238,34 @@ Status: Boots and displays mouse cursor + floppy question mark.
 Nintendo 64 Todo List
 ------------------------
 Overall:
-1. Start RSP and get DMA + memory tests working in systemtest, then start the RSP's scalar unit.
-2. Write own disassembler or build a toolchain to get objdump. Disassemble a libdragon demo (they all die reading from TLB regions).
-	Sometimes they don't, but still blackscreen. Sometimes everything starts blackscreening.
-3. RDP? It kind of does it's own thing in isolation, so don't really have to wait, but there's tests for the RSP. Decisions...
+1. I've swapped VR4300#1&2 as traps/overflow should be quick to get through in systemtest.
+2. non-32bit access to pifram probably works the same way as rspmem?
+3. bang out a simple triangle to watch NICCC.
+4. then nowhere to go but vectorland
 VR4300:
-1. Continue to improve FPU instructions. 
-	There's zero chance the various NaNs and the right exceptions are anywhere near correct.
-2. Fill in traps and overflows and pass the systemtest for those.
+1. Fill in traps and overflows and pass the systemtest for those.
+2. Continue to improve FPU instructions. Had some NaN handling but it wasn't good, so I've stripped out FPU exceptions for now.
 3. TLB?
-RCP:
-1. VI is currently just all registers being r/w so I can display output. Actually do things per-line and v-int.
-2. PIF: one controller and only D-pad + a/b/z/start currently implemented and working in namco.
-	If the cmd byte in pifram gets the bit zero cleared, namco stops getting input.
+RCP Subsystems:
+1. VI: currently just all registers being r/w so I can display output. Actually do things per-line and v-int.
+2. PIF: The rest of the buttons, and support controllers. Still need the framework support for input customization.
 3. RI: RI_SELECT returns 0x14 to help skip other setup in IPL, but should make all regs r/w.
-4. SP: I/DMEM work for 32bit r/w. The rest of the regs are stubbed so IPL works.
-5. DP: Don't need it for now. Texture cmds still used even if doing HLE.
+4. SP: Next up is vector ops.
+5. DP: flat triangles and run NICCC
+6. AI: Figure out why sound sometimes just randomly stops. Namco's title screen is best (worst?) example.
 Status: 
+DP: Enough 16bit textures and rectangles to run Flappy Bird. 8bit textures do enough to run the Bad Apple video.
 MI: done except for MI_MODE's repeat feature
 PI: basic aligned cart->RAM implemented along with interrupt.
 SI: done (PIF now gets its own todo item). Not supporting the single-word xfer regs.
-AI: Audio is ready (question mark. The Super Fighter Demo has junk, silence, then repeats song then silence)
-	Almost ready to either boot from PIFROM or HLE it. After that, already have PI+VI(ish)+SI+COUNT interrupts
-	so Namco should run. Will need FPU for Namco to be legit.
-	After that, it becomes RSP time, unless I want to run the PeterLemon RDP stuff (will need some RDP like textures anyway).
-
-
+AI: Audio works.. ish. Most things it does. Namco's title screen has a few boops, but no music. In-game like pac-man and galaga have sound.
+PIF: one controller and only D-pad + a/b/z/start currently implemented and working in namco.
+	If the cmd byte in pifram gets the bit zero cleared, namco stops getting input.
+Notes:
+	If RI_SELECT is nonzero to skip rdram init, IPL3 never writes RAM size to $80000318 which makes libdragon 
+crash trying to set up the stack at end of RAM.
+	Flappy Bird's pipes use texcoords masks. It doesn't depend on Tile Size. I'm still unclear on how Tile Size and
+all the shift/clamp/mask and what order those happen.
 
 
 
