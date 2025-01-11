@@ -238,14 +238,11 @@ Status: Boots and displays mouse cursor + floppy question mark.
 Nintendo 64 Todo List
 ------------------------
 Overall:
-1. I've swapped VR4300#1&2 as traps/overflow should be quick to get through in systemtest.
-2. non-32bit access to pifram probably works the same way as rspmem?
-3. bang out a simple triangle to watch NICCC.
-4. then nowhere to go but vectorland
+1. bang out a simple triangle to watch NICCC.
+2. then nowhere to go but vectorland
 VR4300:
-1. Fill in traps and overflows and pass the systemtest for those.
-2. Continue to improve FPU instructions. Had some NaN handling but it wasn't good, so I've stripped out FPU exceptions for now.
-3. TLB?
+1. Continue to improve FPU instructions. Had some NaN handling but it wasn't good, so I've stripped out FPU exceptions for now.
+2. TLB?
 RCP Subsystems:
 1. VI: currently just all registers being r/w so I can display output. Actually do things per-line and v-int.
 2. PIF: The rest of the buttons, and support controllers. Still need the framework support for input customization.
@@ -266,7 +263,7 @@ Notes:
 crash trying to set up the stack at end of RAM.
 	Flappy Bird's pipes use texcoords masks. It doesn't depend on Tile Size. I'm still unclear on how Tile Size and
 all the shift/clamp/mask and what order those happen.
-	Commit that implemented traps and non32bit PIF-RAM access made Dig-Dug in Namco blackscreen.
+	Commit that implemented traps and non32bit PIF-RAM access made Namco's DigDug blackscreen.
 
 
 
