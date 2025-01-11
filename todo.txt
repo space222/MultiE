@@ -266,7 +266,7 @@ Notes:
 crash trying to set up the stack at end of RAM.
 	Flappy Bird's pipes use texcoords masks. It doesn't depend on Tile Size. I'm still unclear on how Tile Size and
 all the shift/clamp/mask and what order those happen.
-
+	Commit that implemented traps and non32bit PIF-RAM access made Dig-Dug in Namco blackscreen.
 
 
 

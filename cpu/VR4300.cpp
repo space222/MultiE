@@ -145,7 +145,7 @@ vr4300_instr decode_special(VR4300& proc, u32 opcode)
 		return INSTR { 
 			RTYPE; 
 			s32 v = s32(cpu.r[t])+s32(cpu.r[s]);
-			if( 0 ) //OVERFLOW32(v, s32(cpu.r[t]), s32(cpu.r[s])) ) 
+			if( OVERFLOW32(v, s32(cpu.r[t]), s32(cpu.r[s])) ) 
 			{ 
 				cpu.overflow(); 
 			} else { 
@@ -156,8 +156,8 @@ vr4300_instr decode_special(VR4300& proc, u32 opcode)
 	case 0x22: // SUB
 		return INSTR { 
 			RTYPE; 
-			s32 v = s32(cpu.r[s])-s32(cpu.r[t]); 
-			if( 0 ) //OVERFLOW32(v, u32(cpu.r[t]), ~u32(cpu.r[s])) ) 
+			s32 v = s32(cpu.r[s]) - s32(cpu.r[t]); 
+			if( OVERFLOW32(v, u32(cpu.r[s]), ~u32(cpu.r[t])) ) 
 			{ 
 				cpu.overflow(); 
 			} else { 
@@ -176,7 +176,7 @@ vr4300_instr decode_special(VR4300& proc, u32 opcode)
 		return INSTR { 
 			RTYPE; 
 			u64 v = cpu.r[s] + cpu.r[t];
-			if( 0 ) //OVERFLOW64(v, cpu.r[s], cpu.r[t]) )
+			if( OVERFLOW64(v, cpu.r[s], cpu.r[t]) )
 			{
 				cpu.overflow();
 			} else {
@@ -188,11 +188,10 @@ vr4300_instr decode_special(VR4300& proc, u32 opcode)
 		return INSTR { 
 			RTYPE; 
 			u64 v = cpu.r[s] - cpu.r[t];
-			if( 0 ) //OVERFLOW64(v, cpu.r[s], ~cpu.r[t]) )
+			if( OVERFLOW64(v, cpu.r[s], ~cpu.r[t]) )
 			{
 				cpu.overflow();
 			} else {
-				//printf("dsub $%lX - $%lX = $%lX\n", cpu.r[s], cpu.r[t], v);
 				cpu.r[d] = v; 
 			}
 		};
@@ -305,7 +304,7 @@ vr4300_instr decode_regular(VR4300& proc, u32 opcode)
 			ITYPE; 
 			s32 temp = s16(imm16); 
 			s32 v = s32(cpu.r[s]) + s16(imm16); 
-			if( 0 ) //OVERFLOW32(v, u32(cpu.r[s]), temp) )
+			if( OVERFLOW32(v, u32(cpu.r[s]), temp) )
 			{
 				cpu.overflow();
 			} else {
@@ -397,7 +396,7 @@ vr4300_instr decode_regular(VR4300& proc, u32 opcode)
 			ITYPE; 
 			u64 temp = s64(s16(imm16)); 
 			u64 v = cpu.r[s] + temp; 
-			if( 0 ) //OVERFLOW64(v, cpu.r[s], temp) )
+			if( OVERFLOW64(v, cpu.r[s], temp) )
 			{
 				cpu.overflow();
 			} else {
@@ -667,8 +666,6 @@ void VR4300::branch(u64 target)
 
 void VR4300::overflow()
 {
-	printf("Overflow should not happen\n");
-	exit(1);
 	exception(12);
 }
 
