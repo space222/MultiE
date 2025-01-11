@@ -12,7 +12,7 @@ public:
 		static dc from32(u32 c) { return { u8(c>>24), u8(c>>16), u8(c>>8), u8(c) }; }
 		u8 b, g, r, a;
 		u32 to32() const { return (b<<24)|(g<<16)|(r<<8)|a; }
-		u16 to16() const { return ((b>>3)<<11)|((g>>3)<<6)|((r>>3)<<1); }
+		u16 to16() const { return ((b>>3)<<11)|((g>>3)<<6)|((r>>3)<<1)|(a?1:0); }
 	};
 
 	void run_commands(u64* cmd, u32 dwords);

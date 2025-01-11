@@ -156,8 +156,8 @@ void n64_rdp::load_tile(u64 cmd)
 	//printf("RDP: Load Tile (%i,%i) to (%i,%i)\n", ulS, ulT, lrS, lrT);
 	
 	u32 roffs = (((ulS*T.bpp)+7)/8) + teximg.addr;
-	
 	u32 rdram_stride = ((teximg.width*T.bpp) + 7) / 8; 
+
 	for(u32 Y = ulT; Y <= lrT; ++Y)
 	{
 		memcpy(tmem+T.addr*8+((Y-ulT)*T.line*8), rdram+roffs+(Y*rdram_stride), rdram_stride);
@@ -181,6 +181,10 @@ void n64_rdp::set_tile(u64 cmd)
 	T.mirrorS = cmd&BIT(8);
 	T.maskS = (cmd>>4)&0xf;
 	T.shiftS = cmd&0xf;
+	
+	//if( T.clampT || T.mirrorT || T.clampS || T.mirrorS )
+	//	fprintf(stderr, "cT = %i, mT = %i, cS = %i, mS = %i\n", !!T.clampT, !!T.mirrorT, !!T.clampS, !!T.mirrorS);
+	//fprintf(stderr, "maskT = $%X, maskS = $%X\n", T.maskT, T.maskS);
 }
 
 void n64_rdp::texture_rect(u64 cmd0, u64 cmd1)
@@ -198,18 +202,20 @@ void n64_rdp::texture_rect(u64 cmd0, u64 cmd1)
 	
 	if( cimg.bpp == 16 )
 	{
-		for(u32 Y = ulY; Y < lrY; ++Y, T += DtDy)
+		for(u32 Y = ulY; Y <= lrY; ++Y, T += DtDy)
 		{
 			s32 Sl = S;
-			for(u32 X = ulX; X < lrX; ++X, Sl += DsDx)
+			for(u32 X = ulX; X <= lrX; ++X, Sl += DsDx)
 			{
 				u16 sample = tex_sample(tile, 16, Sl>>10, T>>10);
 				if( other.alpha_compare_en && (__builtin_bswap16(sample)&1) )
+				{
 					*(u16*)&rdram[cimg.addr + (Y*cimg.width*2) + X*2] = sample;
+				}
 			}
 		}	
 	} else if( cimg.bpp == 32 ) {
-		for(u32 Y = ulY; Y < lrY; ++Y, T += DtDy)
+		for(u32 Y = ulY; Y <= lrY; ++Y, T += DtDy)
 		{
 			s32 Sl = S;
 			for(u32 X = ulX; X < lrX; ++X, Sl += DsDx)
@@ -229,21 +235,23 @@ void n64_rdp::texture_rect_flip(u64 cmd0, u64 cmd1)
 u32 n64_rdp::tex_sample(u32 tile, u32 bpp, s32 s, s32 t)
 {
 	auto& T = tiles[tile];
+	s &= (1<<T.maskS)-1;
+	t &= (1<<T.maskT)-1;
+
 	dc res;
 	if( T.bpp == 16 )
 	{
-		//return *(u16*)&tmem[(T.addr*8 + (t*T.line*8) + s*2)&0xffe];
-		res = dc::from16( *(u16*)&tmem[(T.addr*8 + (t*T.line*8) + s*2)&0xffe] );
+		res = dc::from16(__builtin_bswap16( *(u16*)&tmem[(T.addr*8 + (t*T.line*8) + s*2)&0xffe] ));
 	} else if( T.bpp == 32 ) {
 		//todo: put the rg/ba in the separate banks
-		res = dc::from32( *(u32*)&tmem[(T.addr*8 + (t*T.line*8) + s*4)&0xfff] );
+		res = dc::from32( __builtin_bswap32( *(u32*)&tmem[(T.addr*8 + (t*T.line*8) + s*4)&0xfff] ));
 	} else if( T.bpp == 8 ) {
 		u8 v = tmem[T.addr*8 + (t*T.line*8) + s];
 		res = dc::from32((v<<24)|(v<<16)|(v<<8)|v);
 	}
 	
-	if( bpp == 32 ) return (res.to32());
-	return (res.to16());
+	if( bpp == 32 ) return __builtin_bswap32(res.to32());
+	return ( __builtin_bswap16(res.to16()) );
 }
 
 
