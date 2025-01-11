@@ -318,6 +318,11 @@ void n64::reset()
 	RSP.broke = [&]() { if( SP_STATUS & BIT(6) ) { raise_mi_bit(MI_INTR_SP_BIT); } SP_STATUS |= 3; };
 	RSP.IMEM = IMEM;
 	RSP.DMEM = DMEM;
+	RSP.dp_write = [&](u32 a, u32 v) { dp_write(a, v); };
+	RSP.sp_write = [&](u32 a, u32 v) { sp_write(a, v); };
+	RSP.dp_read = [&](u32 a) -> u32 { return dp_read(a); };
+	RSP.sp_read = [&](u32 a) -> u32 { return sp_read(a); };
+	
 	
 	*(u32*)&mem[0x318] = __builtin_bswap32(0x800000);
 	

@@ -27,6 +27,8 @@ private:
 	void load_tile(u64);
 	void texture_rect(u64,u64);
 	void texture_rect_flip(u64,u64);
+	void set_tile_size(u64);
+	
 	u32 tex_sample(u32 tile, u32 bpp, s32 s, s32 t);
 	
 	struct {
@@ -39,6 +41,8 @@ private:
 		u32 palette;
 		u32 addr, line;
 		u32 bpp, format;
+		s32 SL, SH;
+		s32 TL, TH;
 	} tiles[8];
 	
 	struct {
@@ -48,5 +52,11 @@ private:
 
 	u32 depth_image;
 	u32 fill_color;
+	dc blend_color, env_color, fog_color;
+	
+	const u32 CYCLE_TYPE_1CYCLE = 0;
+	const u32 CYCLE_TYPE_2CYCLE = 1;
+	const u32 CYCLE_TYPE_COPY = 2;
+	const u32 CYCLE_TYPE_FILL = 3;
 };
 

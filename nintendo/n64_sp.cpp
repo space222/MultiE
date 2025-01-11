@@ -4,11 +4,42 @@
 #include "n64.h"
 
 void n64::sp_read_dma()
-{
+{	// to RSP
+	u32 skip = (sp_regs[2]>>20)&0xff8;
+	u32 count = ((sp_regs[2]>>12)&0xff)+1;
+	u32 rdlen = (sp_regs[2]&0xfff);
+	if( rdlen < 8 ) rdlen = 8; else rdlen += 1;
+	
+	u8* rmem = ((sp_regs[0]&BIT(12)) ? IMEM : DMEM);
+	u32 ram_offset = sp_regs[1] & 0x3ffFFff;
+	
+	for(u32 c = 0; c < count; ++c)
+	{
+		for(u32 i = 0; i < rdlen; ++i, ++sp_regs[0], ++ram_offset) 
+		{
+			rmem[sp_regs[0] & 0xfff] = (ram_offset < 0x800000 ) ? mem[ram_offset] : 0;
+		}
+		ram_offset += skip;
+	}
 }
 
 void n64::sp_write_dma()
-{
+{	// to RDRAM
+	u32 skip = (sp_regs[3]>>20)&0xff8;
+	u32 count = ((sp_regs[3]>>12)&0xff)+1;
+	u32 wrlen = (sp_regs[3]&0xfff);
+	if( wrlen < 8 ) wrlen = 8; else wrlen += 1;
+	u8* rmem = ((sp_regs[0]&BIT(12)) ? IMEM : DMEM);
+	u32 ram_offset = sp_regs[1] & 0x3ffFFff;
+	
+	for(u32 c = 0; c < count; ++c)
+	{
+		for(u32 i = 0; i < wrlen; ++i, ++sp_regs[0], ++ram_offset) 
+		{
+			if( ram_offset < 0x800000 ) mem[ram_offset] = rmem[sp_regs[0] & 0xfff];
+		}
+		ram_offset += skip;
+	}
 }
 
 void n64::sp_write(u32 addr, u32 v)

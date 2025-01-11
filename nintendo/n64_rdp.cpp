@@ -34,6 +34,10 @@ void n64_rdp::run_commands(u64* list, u32 num)
 			//fprintf(stderr, "set other modes = $%lX, ctype = %i\n", cmd, other.cycle_type);
 			break;
 			
+		case 0x32: // set tile size
+			set_tile_size(cmd);
+			break;
+			
 		case 0x34: // load tile
 			load_tile(cmd);
 			break;
@@ -48,7 +52,16 @@ void n64_rdp::run_commands(u64* list, u32 num)
 		case 0x37: // fill color
 			fill_color = cmd;
 			break;
-			
+		case 0x38: // fog color
+			fog_color = dc::from32(cmd);
+			break;
+		case 0x39: // blend color
+			blend_color = dc::from32(cmd);
+			break;
+		
+		case 0x3B: // environment color
+			env_color = dc::from32(cmd);
+			break;	
 		case 0x3C: // set combine mode
 			break;
 		
@@ -152,6 +165,12 @@ void n64_rdp::load_tile(u64 cmd)
 	u32 ulT = (cmd>>32)&0xfff;
 	u32 lrS = (cmd>>12)&0xfff;
 	u32 lrT = cmd&0xfff;
+	
+	T.SL = ulS;
+	T.SH = lrS;
+	T.TL = ulT;
+	T.TH = lrT;
+	
 	ulS >>= 2; ulT >>= 2; lrS >>= 2; lrT >>= 2;
 	//printf("RDP: Load Tile (%i,%i) to (%i,%i)\n", ulS, ulT, lrS, lrT);
 	
@@ -198,14 +217,19 @@ void n64_rdp::texture_rect(u64 cmd0, u64 cmd1)
 	s32 T = ((cmd1>>32)&0xffff); S <<= 16; T >>= 16; T <<= 5;
 	s32 DsDx = ((cmd1>>16)&0xffff); DsDx <<= 16; DsDx >>= 16;
 	s32 DtDy = (cmd1&0xffff); DtDy <<= 16; DtDy >>= 16;
-	if( other.cycle_type == 2 ) DsDx /= 4;
+	if( other.cycle_type == CYCLE_TYPE_COPY ) 
+	{	// convert copy mode to 1/2cycle mode values.
+		DsDx /= 4;  // probably need other values for when bpp != 16
+		lrY += 1;
+		lrX += 1;
+	}
 	
 	if( cimg.bpp == 16 )
 	{
-		for(u32 Y = ulY; Y <= lrY; ++Y, T += DtDy)
+		for(u32 Y = ulY; Y < lrY; ++Y, T += DtDy)
 		{
 			s32 Sl = S;
-			for(u32 X = ulX; X <= lrX; ++X, Sl += DsDx)
+			for(u32 X = ulX; X < lrX; ++X, Sl += DsDx)
 			{
 				u16 sample = tex_sample(tile, 16, Sl>>10, T>>10);
 				if( other.alpha_compare_en && (__builtin_bswap16(sample)&1) )
@@ -228,15 +252,69 @@ void n64_rdp::texture_rect(u64 cmd0, u64 cmd1)
 
 void n64_rdp::texture_rect_flip(u64 cmd0, u64 cmd1)
 {
-	texture_rect(cmd0, cmd1);
+	u32 tile = (cmd0>>24)&7;
+	u32 lrX = ((cmd0>>44)&0xfff)>>2;
+	u32 lrY = ((cmd0>>32)&0xfff)>>2;
+	u32 ulX = ((cmd0>>12)&0xfff)>>2;
+	u32 ulY = (cmd0&0xfff)>>2;
+	s32 S = ((cmd1>>48)&0xffff); S <<= 16; S >>= 16; S <<= 5;
+	s32 T = ((cmd1>>32)&0xffff); S <<= 16; T >>= 16; T <<= 5;
+	s32 DsDx = ((cmd1>>16)&0xffff); DsDx <<= 16; DsDx >>= 16;
+	s32 DtDy = (cmd1&0xffff); DtDy <<= 16; DtDy >>= 16;
+	if( other.cycle_type == CYCLE_TYPE_COPY ) 
+	{	// convert copy mode to 1/2cycle mode values.
+		DsDx /= 4;  // probably need other values for when bpp != 16
+		lrY += 1;
+		lrX += 1;
+	}
+	
+	if( cimg.bpp == 16 )
+	{
+		for(u32 Y = ulY; Y < lrY; ++Y, T += DtDy)
+		{
+			s32 Sl = S;
+			for(u32 X = ulX; X < lrX; ++X, Sl += DsDx)
+			{
+				u16 sample = tex_sample(tile, 16, T>>10, Sl>>10);
+				//if( other.alpha_compare_en && (__builtin_bswap16(sample)&1) )
+				{
+					*(u16*)&rdram[cimg.addr + (Y*cimg.width*2) + X*2] = sample;
+				}
+			}
+		}	
+	} else if( cimg.bpp == 32 ) {
+		for(u32 Y = ulY; Y <= lrY; ++Y, T += DtDy)
+		{
+			s32 Sl = S;
+			for(u32 X = ulX; X < lrX; ++X, Sl += DsDx)
+			{
+				*(u32*)&rdram[cimg.addr + (Y*cimg.width*4) + X*4] = tex_sample(tile, 32, T>>10, Sl>>10);
+			}
+		}	
+	}	
 	return;
+}
+
+void n64_rdp::set_tile_size(u64 cmd)
+{
+	auto& T = tiles[(cmd>>24)&7];
+	
+	u32 ulS = (cmd>>44)&0xfff;
+	u32 ulT = (cmd>>32)&0xfff;
+	u32 lrS = (cmd>>12)&0xfff;
+	u32 lrT = cmd&0xfff;
+	
+	T.SL = ulS;
+	T.SH = lrS;
+	T.TL = ulT;
+	T.TH = lrT;
 }
 
 u32 n64_rdp::tex_sample(u32 tile, u32 bpp, s32 s, s32 t)
 {
 	auto& T = tiles[tile];
-	s &= (1<<T.maskS)-1;
-	t &= (1<<T.maskT)-1;
+	if( T.maskS ) s &= (1<<T.maskS)-1;
+	if( T.maskT ) t &= (1<<T.maskT)-1;
 
 	dc res;
 	if( T.bpp == 16 )
