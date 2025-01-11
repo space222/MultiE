@@ -255,6 +255,10 @@ rsp_instr rsp_regular(n64_rsp&, u32 opcode)
 	case 0x32: // LWC2
 		printf("LWC2\n");
 		return INSTR {};
+		
+	case 0x3A: // SWC2
+		printf("SWC2\n");
+		return INSTR {};
 	default: printf("RSP: unimpl regular opc $%X\n", opcode>>26); exit(1);
 	}
 }

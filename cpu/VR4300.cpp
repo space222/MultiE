@@ -197,8 +197,13 @@ vr4300_instr decode_special(VR4300& proc, u32 opcode)
 			}
 		};
 	case 0x2F: return INSTR { RTYPE; cpu.r[d] = cpu.r[s] - cpu.r[t]; }; // DSUBU
-
+	
+	case 0x30: return INSTR { RTYPE; if( s64(cpu.r[s]) >= s64(cpu.r[t]) ) { cpu.exception(13); } }; // TGE
+	case 0x31: return INSTR { RTYPE; if( cpu.r[s] >= cpu.r[t] ) { cpu.exception(13); } }; // TGEU
+	case 0x32: return INSTR { RTYPE; if( s64(cpu.r[s]) < s64(cpu.r[t]) ) { cpu.exception(13); } }; // TLT
+	case 0x33: return INSTR { RTYPE; if( cpu.r[s] < cpu.r[t] ) { cpu.exception(13); } }; // TLTU
 	case 0x34: return INSTR { RTYPE; if( cpu.r[s] == cpu.r[t] ) { cpu.exception(13); } }; // TEQ
+
 	case 0x36: return INSTR { RTYPE; if( cpu.r[s] != cpu.r[t] ) { cpu.exception(13); } }; // TNE
 
 	case 0x38: return INSTR { RTYPE; cpu.r[d] = cpu.r[t] << sa; }; // DSLL
@@ -242,6 +247,15 @@ vr4300_instr decode_regimm(VR4300&, u32 opcode)
 				LIKELY;
 			}
 		};
+
+	case 0x08: return INSTR { ITYPE; if( s64(cpu.r[s]) >= s64(s16(imm16)) ) { cpu.exception(13); } }; // TGEI
+	case 0x09: return INSTR { ITYPE; if( cpu.r[s] >= (u64)s64(s16(imm16)) ) { cpu.exception(13); } }; // TGEIU
+	case 0x0A: return INSTR { ITYPE; if( s64(cpu.r[s]) < s64(s16(imm16)) ) { cpu.exception(13); } }; // TLTI
+	case 0x0B: return INSTR { ITYPE; if( cpu.r[s] < (u64)s64(s16(imm16)) ) { cpu.exception(13); } }; // TLTIU
+	case 0x0C: return INSTR { ITYPE; if( s64(cpu.r[s]) == s64(s16(imm16)) ) { cpu.exception(13); } }; // TEQI
+
+	case 0x0E: return INSTR { ITYPE; if( s64(cpu.r[s]) != s64(s16(imm16)) ) { cpu.exception(13); } }; // TNEI
+		
 	case 0x10: return INSTR { ITYPE; u64 temp = LINK; if( s64(cpu.r[s]) < 0 ) { cpu.branch(DS_REL_ADDR); } cpu.r[31] = temp; }; // BLTZAL
 	case 0x11: return INSTR { ITYPE; u64 temp = LINK; if( s64(cpu.r[s]) >= 0 ) { cpu.branch(DS_REL_ADDR); } cpu.r[31] = temp; }; // BGEZAL
 	case 0x12: // BLTZALL

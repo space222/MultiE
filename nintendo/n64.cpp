@@ -97,10 +97,13 @@ u64 n64::read(u32 addr, int size)
 	
 	if( addr >= 0x1FC00000 && addr <= 0x1FCFFFFF )
 	{
-		if( size != 32 )
+		if( size == 8 )
 		{
-			printf("%ibit read from pif!\n", size);
-			exit(1);
+			u32 val = read(addr&~3, 32);
+			return val >> (8*(3-(addr&3)));
+		} else if( size == 16 ) {
+			u32 val = read(addr&~3, 32);
+			return (addr&2) ? (val&0xffff) : (val>>16);
 		}
 		addr &= 0x7ff;
 		if( addr >= 0x7c0 ) return __builtin_bswap32(*(u32*)&pifram[addr&0x3F]);
@@ -157,7 +160,16 @@ void n64::write(u32 addr, u64 v, int size)
 	
 	if( addr >= 0x1FC00000 && addr <= 0x1FCFFFFF )
 	{
-		if( size != 32 ) { printf("%ibit write to pif, $%X = $%X\n", size, addr, u32(v)); exit(1); }
+		if( size == 8 )
+		{
+			v <<= 8*(3-(addr&3));
+			addr &= ~3;
+		} else if( size == 16 ) {
+			if( !(addr & 2) ) { v <<= 16; }
+			addr &= ~3;
+		} else if( size == 64 ) {
+			v >>= 32;
+		}
 		addr &= 0x7ff;
 		if( addr < 0x7c0 ) return;
 		printf("N64: pif%i write $%X = $%X\n", size, addr, u32(v));

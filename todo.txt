@@ -251,7 +251,7 @@ RCP Subsystems:
 2. PIF: The rest of the buttons, and support controllers. Still need the framework support for input customization.
 3. RI: RI_SELECT returns 0x14 to help skip other setup in IPL, but should make all regs r/w.
 4. SP: Next up is vector ops.
-5. DP: flat triangles and run NICCC
+5. DP: flat triangles and run NICCC. LoadTLUT and CI textures.
 6. AI: Figure out why sound sometimes just randomly stops. Namco's title screen is best (worst?) example.
 Status: 
 DP: Enough 16bit textures and rectangles to run Flappy Bird. 8bit textures do enough to run the Bad Apple video.

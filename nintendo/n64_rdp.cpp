@@ -58,7 +58,8 @@ void n64_rdp::run_commands(u64* list, u32 num)
 		case 0x39: // blend color
 			blend_color = dc::from32(cmd);
 			break;
-		
+		case 0x3A: // primitive color
+			break;
 		case 0x3B: // environment color
 			env_color = dc::from32(cmd);
 			break;	
@@ -71,7 +72,9 @@ void n64_rdp::run_commands(u64* list, u32 num)
 			teximg.bpp = imgbpp[((cmd>>51)&3)];
 			teximg.format = ((cmd>>53)&7);
 			break;
-		
+		case 0x3E: // depth image
+			depth_image = cmd & 0x7ffff8;
+			break;
 		case 0x3F: // color image
 			cimg.addr = cmd & 0x7ffff8;
 			cimg.width = ((cmd>>32)&0x3ff)+1;
