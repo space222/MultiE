@@ -12,6 +12,9 @@
 typedef void (*rsp_instr)(n64_rsp&, u32);
 #define INSTR [](n64_rsp& cpu, u32 opc)
 
+rsp_instr rsp_lwc2(n64_rsp&, u32);
+rsp_instr rsp_swc2(n64_rsp&, u32);
+
 rsp_instr rsp_special(n64_rsp&, u32 opcode)
 {
 	switch( opcode & 0x3F )
@@ -106,7 +109,7 @@ rsp_instr rsp_regimm(n64_rsp&, u32 opcode)
 	return nullptr;
 }
 
-rsp_instr rsp_regular(n64_rsp&, u32 opcode)
+rsp_instr rsp_regular(n64_rsp& proc, u32 opcode)
 {
 	switch( opcode>>26 )
 	{
@@ -252,13 +255,10 @@ rsp_instr rsp_regular(n64_rsp&, u32 opcode)
 			cpu.DMEM[(addr+3)&0xfff] = cpu.r[t];
 		};
 		
-	case 0x32: // LWC2
-		printf("LWC2\n");
-		return INSTR {};
+	case 0x32: return rsp_lwc2(proc, opcode); // LWC2
 		
-	case 0x3A: // SWC2
-		printf("SWC2\n");
-		return INSTR {};
+	case 0x3A: return rsp_swc2(proc, opcode); // SWC2
+
 	default: printf("RSP: unimpl regular opc $%X\n", opcode>>26); exit(1);
 	}
 }
