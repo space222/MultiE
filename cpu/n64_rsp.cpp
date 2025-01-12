@@ -14,6 +14,7 @@ typedef void (*rsp_instr)(n64_rsp&, u32);
 
 rsp_instr rsp_lwc2(n64_rsp&, u32);
 rsp_instr rsp_swc2(n64_rsp&, u32);
+rsp_instr rsp_cop2(n64_rsp&, u32);
 
 rsp_instr rsp_special(n64_rsp&, u32 opcode)
 {
@@ -154,7 +155,7 @@ rsp_instr rsp_regular(n64_rsp& proc, u32 opcode)
 			exit(1);
 		}
 	case 0x11: return INSTR {}; // COP1 / FPU todo
-	case 0x12: printf("RSP: COP2 instruction\n"); exit(1); // COP2??		
+	case 0x12: return rsp_cop2(proc, opcode); // vector ops
 	case 0x13: return INSTR {}; // COP3??		
 	
 	case 0x14:  // BEQL 

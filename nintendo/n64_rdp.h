@@ -60,6 +60,7 @@ private:
 	u32 depth_image;
 	u32 fill_color;
 	dc blend_color, env_color, fog_color;
+	u16 prim_z, prim_delta_z;
 	
 	const u32 CYCLE_TYPE_1CYCLE = 0;
 	const u32 CYCLE_TYPE_2CYCLE = 1;
