@@ -50,6 +50,12 @@ private:
 		u32 cycle_type;
 		u32 alpha_compare_en;
 	} other;
+	
+	struct {
+		u32 ulX, ulY;
+		u32 lrX, lrY;
+		u32 odd, field;
+	} scissor;
 
 	u32 depth_image;
 	u32 fill_color;

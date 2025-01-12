@@ -29,8 +29,12 @@ void n64_rdp::run_commands(u64* list, u32 num)
 			break;
 		
 		case 0x2D: // scissor
-		
-		
+			scissor.ulX = (cmd>>46)&0x3ff;
+			scissor.ulY = (cmd>>34)&0x3ff;
+			scissor.field = cmd & BITL(25);
+			scissor.odd = cmd & BITL(24);
+			scissor.lrX = (cmd>>14)&0x3ff;
+			scissor.lrY = (cmd>>2)&0x3ff;
 			break;
 		
 		case 0x2F: // other modes
@@ -284,7 +288,7 @@ void n64_rdp::texture_rect_flip(u64 cmd0, u64 cmd1)
 			for(u32 X = ulX; X < lrX; ++X, Sl += DsDx)
 			{
 				u16 sample = tex_sample(tile, 16, T>>10, Sl>>10);
-				//if( other.alpha_compare_en && (__builtin_bswap16(sample)&1) )
+				if( other.alpha_compare_en && (__builtin_bswap16(sample)&1) )
 				{
 					*(u16*)&rdram[cimg.addr + (Y*cimg.width*2) + X*2] = sample;
 				}
@@ -343,7 +347,7 @@ u32 n64_rdp::tex_sample(u32 tile, u32 bpp, s32 s, s32 t)
 void n64_rdp::flat_triangle(u64 cmd0, u64 cmd1, u64 cmd2, u64 cmd3)
 {
 	//todo: actually use the settings to determine color outside fill mode
-	dc flat_color = (other.cycle_type == CYCLE_TYPE_FILL) ? dc::from32(fill_color) : blend_color;
+	u32 flat_color = (other.cycle_type == CYCLE_TYPE_FILL) ? fill_color : ((blend_color.to16()<<16)|blend_color.to16());
 	bool left = cmd0 & BITL(55);
 	s64 Y3 = s32(((cmd0>>32)&0x3FFF) << 19); Y3 >>= 5;
 	s64 Y2 = s32(((cmd0>>16)&0x3FFF) << 19); Y2 >>= 5;
@@ -363,14 +367,18 @@ void n64_rdp::flat_triangle(u64 cmd0, u64 cmd1, u64 cmd2, u64 cmd3)
 	s64 X2 = XM;
 	for(s64 Y = Y1>>16; Y <= Y3>>16; ++Y)
 	{
-		for(s64 X = X1>>16; X <= X2>>16; ++X)
+		if( Y >= scissor.lrY ) return;
+		if( Y >= scissor.ulY )
 		{
-			if( X < 0 || X >= 256 ) continue;
-			if( cimg.bpp == 16 )
+			for(s64 X = X1>>16; X <= X2>>16; ++X)
 			{
-				*(u16*)&rdram[cimg.addr + (Y*cimg.width*2) + X*2] = __builtin_bswap16(flat_color.to16());
-			} else {
-				*(u32*)&rdram[cimg.addr + (Y*cimg.width*4) + X*4] = __builtin_bswap32(flat_color.to32());
+				if( X < scissor.ulX || X > scissor.lrX ) continue;
+				if( cimg.bpp == 16 )
+				{
+					*(u16*)&rdram[cimg.addr + (Y*cimg.width*2) + X*2] = __builtin_bswap16(u16(flat_color>>((X&1)*16)));
+				} else {
+					*(u32*)&rdram[cimg.addr + (Y*cimg.width*4) + X*4] = __builtin_bswap32(flat_color);
+				}
 			}
 		}
 		X1 += ISH;
