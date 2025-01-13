@@ -239,8 +239,7 @@ Nintendo 64 Todo List
 ------------------------
 Overall:
 1. LoadTLUT and CI textures
-2. Enter vectorland with LQV/LRV is needed and used by the rest of the load/store tests.
-3. Further vectorland with the rest of the S/LWC2 load/store opcodes and pass the tests (possibly excluding transpose)
+2. Setup a systemtest with the rest of the rsp vector instructions.
 VR4300:
 1. Continue to improve FPU instructions. Had some NaN handling but it wasn't good, so I've stripped out FPU exceptions for now.
 2. TLB?
@@ -266,7 +265,7 @@ crash trying to set up the stack at end of RAM.
 	Flappy Bird's pipes use texcoords masks. It doesn't depend on Tile Size. I'm still unclear on how Tile Size and
 all the shift/clamp/mask and what order those happen.
 	Commit that implemented traps and non32bit PIF-RAM access made Namco's DigDug blackscreen (sometimes it still works??).
-
+	Even if not using any unimplemented rsp vector ops, none of the commercial games do anything.
 
 
 
