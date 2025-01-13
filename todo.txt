@@ -238,8 +238,8 @@ Status: Boots and displays mouse cursor + floppy question mark.
 Nintendo 64 Todo List
 ------------------------
 Overall:
-1. LoadTLUT and CI textures
-2. Setup a systemtest with the rest of the rsp vector instructions.
+1. LoadTLUT, CI Textures, LoadBlock
+2. Continue implementing vector instructions to pass the relevant systemtests.
 VR4300:
 1. Continue to improve FPU instructions. Had some NaN handling but it wasn't good, so I've stripped out FPU exceptions for now.
 2. TLB?

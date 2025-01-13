@@ -111,7 +111,7 @@ rsp_instr rsp_cop2(n64_rsp& rsp, u32 opcode)
 			vreg res;
 			for(u32 i = 0; i < 8; ++i)
 			{
-				s32 prod = rsp.v[vs].sw(i);
+				s64 prod = rsp.v[vs].sw(i);
 				prod *= rsp.v[vt].sw(BC(i));
 				prod *= 2;
 				rsp.a[i] = prod + 0x8000;
@@ -125,7 +125,7 @@ rsp_instr rsp_cop2(n64_rsp& rsp, u32 opcode)
 			vreg res;
 			for(u32 i = 0; i < 8; ++i)
 			{
-				s32 prod = rsp.v[vs].sw(i);
+				s64 prod = rsp.v[vs].sw(i);
 				prod *= rsp.v[vt].sw(BC(i));
 				prod *= 2;
 				rsp.a[i] = prod + 0x8000;
@@ -191,11 +191,11 @@ rsp_instr rsp_cop2(n64_rsp& rsp, u32 opcode)
 			vreg res;
 			for(u32 i = 0; i < 8; ++i)
 			{
-				s32 prod = rsp.v[vs].sw(i);
+				s64 prod = rsp.v[vs].sw(i);
 				prod *= rsp.v[vt].sw(BC(i));
 				prod *= 2;
 				rsp.a[i] &= 0xffffFFFFffffull;
-				rsp.a[i] += prod;
+				rsp.a[i] += prod&0xffffFFFFffffull;
 				res.w(i) = clamp_signed(rsp.a[i]>>16);
 			}		
 			rsp.v[vd] = res;
@@ -206,12 +206,25 @@ rsp_instr rsp_cop2(n64_rsp& rsp, u32 opcode)
 			vreg res;
 			for(u32 i = 0; i < 8; ++i)
 			{
-				s32 prod = rsp.v[vs].sw(i);
+				s64 prod = rsp.v[vs].sw(i);
 				prod *= rsp.v[vt].sw(BC(i));
 				prod *= 2;
 				rsp.a[i] &= 0xffffFFFFffffull;
 				rsp.a[i] += prod;
 				res.w(i) = clamp_unsigned(rsp.a[i]>>16);
+			}		
+			rsp.v[vd] = res;
+		};
+	case 0x0C: // VMADL
+		return INSTR {
+			VOPP;
+			vreg res;
+			for(u32 i = 0; i < 8; ++i)
+			{
+				u32 prod = rsp.v[vs].w(i);
+				prod *= rsp.v[vt].w(BC(i));
+				rsp.a[i] += (prod>>16)&0xffff;
+				res.w(i) = clamp_unsigned_x(rsp.a[i]);
 			}		
 			rsp.v[vd] = res;
 		};
@@ -221,10 +234,10 @@ rsp_instr rsp_cop2(n64_rsp& rsp, u32 opcode)
 			vreg res;
 			for(u32 i = 0; i < 8; ++i)
 			{
-				s32 prod = rsp.v[vs].w(i);
-				prod *= rsp.v[vt].sw(BC(i));
+				s64 prod = rsp.v[vs].sw(i);
+				prod *= rsp.v[vt].w(BC(i));
 				rsp.a[i] &= 0xffffFFFFffffull;
-				rsp.a[i] += s64(prod) & 0xffffFFFFffffull;
+				rsp.a[i] += prod & 0xffffFFFFffffull;
 				res.w(i) = clamp_signed(rsp.a[i]>>16);
 			}
 			rsp.v[vd] = res;
@@ -235,7 +248,7 @@ rsp_instr rsp_cop2(n64_rsp& rsp, u32 opcode)
 			vreg res;
 			for(u32 i = 0; i < 8; ++i)
 			{
-				s32 prod = rsp.v[vs].w(i);
+				s64 prod = rsp.v[vs].w(i);
 				prod *= rsp.v[vt].sw(BC(i));
 				rsp.a[i] += prod;
 				res.w(i) = clamp_unsigned_x(rsp.a[i]);

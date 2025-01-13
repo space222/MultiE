@@ -76,7 +76,7 @@ u64 n64::read(u32 addr, int size)
 		if( addr >= 0x04800000 && addr < 0x04900000 ) return si_read(addr);
 		
 		if( addr == 0x0410000C ) return 0;
-		if( addr == 0x0470000C ) return 0x14;
+		if( addr == 0x0470000C ) return 0x14;  // RI_SELECT to 0x14 to skip a lot of IPL init
 		if( addr == 0x04080000 ) return 0;
 		
 		printf("N64: Unhandled RCP Read%i <$%X\n", size, addr);
@@ -113,6 +113,8 @@ u64 n64::read(u32 addr, int size)
 		}
 		return 0;
 	}
+	
+	if( addr >= 0x03F00000 && addr <= 0x03FFFFFF ) return 0;
 	
 	printf("N64:$%X: r%i <$%X\n", u32(cpu.pc), size, addr);
 	exit(1);
@@ -330,6 +332,7 @@ void n64::reset()
 	
 	RDP.rdp_irq = [&](){ raise_mi_bit(MI_INTR_DP_BIT); };
 	RDP.rdram = mem.data();
+	DP_STATUS |= 0x80;
 	
 	for(u32 i = 0; i < 8; ++i) sp_regs[i] = 0;
 	SP_STATUS |= 1;
