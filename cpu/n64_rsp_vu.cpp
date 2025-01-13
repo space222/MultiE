@@ -299,8 +299,39 @@ rsp_instr rsp_cop2(n64_rsp& rsp, u32 opcode)
 			}
 			rsp.VCO = 0;
 			rsp.v[vd] = res;
+		};
+		
+	case 0x14: // VADDC
+		return INSTR {
+			VOPP;
+			vreg res;
+			rsp.VCO = 0;
+			for(u32 i = 0; i < 8; ++i)
+			{
+				u32 add = rsp.v[vs].w(i) + rsp.v[vt].w(BC(i));
+				rsp.a[i] &= ~0xffffull;
+				rsp.a[i] |= add & 0xffff;
+				res.w(i) = add;
+				rsp.VCO |= (add&BIT(16))?(1<<i):0;
+			}
+			rsp.v[vd] = res;		
+		};
+	case 0x15: // VSUBC
+		return INSTR {
+			VOPP;
+			vreg res;
+			rsp.VCO = 0;
+			for(u32 i = 0; i < 8; ++i)
+			{
+				u32 add = rsp.v[vs].w(i) - rsp.v[vt].w(BC(i));
+				rsp.a[i] &= ~0xffffull;
+				rsp.a[i] |= add & 0xffff;
+				res.w(i) = add;
+				rsp.VCO |= (add&BIT(16))?(1<<i):0;
+				rsp.VCO |= (add&0x1ffff)?(1<<(8+i)):0;
+			}
+			rsp.v[vd] = res;		
 		};	
-	
 	case 0x1D: // VSAR
 		return INSTR {
 			VOPP;
@@ -311,6 +342,84 @@ rsp_instr rsp_cop2(n64_rsp& rsp, u32 opcode)
 				else { rsp.v[vd].w(i) = rsp.a[i]>>32; }
 			}		
 		};
+	case 0x20: // VLT
+		return INSTR {
+			VOPP;
+			vreg res;
+			rsp.VCC = 0;
+			for(u32 i = 0; i < 8; ++i)
+			{
+			u32 egl = rsp.v[vs].w(i) == rsp.v[vt].w(BC(i));
+			u32 neg = ((rsp.VCO&BIT(i+8)) && (rsp.VCO&BIT(i))) && egl;
+			rsp.VCC |= (neg || (rsp.v[vs].sw(i) < rsp.v[vt].sw(BC(i))) ) ? (1<<i) : 0;
+			rsp.a[i] &= ~0xffffull;
+			rsp.a[i] |= res.w(i) = ((rsp.VCC&BIT(i))? rsp.v[vs].w(i) : rsp.v[vt].w(BC(i)));
+			}
+			rsp.VCC &= 0xff;
+			rsp.VCO = 0;
+			rsp.v[vd] = res;
+		};
+	case 0x21: // VEQ
+		return INSTR {
+			VOPP;
+			vreg res;
+			rsp.VCC = 0;
+			for(u32 i = 0; i < 8; ++i)
+			{
+			rsp.VCC |= (!(rsp.VCO&BIT(i+8)) && (rsp.v[vs].w(i) == rsp.v[vt].w(BC(i))) ) ? (1<<i) : 0;
+			rsp.a[i] &= ~0xffffull;
+			rsp.a[i] |= res.w(i) = ((rsp.VCC&BIT(i))? rsp.v[vs].w(i) : rsp.v[vt].w(BC(i)));
+			}
+			rsp.VCC &= 0xff;
+			rsp.VCO = 0;
+			rsp.v[vd] = res;
+		};
+	case 0x22: // VNE
+		return INSTR {
+			VOPP;
+			vreg res;
+			rsp.VCC = 0;
+			for(u32 i = 0; i < 8; ++i)
+			{
+			rsp.VCC |= ((rsp.VCO&BIT(i+8)) || (rsp.v[vs].w(i) != rsp.v[vt].w(BC(i))) ) ? (1<<i) : 0;
+			rsp.a[i] &= ~0xffffull;
+			rsp.a[i] |= res.w(i) = ((rsp.VCC&BIT(i))? rsp.v[vs].w(i) : rsp.v[vt].w(BC(i)));
+			}
+			rsp.VCC &= 0xff;
+			rsp.VCO = 0;
+			rsp.v[vd] = res;
+		};	
+	case 0x23: // VGE
+		return INSTR {
+			VOPP;
+			vreg res;
+			rsp.VCC = 0;
+			for(u32 i = 0; i < 8; ++i)
+			{
+			u32 egl = rsp.v[vs].w(i) == rsp.v[vt].w(BC(i));
+			u32 neg = !((rsp.VCO&BIT(i+8)) && (rsp.VCO&BIT(i))) && egl;
+			rsp.VCC |= (neg || (rsp.v[vs].sw(i) > rsp.v[vt].sw(BC(i))) ) ? (1<<i) : 0;
+			rsp.a[i] &= ~0xffffull;
+			rsp.a[i] |= res.w(i) = ((rsp.VCC&BIT(i))? rsp.v[vs].w(i) : rsp.v[vt].w(BC(i)));
+			}
+			rsp.VCC &= 0xff;
+			rsp.VCO = 0;
+			rsp.v[vd] = res;
+		};
+		
+	case 0x27: // VMRG
+		return INSTR {
+			VOPP;
+			vreg res;
+			for(u32 i = 0; i < 8; ++i)
+			{
+				rsp.a[i] &= ~0xffffull;
+				rsp.a[i] |= res.w(i) = (rsp.VCC&BIT(i)) ? rsp.v[vs].w(i) : rsp.v[vt].w(BC(i));
+			}
+			rsp.v[vd] = res;
+			rsp.VCO = 0; // ??
+		};
+		
 	case 0x28: // VAND
 		return INSTR {
 			VOPP;
@@ -377,12 +486,18 @@ rsp_instr rsp_cop2(n64_rsp& rsp, u32 opcode)
 			}
 			rsp.v[vd] = res;
 		};
+		
+	case 0x32: // VRCPH  //TODO
+		return INSTR {
+			VOPP;		
+		};
 	case 0x37: return INSTR {}; // VNOP??
 	default:
 		printf("RSP: unimpl cop2 opcode = $%X\n", opcode&0x3F);
-		exit(1);
+		//exit(1);
 		return INSTR {};
 	}
+	return INSTR {};
 }
 
 rsp_instr rsp_lwc2(n64_rsp& rsp, u32 opcode)

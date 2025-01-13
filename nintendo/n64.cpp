@@ -117,7 +117,7 @@ u64 n64::read(u32 addr, int size)
 	if( addr >= 0x03F00000 && addr <= 0x03FFFFFF ) return 0;
 	
 	printf("N64:$%X: r%i <$%X\n", u32(cpu.pc), size, addr);
-	exit(1);
+	//exit(1);
 	return 0;
 }
 
@@ -330,7 +330,7 @@ void n64::reset()
 	MI_INTERRUPT = 0;
 	MI_MASK = 0;
 	
-	RDP.rdp_irq = [&](){ raise_mi_bit(MI_INTR_DP_BIT); };
+	RDP.rdp_irq = [&](){ raise_mi_bit(MI_INTR_DP_BIT); DP_STATUS &= ~BIT(5); };
 	RDP.rdram = mem.data();
 	DP_STATUS |= 0x80;
 	
@@ -383,7 +383,7 @@ void n64::reset()
 
 void n64::raise_mi_bit(u32 b)
 {
-	if( b != 3 ) printf("MI IRQ raised, intr bit %i\n", b);
+	//if( b != 3 ) printf("MI IRQ raised, intr bit %i\n", b);
 	MI_INTERRUPT |= BIT(b);
 	if( MI_INTERRUPT & MI_MASK & 0x3F )
 	{

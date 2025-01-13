@@ -22,6 +22,9 @@ void n64::pi_dma(bool write)
 		PI_DRAM_ADDR += (len+7)&~7;
 	} else {
 		//todo: writing from RAM to cart's save ram
+		u32 len = (PI_WR_LEN & 0xffFFff)+1;
+		PI_CART_ADDR += (len+1)&~1;
+		PI_DRAM_ADDR += (len+7)&~7;
 	}
 	
 	PI_STATUS |= BIT(3);
@@ -44,6 +47,8 @@ void n64::pi_write(u32 addr, u32 v)
 		return;
 	}
 	pi_regs[reg] = v;
+	PI_CART_ADDR &= ~1;
+	PI_DRAM_ADDR &= ~1;
 	if( reg == 2 )
 	{
 		pi_dma(false);
