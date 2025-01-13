@@ -95,6 +95,41 @@ rsp_instr rsp_cop2(n64_rsp& rsp, u32 opcode)
 	
 	switch( opcode & 0x3F )
 	{
+	case 0x00: // VMULF
+		return INSTR {
+			VOPP;
+			vreg res;
+			for(u32 i = 0; i < 8; ++i)
+			{
+				s32 prod = rsp.v[vs].sw(i);
+				prod *= rsp.v[vt].sw(BC(i));
+				prod *= 2;
+				rsp.a[i] = prod + 0x8000;
+				res.w(i) = clamp_signed(rsp.a[i]>>16);
+			}		
+			rsp.v[vd] = res;
+		};		
+
+	case 0x08: // VMACF
+		return INSTR {
+			VOPP;
+			vreg res;
+			for(u32 i = 0; i < 8; ++i)
+			{
+				s32 prod = rsp.v[vs].sw(i);
+				prod *= rsp.v[vt].sw(BC(i));
+				prod *= 2;
+				rsp.a[i] &= 0xffffFFFFffffull;
+				rsp.a[i] += prod;
+				res.w(i) = clamp_signed(rsp.a[i]>>16);
+			}		
+			rsp.v[vd] = res;
+		};
+		/*
+		prod(32..0) = VS<i>(15..0) * VT<i>(15..0) * 2   // signed multiplication
+		ACC<i>(47..0) += sign_extend(prod(32..0))
+		VD<i>(15..0) = clamp_signed(ACC<i>(47..16))
+		*/
 	case 0x10: // VADD
 		return INSTR {
 			VOPP;

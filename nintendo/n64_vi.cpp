@@ -54,7 +54,7 @@ void n64::vi_write(u32 addr, u32 v)
 	addr = (addr&0x3F)>>2;
 	if( addr == 4 ) 
 	{	// VI_V_CURRENT: writes clear irq
-		printf("N64: VI irq cleared\n");
+		//printf("N64: VI irq cleared\n");
 		clear_mi_bit(MI_INTR_VI_BIT);
 		return; 
 	}

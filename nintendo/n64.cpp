@@ -252,6 +252,8 @@ bool n64::loadROM(const std::string fname)
 	return true;
 }
 
+int rsp_div = 0;
+
 void n64::run_frame()
 {
 	for(u32 line = 0; line < 262; ++line)
@@ -266,7 +268,10 @@ void n64::run_frame()
 		for(u32 i = 0; i < 5725; ++i)
 		{
 			cpu.step();
-			if( !(SP_STATUS & 1) ) RSP.step();
+			if( !(SP_STATUS & 1) ) 
+			{
+				if( i%3 == 0 ) RSP.step();
+			}
 			if( ai_dma_enabled && ai_buf[0].valid )
 			{
 				ai_cycles += 1;
@@ -306,6 +311,7 @@ void n64::run_frame()
 
 void n64::reset()
 {
+	rsp_div = 0;
 	curwidth = 320;
 	curheight = 240;
 	curbpp = 16;
@@ -405,7 +411,6 @@ void n64::mi_write(u32 r, u32 v)
 		if( v & BIT(11) )
 		{
 			clear_mi_bit(MI_INTR_DP_BIT);
-			//todo: clear DP interrupt on DP somewhere?
 		}
 		return;
 	}

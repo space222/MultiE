@@ -148,6 +148,7 @@ void n64_rdp::run_commands(u64* list, u32 num)
 	}
 }
 
+
 void n64_rdp::fill_rect(u64 cmd)
 {
 	//todo: 1/2-cycle and copy modes. check coordinate rounding
@@ -195,9 +196,9 @@ void n64_rdp::load_tile(u64 cmd)
 	T.SH = lrS;
 	T.TL = ulT;
 	T.TH = lrT;
-	fprintf(stderr, "LT Tile%i Size = (%i, %i) - (%i, %i)\n", u8((cmd>>24)&7), ulS, ulT, lrS, lrT);
 	
 	ulS >>= 2; ulT >>= 2; lrS >>= 2; lrT >>= 2;
+	fprintf(stderr, "LT Tile%i Size = (%i, %i) - (%i, %i)\n", u8((cmd>>24)&7), ulS, ulT, lrS, lrT);
 	//printf("RDP: Load Tile (%i,%i) to (%i,%i)\n", ulS, ulT, lrS, lrT);
 	
 	u32 roffs = (((ulS*T.bpp)+7)/8) + teximg.addr;
@@ -359,8 +360,10 @@ u32 n64_rdp::tex_sample(u32 tile, u32 bpp, s32 s, s32 t)
 		if( T.format == 2 )
 		{
 			//printf("CI8 tex!\n");
+			u8 v = tmem[(T.addr*8 + (t*T.line*8) + s)&0xfff];
+			res = dc::from32((v<<24)|(v<<16)|(v<<8)|v);
 		} else {
-			u8 v = tmem[(T.addr*8 + (t*T.line*8) + s)&0xfff]<<7;
+			u8 v = tmem[(T.addr*8 + (t*T.line*8) + s)&0xfff];
 			res = dc::from32((v<<24)|(v<<16)|(v<<8)|v);
 		}
 	}
