@@ -43,6 +43,16 @@ u16 clamp_unsigned(s32 accum)
 	return accum;
 }
 
+u16 clamp_unsigned_x(s64 accum)
+{
+	u16 ACCHI = accum>>32;
+	u16 ACCMD = accum>>16;
+	u16 ACCLO = accum;
+	if( (ACCHI==0xffff&&(ACCMD&BIT(15))) || (ACCHI==0&&!(ACCMD&BIT(15))) ) return ACCLO;
+	if( ACCHI & BIT(15) ) return 0;
+	return 65535;
+}
+
 rsp_instr rsp_cop2(n64_rsp& rsp, u32 opcode)
 {
 	if( !(opcode & BIT(25)) )
@@ -109,7 +119,72 @@ rsp_instr rsp_cop2(n64_rsp& rsp, u32 opcode)
 			}		
 			rsp.v[vd] = res;
 		};		
-
+	case 0x01: // VMULU
+		return INSTR {
+			VOPP;
+			vreg res;
+			for(u32 i = 0; i < 8; ++i)
+			{
+				s32 prod = rsp.v[vs].sw(i);
+				prod *= rsp.v[vt].sw(BC(i));
+				prod *= 2;
+				rsp.a[i] = prod + 0x8000;
+				res.w(i) = clamp_unsigned(rsp.a[i]>>16);
+			}		
+			rsp.v[vd] = res;
+		};
+	case 0x04: // VMUDL
+		return INSTR {
+			VOPP;
+			vreg res;
+			for(u32 i = 0; i < 8; ++i)
+			{
+				u32 prod = rsp.v[vs].w(i);
+				prod *= rsp.v[vt].w(BC(i));
+				rsp.a[i] = (prod>>16)&0xffff;
+				res.w(i) = clamp_unsigned_x(rsp.a[i]);
+			}		
+			rsp.v[vd] = res;
+		};		
+	
+	case 0x05: // VMUDM
+		return INSTR {
+			VOPP;
+			vreg res;
+			for(u32 i = 0; i < 8; ++i)
+			{
+				s64 prod = s64(rsp.v[vs].sw(i)) * u64(rsp.v[vt].w(BC(i)));
+				rsp.a[i] = s64(prod) & 0xffffFFFFffffull;
+				res.w(i) = clamp_signed(rsp.a[i]>>16);
+			}		
+			rsp.v[vd] = res;
+		};	
+	case 0x06: // VMUDN
+		return INSTR {
+			VOPP;
+			vreg res;
+			for(u32 i = 0; i < 8; ++i)
+			{
+				s32 prod = rsp.v[vs].w(i);
+				prod *= rsp.v[vt].sw(BC(i));
+				rsp.a[i] = prod;
+				res.w(i) = clamp_unsigned_x(rsp.a[i]);
+			}
+			rsp.v[vd] = res;	
+		};	
+	case 0x07: // VMUDH
+		return INSTR {
+			VOPP;
+			vreg res;
+			for(u32 i = 0; i < 8; ++i)
+			{
+				s32 prod = rsp.v[vs].sw(i);
+				prod *= rsp.v[vt].sw(BC(i));
+				rsp.a[i] = u64(prod)<<16;
+				res.w(i) = clamp_signed(rsp.a[i]>>16);
+			}
+			rsp.v[vd] = res;
+		};		
 	case 0x08: // VMACF
 		return INSTR {
 			VOPP;
@@ -125,11 +200,61 @@ rsp_instr rsp_cop2(n64_rsp& rsp, u32 opcode)
 			}		
 			rsp.v[vd] = res;
 		};
-		/*
-		prod(32..0) = VS<i>(15..0) * VT<i>(15..0) * 2   // signed multiplication
-		ACC<i>(47..0) += sign_extend(prod(32..0))
-		VD<i>(15..0) = clamp_signed(ACC<i>(47..16))
-		*/
+	case 0x09: // VMACU
+		return INSTR {
+			VOPP;
+			vreg res;
+			for(u32 i = 0; i < 8; ++i)
+			{
+				s32 prod = rsp.v[vs].sw(i);
+				prod *= rsp.v[vt].sw(BC(i));
+				prod *= 2;
+				rsp.a[i] &= 0xffffFFFFffffull;
+				rsp.a[i] += prod;
+				res.w(i) = clamp_unsigned(rsp.a[i]>>16);
+			}		
+			rsp.v[vd] = res;
+		};
+	case 0x0D: // VMADM
+		return INSTR {
+			VOPP;
+			vreg res;
+			for(u32 i = 0; i < 8; ++i)
+			{
+				s32 prod = rsp.v[vs].w(i);
+				prod *= rsp.v[vt].sw(BC(i));
+				rsp.a[i] &= 0xffffFFFFffffull;
+				rsp.a[i] += s64(prod) & 0xffffFFFFffffull;
+				res.w(i) = clamp_signed(rsp.a[i]>>16);
+			}
+			rsp.v[vd] = res;
+		};	
+	case 0x0E: // VMADN
+		return INSTR {
+			VOPP;
+			vreg res;
+			for(u32 i = 0; i < 8; ++i)
+			{
+				s32 prod = rsp.v[vs].w(i);
+				prod *= rsp.v[vt].sw(BC(i));
+				rsp.a[i] += prod;
+				res.w(i) = clamp_unsigned_x(rsp.a[i]);
+			}
+			rsp.v[vd] = res;
+		};
+	case 0x0F: // VMADH
+		return INSTR {
+			VOPP;
+			vreg res;
+			for(u32 i = 0; i < 8; ++i)
+			{
+				s32 prod = rsp.v[vs].sw(i);
+				prod *= rsp.v[vt].sw(BC(i));
+				rsp.a[i] += u64(prod)<<16;
+				res.w(i) = clamp_signed(rsp.a[i]>>16);
+			}		
+			rsp.v[vd] = res;
+		};	
 	case 0x10: // VADD
 		return INSTR {
 			VOPP;
@@ -239,8 +364,10 @@ rsp_instr rsp_cop2(n64_rsp& rsp, u32 opcode)
 			}
 			rsp.v[vd] = res;
 		};
+	case 0x37: return INSTR {}; // VNOP??
 	default:
 		printf("RSP: unimpl cop2 opcode = $%X\n", opcode&0x3F);
+		exit(1);
 		return INSTR {};
 	}
 }
