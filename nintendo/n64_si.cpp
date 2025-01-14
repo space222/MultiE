@@ -9,7 +9,7 @@ void n64::pif_run()
 
 
 	if( !(pifram[0x3f] & 1) ) return;
-	pifram[0x3f] |= 0x80;
+	//pifram[0x3f] |= 0x80;
 	// from here on it's controller time
 	
 	/*

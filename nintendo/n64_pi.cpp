@@ -47,8 +47,6 @@ void n64::pi_write(u32 addr, u32 v)
 		return;
 	}
 	pi_regs[reg] = v;
-	PI_CART_ADDR &= ~1;
-	PI_DRAM_ADDR &= ~1;
 	if( reg == 2 )
 	{
 		pi_dma(false);

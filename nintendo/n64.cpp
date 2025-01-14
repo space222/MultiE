@@ -262,7 +262,7 @@ void n64::run_frame()
 	{
 		if( VI_CTRL & 3 )
 		{
-			VI_V_CURRENT = line<<1;
+			VI_V_CURRENT = (VI_V_CURRENT&1) | (line<<1);
 			if( (VI_V_CURRENT>>1) == (VI_V_INTR>>1) ) raise_mi_bit(MI_INTR_VI_BIT);
 		} else {
 			VI_V_CURRENT = 0;
@@ -308,6 +308,9 @@ void n64::run_frame()
 			}
 		}
 	}
+	
+	if( !(VI_V_TOTAL & 1) && (VI_CTRL&3) ) VI_V_CURRENT ^= 1;
+	
 	vi_draw_frame();
 }
 
@@ -325,6 +328,8 @@ void n64::reset()
 	cpu.nnpc = cpu.npc + 4;
 	
 	PI_STATUS = VI_CTRL = 0;
+	memset(si_regs, 0, 24);
+	SP_STATUS = 3;
 	pif_rom_enabled = true;
 	MI_VERSION = 0x02020102;
 	MI_INTERRUPT = 0;

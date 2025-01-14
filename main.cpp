@@ -753,7 +753,7 @@ bool getKeyState(u32 key)
 
 
 
-
+std::string lastDir;
 
 #ifdef _WIN32
 #include <Windows.h>
@@ -773,7 +773,8 @@ std::string getOpenFile(const std::string& title)
 	char filename[1024];
 	filename[0] = 0;
 	std::string cmd = "zenity --title \"";
-	cmd += title + "\" --file-selection 2>/dev/null";
+	cmd += title + "\" --file-selection 2>/dev/null ";
+	if( !lastDir.empty() ) cmd += "--filename=\"" + lastDir + "\"";
 	FILE *f = popen(cmd.c_str(), "r"); //2>/dev/null prevents Gtk msg to stderr
 	[[maybe_unused]] auto unu = fgets(filename, 1024, f);
 	int ret = pclose(f);
@@ -781,9 +782,9 @@ std::string getOpenFile(const std::string& title)
 	{
 		return {};
 	}
-	std::string d = filename;
-	if( d.ends_with("\n") ) d.pop_back();
-	return d;
+	lastDir = filename;
+	if( lastDir.ends_with("\n") ) lastDir.pop_back();
+	return lastDir;
 }
 
 #endif

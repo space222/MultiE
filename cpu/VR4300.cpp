@@ -625,7 +625,7 @@ void VR4300::step()
 	ndelay = false;
 	BusResult opc;
 	
-	COUNT += 1;
+	COUNT = (COUNT + 1) & 0x1FFFFffffull;
 	if( u32(COUNT>>1) == u32(COMPARE>>1) )
 	{
 		CAUSE |= BIT(15);
