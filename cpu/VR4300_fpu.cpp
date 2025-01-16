@@ -15,11 +15,10 @@
 #define DS_REL_ADDR (cpu.npc + (s32(s16(imm16))<<2))
 #define LIKELY cpu.npc = cpu.nnpc; cpu.nnpc += 4;
 #define FLTYPE u32 fs = (opc>>11)&0x1f; u32 rt = (opc>>16)&0x1f
-
-#define FITYPE  u32 fs = (opc>>11)&0x1f; \
+#define FITYPE  if( cpu.COPUnusable(1) ) return; \
+		u32 fs = (opc>>11)&0x1f; \
 		u32 fd = (opc>>6)&0x1f;  \
 		u32 ft = (opc>>16)&0x1f; \
-		if( cpu.COPUnusable(1) ) return; \
 		cpu.FCSR &= ~0x3f000
 
 typedef void(*vr4300_instr) (VR4300&, u32);
@@ -92,7 +91,6 @@ vr4300_instr cop1_d(VR4300& proc, u32 opcode)
 			if( res ) cpu.FCSR |= BIT(23);
 		};
 	}
-
 
 	switch( opcode & 0x3F )
 	{
@@ -458,13 +456,20 @@ vr4300_instr cop1(VR4300& proc, u32 opcode)
 		return INSTR {
 			FLTYPE;
 			if( cpu.COPUnusable(1) ) return;
-			memcpy(&cpu.r[rt], &cpu.f[fs<<3], 4);
+			if( !(cpu.STATUS & BIT(26)) )
+			{
+				fs = ((fs&~1)<<3) + ((fs&1)?4:0);
+			} else { 
+				fs <<= 3;
+			}
+			memcpy(&cpu.r[rt], &cpu.f[fs], 4);
 			cpu.r[rt] = s32(cpu.r[rt]);
 		};
 	case 1: // DMFC1
 		return INSTR {
 			FLTYPE;
 			if( cpu.COPUnusable(1) ) return;
+			if( !(cpu.STATUS & BIT(26)) ) fs &= ~1;
 			memcpy(&cpu.r[rt], &cpu.f[fs<<3], 8);
 		};
 	case 2: // CFC1
@@ -483,12 +488,19 @@ vr4300_instr cop1(VR4300& proc, u32 opcode)
 		return INSTR {
 			FLTYPE;
 			if( cpu.COPUnusable(1) ) return;
-			memcpy(&cpu.f[fs<<3], &cpu.r[rt], 4);
+			if( !(cpu.STATUS & BIT(26)) )
+			{
+				fs = ((fs&~1)<<3) + ((fs&1)?4:0);
+			} else { 
+				fs <<= 3;
+			}
+			memcpy(&cpu.f[fs], &cpu.r[rt], 4);
 		};
 	case 5: // DMTC1
 		return INSTR {
 			FLTYPE;
 			if( cpu.COPUnusable(1) ) return;
+			if( !(cpu.STATUS & BIT(26)) ) fs &= ~1;
 			memcpy(&cpu.f[fs<<3], &cpu.r[rt], 8);
 		};
 	case 6: // CTC1
@@ -519,6 +531,7 @@ vr4300_instr cop1(VR4300& proc, u32 opcode)
 	case 8: // BC
 		return INSTR {
 			ITYPE;
+			if( cpu.COPUnusable(1) ) return;
 			switch( (opc>>16)&0x1f )
 			{
 			case 0: // BCF
@@ -551,7 +564,9 @@ vr4300_instr cop1(VR4300& proc, u32 opcode)
 					LIKELY;
 				}
 				break;
-			default: break;
+			default: 
+				printf("cop1_bc unimpl opcode = $%X\n", (opc>>16)&0x1f);
+				break;
 			}
 		};
 		
@@ -586,7 +601,9 @@ vr4300_instr cop1_word(VR4300&, u32 opcode)
 			double b = a;
 			memcpy(&cpu.f[fd<<3], &b, 8);
 		};
-	default: return INSTR {};
+	default: 
+		printf("cop1_word unimpl opcode = $%X\n", opcode & 0x3F);
+		return INSTR {};
 	}
 }
 
@@ -610,7 +627,9 @@ vr4300_instr cop1_long(VR4300&, u32 opcode)
 			double b = a;
 			memcpy(&cpu.f[fd<<3], &b, 8);
 		};	
-	default: return INSTR {};
+	default: 
+		printf("cop1_long unimpl opcode = $%X\n", opcode & 0x3F);
+		return INSTR {};
 	}
 }
 

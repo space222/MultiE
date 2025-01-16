@@ -538,8 +538,13 @@ vr4300_instr decode_regular(VR4300& proc, u32 opcode)
 			auto res = cpu.read(cpu.r[s]+s16(imm16), 32);
 			if( !res ) { return; }
 			u32 a = res;
-			//printf("LWC1 got %f\n", std::bit_cast<float>(a));
-			memcpy(&cpu.f[t<<3], &a, 4);
+			if( !(cpu.STATUS & BIT(26)) )
+			{
+				t = ((t&~1)<<3) + ((t&1)?4:0);
+			} else { 
+				t <<= 3;
+			}
+			memcpy(&cpu.f[t], &a, 4);
 		};
 
 	case 0x34: // LLD
@@ -559,6 +564,7 @@ vr4300_instr decode_regular(VR4300& proc, u32 opcode)
 			auto res = cpu.read(cpu.r[s]+s16(imm16), 64);
 			if( !res ) { return; }
 			u64 a = res;
+			if( !(cpu.STATUS & BIT(26)) ) t &= ~1;
 			memcpy(&cpu.f[t<<3], &a, 8);
 		};
 	case 0x37: // LD
@@ -586,7 +592,13 @@ vr4300_instr decode_regular(VR4300& proc, u32 opcode)
 			ITYPE;
 			if( cpu.COPUnusable(1) ) return;
 			u32 a = 0;
-			memcpy(&a, &cpu.f[t<<3], 4);
+			if( !(cpu.STATUS & BIT(26)) )
+			{
+				t = ((t&~1)<<3) + ((t&1)?4:0);
+			} else { 
+				t <<= 3;
+			}
+			memcpy(&a, &cpu.f[t], 4);
 			cpu.write(cpu.r[s] + s16(imm16), a, 32);
 		};
 	case 0x3C: // SCD
@@ -601,11 +613,12 @@ vr4300_instr decode_regular(VR4300& proc, u32 opcode)
 				cpu.r[t] = 0;
 			}		
 		};
-	case 0x3D: // SCD1
+	case 0x3D: // SDC1
 		return INSTR {
 			ITYPE;
 			if( cpu.COPUnusable(1) ) return;
 			u64 a = 0;
+			if( !(cpu.STATUS & BIT(26)) ) t &= ~1;
 			memcpy(&a, &cpu.f[t<<3], 8);
 			cpu.write(cpu.r[s] + s16(imm16), a, 64);
 		};
@@ -616,8 +629,6 @@ vr4300_instr decode_regular(VR4300& proc, u32 opcode)
 	return nullptr;
 }
 
-//extern u32 mimask, miirq;
-
 void VR4300::step()
 {
 	r[0] = 0;
@@ -626,7 +637,7 @@ void VR4300::step()
 	BusResult opc;
 	
 	COUNT = (COUNT + 1) & 0x1FFFFffffull;
-	if( u32(COUNT>>1) == u32(COMPARE>>1) )
+	if( COUNT == COMPARE )
 	{
 		CAUSE |= BIT(15);
 	}
@@ -651,8 +662,6 @@ void VR4300::step()
 		}
 	}
 	
-	//if( u32(pc) >= 0x80000400u && u32(pc) < 0xa0000000u ) printf("$%lX: opc = $%X\n", pc, u32(opc));
-		
 	pc = npc;
 	npc = nnpc;
 	nnpc += 4;

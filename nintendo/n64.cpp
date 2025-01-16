@@ -87,10 +87,14 @@ u64 n64::read(u32 addr, int size)
 		
 	if( addr >= 0x10000000 && addr < (0x10000000 + ROM.size()) )
 	{
+		if( size == 16 )
+		{
+			return __builtin_bswap16(*(u16*)&ROM[addr-0x10000000]);
+		}
 		if( size != 32 )
 		{
 			printf("%ibit read from cart!\n", size);
-			exit(1);
+			//exit(1);
 		}
 		return __builtin_bswap32(*(u32*)&ROM[addr-0x10000000]);
 	}
@@ -254,7 +258,6 @@ bool n64::loadROM(const std::string fname)
 	return true;
 }
 
-int rsp_div = 0;
 
 void n64::run_frame()
 {
@@ -267,12 +270,30 @@ void n64::run_frame()
 		} else {
 			VI_V_CURRENT = 0;
 		}
-		for(u32 i = 0; i < 5725; ++i)
+		for(u32 i = 0; i < 5825; ++i)
 		{
 			cpu.step();
 			if( !(SP_STATUS & 1) ) 
 			{
-				if( i%3 == 0 ) RSP.step();
+				RSP.step();
+			}
+			if( pi_cycles_til_irq )
+			{
+				pi_cycles_til_irq -= 1;
+				if( pi_cycles_til_irq == 0 )
+				{
+					PI_STATUS &= ~3;
+					raise_mi_bit(MI_INTR_PI_BIT);
+				}
+			}
+			if( si_cycles_til_irq )
+			{
+				si_cycles_til_irq -= 1;
+				if( si_cycles_til_irq == 0 )
+				{
+					SI_STATUS &= ~1;
+					raise_mi_bit(MI_INTR_SI_BIT);
+				}			
 			}
 			if( ai_dma_enabled && ai_buf[0].valid )
 			{
@@ -316,7 +337,6 @@ void n64::run_frame()
 
 void n64::reset()
 {
-	rsp_div = 0;
 	curwidth = 320;
 	curheight = 240;
 	curbpp = 16;
@@ -327,9 +347,8 @@ void n64::reset()
 	cpu.npc = cpu.pc + 4;
 	cpu.nnpc = cpu.npc + 4;
 	
-	PI_STATUS = VI_CTRL = 0;
-	memset(si_regs, 0, 24);
-	SP_STATUS = 3;
+	PI_STATUS = SI_STATUS = VI_CTRL = 0;
+	memset(si_regs, 0, 30);
 	pif_rom_enabled = true;
 	MI_VERSION = 0x02020102;
 	MI_INTERRUPT = 0;
@@ -348,10 +367,9 @@ void n64::reset()
 	RSP.sp_write = [&](u32 a, u32 v) { sp_write(a, v); };
 	RSP.dp_read = [&](u32 a) -> u32 { return dp_read(a); };
 	RSP.sp_read = [&](u32 a) -> u32 { return sp_read(a); };
-	
-	
+		
 	*(u32*)&mem[0x318] = __builtin_bswap32(0x800000);
-	
+	*(u32*)&mem[0x3f0] = __builtin_bswap32(0x800000);	
 	memset(pifram, 0, 64);
 	
 	if( do_boot_hle )

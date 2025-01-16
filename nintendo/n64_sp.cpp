@@ -63,7 +63,7 @@ void n64::sp_write(u32 addr, u32 v)
 		RSP.nnpc = RSP.npc + 4;
 		return;
 	}
-	printf("SP Write $%X = $%X\n", addr, v);
+	//printf("SP Write $%X = $%X\n", addr, v);
 	const u32 r = (addr&0x1C)>>2;
 	
 	if( r < 4 )

@@ -66,6 +66,7 @@ public:
 	void pi_write(u32, u32);
 	u32 pi_read(u32);
 	void pi_dma(bool);
+	s64 pi_cycles_til_irq;
 	
 	bool pif_rom_enabled, do_boot_hle;
 	u8 pifrom[0x800];
@@ -101,9 +102,11 @@ public:
 	void ai_write(u32, u32);
 	
 	u32 si_regs[7];
+	u32& SI_STATUS = si_regs[6];
 	u32 si_read(u32);
 	void si_write(u32, u32);
 	void pif_run();
+	u64 si_cycles_til_irq;
 	
 	u8 DMEM[0x1000];
 	u8 IMEM[0x1000];

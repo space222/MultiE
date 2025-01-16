@@ -5,8 +5,8 @@ project(test)
 find_package(SDL2)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
-set(CMAKE_CXX_FLAGS "-O3 -march=native -Wall -Wpedantic -Wextra -Wshadow")
-set(CMAKE_CPP_COMPILER clang++)
+set(CMAKE_CXX_FLAGS "-O3 -ftree-vectorize -march=native -Wall -Wpedantic -Wextra -Wshadow")
+set(CMAKE_CPP_COMPILER g++)
 
 add_executable(test main.cpp imgui/backends/imgui_impl_sdl2.cpp progopt.cpp commodore/c64.cpp commodore/TAPFile.cpp 
 atari/a26.cpp atari/a52.cpp atari/antic.cpp atari/tia.cpp cpu/6502.cpp

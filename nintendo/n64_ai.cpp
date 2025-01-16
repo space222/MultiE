@@ -19,7 +19,7 @@ u32 n64::ai_read(u32 addr)
 
 void n64::ai_write(u32 addr, u32 v)
 {
-	printf("N64: AI $%X = $%X\n", addr, v);
+	//printf("N64: AI $%X = $%X\n", addr, v);
 	u32 r = (addr&0x1F)>>2;
 	if( r > 5 ) return;
 	
@@ -57,7 +57,7 @@ void n64::ai_write(u32 addr, u32 v)
 	
 	if( r == 3 )
 	{	// AI_STATUS: writes clear the irq
-		printf("N64: AI irq cleared\n");
+		//printf("N64: AI irq cleared\n");
 		clear_mi_bit(MI_INTR_AI_BIT);
 		return;
 	}
@@ -71,7 +71,7 @@ void n64::ai_write(u32 addr, u32 v)
 		float DAChz = VI_CLOCK / float(v&0x3fff);
 		ai_cycles_per_sample = CPU_HZ / DAChz;
 		//if( ai_cycles_per_sample < 800 ) ai_cycles_per_sample = 8000;
-		printf("N64: AI config %fHz, %li cycles per sample\n", DAChz, ai_cycles_per_sample);
+		//printf("N64: AI config %fHz, %li cycles per sample\n", DAChz, ai_cycles_per_sample);
 		return;
 	}
 }
