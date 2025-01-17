@@ -199,7 +199,7 @@ void n64_rdp::load_tile(u64 cmd)
 	T.TH = lrT;
 	
 	ulS >>= 2; ulT >>= 2; lrS >>= 2; lrT >>= 2;
-	//fprintf(stderr, "LT Tile%i Size = (%i, %i) - (%i, %i)\n", u8((cmd>>24)&7), ulS, ulT, lrS, lrT);
+	fprintf(stderr, "LT Tile%i Size = (%i, %i) - (%i, %i)\n\n", u8((cmd>>24)&7), ulS, ulT, lrS, lrT);
 	
 	u32 roffs = (((ulS*T.bpp)+7)/8) + teximg.addr;
 	u32 rdram_stride = ((teximg.width*T.bpp) + 7) / 8; 
@@ -219,7 +219,8 @@ void n64_rdp::set_tile(u64 cmd)
 	T.bpp = imgbpp[(cmd>>51)&3];
 	T.line = (cmd>>41)&0x1ff;
 	
-	//fprintf(stderr, "set tile%i, addr = $%X, line = $%X\n", u8((cmd>>24)&7), T.addr, T.line);
+	//fprintf(stderr, "set tile%i, addr = $%X, line = $%X\n\tformat = $%X, bpp=$%X\n", 
+	//	u8((cmd>>24)&7), T.addr, T.line, T.format, T.bpp);
 	
 	T.clampT = (cmd&BITL(19));
 	T.mirrorT = (cmd&BITL(18));
@@ -243,7 +244,7 @@ void n64_rdp::texture_rect(u64 cmd0, u64 cmd1)
 	u32 ulX = ((cmd0>>12)&0xfff)>>2;
 	u32 ulY = (cmd0&0xfff)>>2;
 	s32 S = ((cmd1>>48)&0xffff); S <<= 16; S >>= 16; S <<= 5;
-	s32 T = ((cmd1>>32)&0xffff); S <<= 16; T >>= 16; T <<= 5;
+	s32 T = ((cmd1>>32)&0xffff); T <<= 16; T >>= 16; T <<= 5;
 	s32 DsDx = ((cmd1>>16)&0xffff); DsDx <<= 16; DsDx >>= 16;
 	s32 DtDy = (cmd1&0xffff); DtDy <<= 16; DtDy >>= 16;
 	if( other.cycle_type == CYCLE_TYPE_COPY ) 
@@ -253,7 +254,8 @@ void n64_rdp::texture_rect(u64 cmd0, u64 cmd1)
 		lrX += 1;
 	}
 	
-	//fprintf(stderr, "texrect (%i, %i) to (%i, %i)\n", ulX, ulY, lrX, lrY);
+	fprintf(stderr, "texrect t%i (%i, %i) to (%i, %i)\n\tst(%X, %X), d(%X,%X)\n\n", 
+		other.cycle_type, ulX, ulY, lrX, lrY, S, T, DsDx, DtDy);
 		
 	if( cimg.bpp == 16 )
 	{
@@ -262,7 +264,7 @@ void n64_rdp::texture_rect(u64 cmd0, u64 cmd1)
 			s32 Sl = S;
 			for(u32 X = ulX; X < lrX; ++X, Sl += DsDx)
 			{
-				u16 sample = tex_sample(tile, 16, Sl>>10, T>>10);
+				u16 sample = tex_sample(tile, 16, Sl, T);
 				if( other.alpha_compare_en && (__builtin_bswap16(sample)&1) )
 				{
 					*(u16*)&rdram[cimg.addr + (Y*cimg.width*2) + X*2] = sample;
@@ -275,7 +277,7 @@ void n64_rdp::texture_rect(u64 cmd0, u64 cmd1)
 			s32 Sl = S;
 			for(u32 X = ulX; X < lrX; ++X, Sl += DsDx)
 			{
-				*(u32*)&rdram[cimg.addr + (Y*cimg.width*4) + X*4] = tex_sample(tile, 32, Sl>>10, T>>10);
+				*(u32*)&rdram[cimg.addr + (Y*cimg.width*4) + X*4] = tex_sample(tile, 32, Sl, T);
 			}
 		}	
 	}
@@ -308,7 +310,7 @@ void n64_rdp::texture_rect_flip(u64 cmd0, u64 cmd1)
 			s32 Sl = S;
 			for(u32 X = ulX; X < lrX; ++X, Sl += DsDx)
 			{
-				u16 sample = tex_sample(tile, 16, T>>10, Sl>>10);
+				u16 sample = tex_sample(tile, 16, T, Sl);
 				if( other.alpha_compare_en && (__builtin_bswap16(sample)&1) )
 				{
 					*(u16*)&rdram[(cimg.addr + (Y*cimg.width*2) + X*2)&0x7ffffe] = sample;
@@ -321,7 +323,7 @@ void n64_rdp::texture_rect_flip(u64 cmd0, u64 cmd1)
 			s32 Sl = S;
 			for(u32 X = ulX; X < lrX; ++X, Sl += DsDx)
 			{
-				*(u32*)&rdram[(cimg.addr + (Y*cimg.width*4) + X*4)&0x7ffffc] = tex_sample(tile, 32, T>>10, Sl>>10);
+				*(u32*)&rdram[(cimg.addr + (Y*cimg.width*4) + X*4)&0x7ffffc] = tex_sample(tile, 32, T, Sl);
 			}
 		}	
 	}	
@@ -348,9 +350,15 @@ void n64_rdp::set_tile_size(u64 cmd)
 u32 n64_rdp::tex_sample(u32 tile, u32 bpp, s32 s, s32 t)
 {
 	auto& T = tiles[tile];
+	//s += 0x400;
+	//t += 0x400;
+	s >>= 10;
+	t >>= 10;
+	s -= T.SL>>2;
+	t -= T.TL>>2;
 	if( T.maskS ) s &= (1<<T.maskS)-1;
 	if( T.maskT ) t &= (1<<T.maskT)-1;
-
+	
 	dc res;
 	if( T.bpp == 16 )
 	{
@@ -361,8 +369,10 @@ u32 n64_rdp::tex_sample(u32 tile, u32 bpp, s32 s, s32 t)
 	} else if( T.bpp == 8 ) {
 		if( T.format == 2 )
 		{
-			u8 v = tmem[(T.addr*8 + (t*T.line*8) + s)&0xfff];
-			res = dc::from16(__builtin_bswap16(*(u16*)&tmem[(0x100+v)*8]));
+			//u8 v = tmem[(T.addr*8 + (t*T.line*8) + s)&0xfff];
+			//res = dc::from16(__builtin_bswap16(*(u16*)&tmem[(0x100+v)*8]));
+			u8 v = tmem[(T.addr*8 + (t*T.line*8) + s)&0xfff]<<4;
+			res = dc::from32((v<<24)|(v<<16)|(v<<8)|v);
 		} else {
 			u8 v = tmem[(T.addr*8 + (t*T.line*8) + s)&0xfff];
 			res = dc::from32((v<<24)|(v<<16)|(v<<8)|v);

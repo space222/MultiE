@@ -260,6 +260,8 @@ AI: Audio works.. ish. Most things it does. Namco's title screen has a few boops
 PIF: one controller and only D-pad + a/b/z/start currently implemented and working in namco.
 	If the cmd byte in pifram gets the bit zero cleared, namco stops getting input.
 Notes:
+	After implementing LWC1/MTC1 and friends half mode odd registers, Namco's title screen and menu button music/sounds function.
+		I don't understand why that would matter if odd registers are undefined
 	If RI_SELECT is nonzero to skip rdram init, IPL3 never writes RAM size to $80000318 which makes libdragon 
 crash trying to set up the stack at end of RAM.
 	Flappy Bird's pipes use texcoords masks. It doesn't depend on Tile Size. I'm still unclear on how Tile Size and

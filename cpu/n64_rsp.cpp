@@ -2,7 +2,7 @@
 #include <cstdlib>
 #include "n64_rsp.h"
 
-#define JTYPE u64 target = ((opc<<2)&0x0fffFFFFu)
+#define JTYPE u32 target = ((opc<<2)&0x0fffFFFFu)
 #define RTYPE u32 d = (opc>>11)&0x1f; u32 s = (opc>>21)&0x1f; u32 t = (opc>>16)&0x1f; u32 sa=(opc>>6)&0x1f
 #define ITYPE u32 t = (opc>>16)&0x1f; u32 s = (opc>>21)&0x1f; u16 imm16 = opc
 #define LINK (cpu.nnpc&0xffc)
@@ -29,7 +29,7 @@ rsp_instr rsp_special(n64_rsp&, u32 opcode)
 	case 0x07: return INSTR { RTYPE; cpu.r[d] = (s32(cpu.r[t]) >> (cpu.r[s]&0x1F)); }; // SRAV
 	
 	case 0x08: return INSTR { RTYPE; cpu.branch(cpu.r[s]); }; // JR
-	case 0x09: return INSTR { RTYPE; u64 temp = cpu.r[s]; cpu.r[d] = LINK; cpu.branch(temp); }; // JALR
+	case 0x09: return INSTR { RTYPE; u32 temp = cpu.r[s]; cpu.r[d] = LINK; cpu.branch(temp); }; // JALR
 	
 	case 0x0D: return INSTR { cpu.broke(); }; // BREAK
 	
@@ -141,7 +141,8 @@ rsp_instr rsp_regular(n64_rsp& proc, u32 opcode)
 					cpu.r[t] = cpu.dp_read((d-8)<<2);
 				}
 			};
-		case 4: return INSTR { 
+		case 4: // MTC0
+			return INSTR { 
 				RTYPE; 
 				if( d < 8 )
 				{
@@ -149,7 +150,7 @@ rsp_instr rsp_regular(n64_rsp& proc, u32 opcode)
 				} else {
 					cpu.dp_write((d-8)<<2, cpu.r[t]);
 				}
-			}; //cpu.c0_write32(d, cpu.r[t]); }; // MTC0
+			};
 		default:
 			printf("RSP: Unimpl COP0 opcode = $%X\n", opcode);
 			exit(1);

@@ -45,6 +45,8 @@ static void sized_write(u8* data, u32 addr, u64 v, int size)
 	data[addr] = v;
 }
 
+char viewbuf[0x2000];
+
 u64 n64::read(u32 addr, int size)
 {
 	if( addr < 8*1024*1024 ) return sized_read(mem.data(), addr, size);
@@ -120,12 +122,16 @@ u64 n64::read(u32 addr, int size)
 	
 	if( addr >= 0x03F00000 && addr <= 0x03FFFFFF ) return 0;
 	
+	if( addr >= 0x13FF0000 && addr < 0x13FF2000 )
+	{
+		if( size != 32 ) { printf("ISViewer not word!\n"); exit(1); }
+		return __builtin_bswap32(*(u32*)&viewbuf[addr-0x13ff0000]);
+	}
+	
 	printf("N64:$%X: r%i <$%X\n", u32(cpu.pc), size, addr);
 	//exit(1);
 	return 0;
 }
-
-char viewbuf[0x200];
 
 void n64::write(u32 addr, u64 v, int size)
 {
@@ -188,18 +194,18 @@ void n64::write(u32 addr, u64 v, int size)
 		u32 len = (v < 0x200) ? v : 0x200;
 		for(u32 i = 0; i < len; ++i)
 		{
-			fputc(viewbuf[i], stderr);
+			fputc(viewbuf[0x20+i], stderr);
 		}
 		return;
 	}
-	if( addr >= 0x13FF0020 && addr < 0x13FF0220 )
+	if( addr >= 0x13FF0000 && addr < 0x13FF2000 )
 	{
 		if( size != 32 ) { printf("ISViewer not word!\n"); exit(1); }
-		*(u32*)&viewbuf[addr-0x13ff0020] = __builtin_bswap32(u32(v));
+		*(u32*)&viewbuf[addr-0x13ff0000] = __builtin_bswap32(u32(v));
 		return;
 	}
 	
-	printf("W%i $%X = $%lX\n", size, addr, v);
+	printf("$%X: W%i $%X = $%lX\n", u32(cpu.pc), size, addr, v);
 }
 
 bool n64::loadROM(const std::string fname)
@@ -270,11 +276,12 @@ void n64::run_frame()
 		} else {
 			VI_V_CURRENT = 0;
 		}
-		for(u32 i = 0; i < 5825; ++i)
+		for(u32 i = 0; i < 5000; ++i)
 		{
 			cpu.step();
 			if( !(SP_STATUS & 1) ) 
 			{
+				RSP.step();
 				RSP.step();
 			}
 			if( pi_cycles_til_irq )
@@ -356,7 +363,7 @@ void n64::reset()
 	
 	RDP.rdp_irq = [&](){ raise_mi_bit(MI_INTR_DP_BIT); DP_STATUS &= ~BIT(5); };
 	RDP.rdram = mem.data();
-	DP_STATUS |= 0x80;
+	DP_STATUS = 0x80;
 	
 	for(u32 i = 0; i < 8; ++i) sp_regs[i] = 0;
 	SP_STATUS |= 1;

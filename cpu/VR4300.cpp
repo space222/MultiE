@@ -637,7 +637,7 @@ void VR4300::step()
 	BusResult opc;
 	
 	COUNT = (COUNT + 1) & 0x1FFFFffffull;
-	if( COUNT == COMPARE )
+	if( u32(COUNT>>1) == u32(COMPARE) )
 	{
 		CAUSE |= BIT(15);
 	}
@@ -661,7 +661,7 @@ void VR4300::step()
 			decode_regular(*this, opc)(*this, opc);
 		}
 	}
-	
+
 	pc = npc;
 	npc = nnpc;
 	nnpc += 4;
@@ -711,8 +711,8 @@ void VR4300::reset()
 	for(u32 i = 0; i < 32; ++i) c[i] = 0;
 	STATUS = 0;
 	CAUSE = 0;
-	COUNT = 0x80000000u;
-	COMPARE = 0xffffffffu;
+	COUNT = 0;
+	COMPARE = 0;
 	STATUS = 0x34000000;
 	cop1_half_mode = !(STATUS & BIT(26));
 	c[15] = 0x00000B22;
@@ -775,7 +775,9 @@ BusResult VR4300::write(u64 addr, u64 v, int size)
 u32 VR4300::c0_read32(u32 reg)
 {
 	//fprintf(stderr, "cop0 read32 c%i = $%lX\n", reg, s64(s32(c[reg])));
-	return c0_read64(reg);
+	u64 val = c0_read64(reg);
+	//if( reg == 9 ) printf("mfc0 count(%i) = $%X\n", reg, u32(val));
+	return val;
 }
 
 u64 VR4300::c0_read64(u32 reg)
@@ -784,7 +786,7 @@ u64 VR4300::c0_read64(u32 reg)
 	switch( reg )
 	{
 	case 9: return u32(COUNT>>1);
-	case 11: return u32(COMPARE>>1);
+	case 11: return COMPARE;
 	default: break;
 	}
 	return c[reg];
@@ -803,7 +805,7 @@ void VR4300::c0_write64(u32 reg, u64 v)
 	
 	case 6: WIRED = v & 0x3F; RANDOM = 31; return;
 	case 9: COUNT = u32(v); COUNT <<= 1; return;
-	case 11: CAUSE &= ~BIT(15); COMPARE = u32(v); COMPARE <<= 1; return;
+	case 11: CAUSE &= ~BIT(15); COMPARE = u32(v); return;
 	case 12: STATUS = u32(v); STATUS &= ~BITL(19); cop1_half_mode = !(STATUS & BIT(26)); return;
 	case 13: CAUSE &= ~(BIT(8)|BIT(9)); CAUSE |= v & (BIT(8)|BIT(9)); return;
 	
