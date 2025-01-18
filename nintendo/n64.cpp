@@ -152,9 +152,9 @@ void n64::write(u32 addr, u64 v, int size)
 		{
 			if( addr & 0x1000 )
 			{
-				*(u32*)&IMEM[addr&0xfff] = __builtin_bswap32(u32(v));
+				*(u32*)&IMEM[addr&0xffc] = __builtin_bswap32(u32(v));
 			} else {
-				*(u32*)&DMEM[addr&0xfff] = __builtin_bswap32(u32(v));
+				*(u32*)&DMEM[addr&0xffc] = __builtin_bswap32(u32(v));
 			}
 			return;
 		}
@@ -282,7 +282,6 @@ void n64::run_frame()
 			if( !(SP_STATUS & 1) ) 
 			{
 				RSP.step();
-				RSP.step();
 			}
 			if( pi_cycles_til_irq )
 			{
@@ -353,6 +352,9 @@ void n64::reset()
 	cpu.pc = s32(0xbfc00000); //__builtin_bswap32(*(u32*)&ROM[8]));
 	cpu.npc = cpu.pc + 4;
 	cpu.nnpc = cpu.npc + 4;
+	memset(&mem[0], 0, 0x800000);
+	memset(DMEM, 0, 0x1000);
+	memset(IMEM, 0, 0x1000);
 	
 	PI_STATUS = SI_STATUS = VI_CTRL = 0;
 	memset(si_regs, 0, 30);
@@ -367,7 +369,14 @@ void n64::reset()
 	
 	for(u32 i = 0; i < 8; ++i) sp_regs[i] = 0;
 	SP_STATUS |= 1;
-	RSP.broke = [&]() { if( SP_STATUS & BIT(6) ) { raise_mi_bit(MI_INTR_SP_BIT); } SP_STATUS |= 3; };
+	RSP.broke = [&]() 
+		{ 
+			if( SP_STATUS & BIT(6) ) 
+			{ 
+				raise_mi_bit(MI_INTR_SP_BIT); 
+			} 
+			SP_STATUS |= 3;
+		};
 	RSP.IMEM = IMEM;
 	RSP.DMEM = DMEM;
 	RSP.dp_write = [&](u32 a, u32 v) { dp_write(a, v); };
@@ -413,7 +422,7 @@ void n64::reset()
 
 void n64::raise_mi_bit(u32 b)
 {
-	//if( b != 3 ) printf("MI IRQ raised, intr bit %i\n", b);
+	//if( b == 0 ) printf("MI IRQ raised, intr bit %i\n", b);
 	MI_INTERRUPT |= BIT(b);
 	if( MI_INTERRUPT & MI_MASK & 0x3F )
 	{

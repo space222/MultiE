@@ -31,7 +31,7 @@ public:
 	
 	void branch(u32 target)
 	{
-		nnpc = target;
+		nnpc = target & 0xffc;
 	}
 };
 

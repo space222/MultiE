@@ -50,7 +50,8 @@ private:
 	
 	struct {
 		u32 cycle_type;
-		u32 alpha_compare_en;
+		bool alpha_compare_en;
+		bool force_blend;
 	} other;
 	
 	struct {

@@ -238,8 +238,7 @@ Status: Boots and displays mouse cursor + floppy question mark.
 Nintendo 64 Todo List
 ------------------------
 Overall:
-1. LoadTLUT, CI Textures, LoadBlock
-2. Continue implementing vector instructions to pass the relevant systemtests.
+1. Continue implementing vector instructions to pass the relevant systemtests.
 VR4300:
 1. Continue to improve FPU instructions. Had some NaN handling but it wasn't good, so I've stripped out FPU exceptions for now.
 2. TLB?
@@ -247,9 +246,9 @@ RCP Subsystems:
 1. VI: currently just all registers being r/w so I can display output. Actually do things per-line and v-int.
 2. PIF: The rest of the buttons, and support controllers. Still need the framework support for input customization.
 3. RI: RI_SELECT returns 0x14 to help skip other setup in IPL, but should make all regs r/w.
-4. SP: Next up is vector ops.
-5. DP: LoadTLUT and CI textures.
-6. AI: Figure out why sound sometimes just randomly stops. Namco's title screen is best (worst?) example.
+4. SP: Rewrite SP_STATUS handling. Continue vector ops.
+5. DP: Shaded triangles, textured triangles, zbuffering. Improve texture loading. Eventually proper BL and CC units. Coverage
+6. AI: Doneish? Not supporting the delayed carry hardware bug for now. 
 Status:
 SP: everything done except the vector unit. Like all the rest of the DMAs (except AI), DMA is instant.
 DP: Enough 16bit textures and rectangles to run Flappy Bird. 8bit textures do enough to run the Bad Apple video.
@@ -259,15 +258,14 @@ SI: done (PIF now gets its own todo item). Not supporting the single-word xfer r
 AI: Audio works.. ish. Most things it does. Namco's title screen has a few boops, but no music. In-game like pac-man and galaga have sound.
 PIF: one controller and only D-pad + a/b/z/start currently implemented and working in namco.
 	If the cmd byte in pifram gets the bit zero cleared, namco stops getting input.
-Notes:
+Notes (latest first):
 	After implementing LWC1/MTC1 and friends half mode odd registers, Namco's title screen and menu button music/sounds function.
-		I don't understand why that would matter if odd registers are undefined
+		Looks like odd register access isn't undefined in half mode; it's for getting data into upper parts of a double.
 	If RI_SELECT is nonzero to skip rdram init, IPL3 never writes RAM size to $80000318 which makes libdragon 
 crash trying to set up the stack at end of RAM.
 	Flappy Bird's pipes use texcoords masks. It doesn't depend on Tile Size. I'm still unclear on how Tile Size and
 all the shift/clamp/mask and what order those happen.
-	Commit that implemented traps and non32bit PIF-RAM access made Namco's DigDug blackscreen (sometimes it still works??).
-	Even if not using any unimplemented rsp vector ops, none of the commercial games do anything.
+
 
 
 

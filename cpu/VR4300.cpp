@@ -49,7 +49,7 @@ vr4300_instr decode_special(VR4300& proc, u32 opcode)
 		{
 			ITYPE;
 			s64 a = s32(cpu.r[s]);
-			a *= s64(cpu.r[t]<<30)>>30;
+			a *= s32(cpu.r[t]); //s64(cpu.r[t]<<30)>>30;
 			cpu.hi = s32(u32(a>>32));
 			cpu.lo = s32(u32(a));
 		};
@@ -311,17 +311,17 @@ vr4300_instr decode_regular(VR4300& proc, u32 opcode)
 				cpu.r[t] = v;
 			}			
 		};
-	case 0x09: return INSTR { ITYPE; cpu.r[t] = s32(cpu.r[s] + s16(imm16)); }; // ADDIU
+	case 0x09: return INSTR { ITYPE; cpu.r[t] = s32(cpu.r[s]) + s16(imm16); }; // ADDIU
 	case 0x0A: return INSTR { ITYPE; cpu.r[t] = s64(cpu.r[s]) < s64(s16(imm16)); }; // SLTI
 	case 0x0B: return INSTR { ITYPE; cpu.r[t] = cpu.r[s] < u64(s16(imm16)); }; // SLTIU
-	case 0x0C: return INSTR { ITYPE; cpu.r[t] = cpu.r[s] & imm16; }; // ANDI
-	case 0x0D: return INSTR { ITYPE; cpu.r[t] = cpu.r[s] | u64(imm16); }; // ORI
-	case 0x0E: return INSTR { ITYPE; cpu.r[t] = cpu.r[s] ^ imm16; }; // XORI
+	case 0x0C: return INSTR { ITYPE; cpu.r[t] = cpu.r[s] & u64(u16(imm16)); }; // ANDI
+	case 0x0D: return INSTR { ITYPE; cpu.r[t] = cpu.r[s] | u64(u16(imm16)); }; // ORI
+	case 0x0E: return INSTR { ITYPE; cpu.r[t] = cpu.r[s] ^ u64(u16(imm16)); }; // XORI
 	case 0x0F: return INSTR { ITYPE; cpu.r[t] = s32(imm16<<16); }; // LUI
 	case 0x10: // COP0 instructions
 		switch( (opcode>>21) & 0x1F )
 		{
-		case 0: return INSTR { RTYPE; cpu.r[t] = s32(u32(cpu.c0_read32(d))); }; // MFC0
+		case 0: return INSTR { RTYPE; cpu.r[t] = (u32(cpu.c0_read32(d))); }; // MFC0
 		case 1: return INSTR { RTYPE; cpu.r[t] = cpu.c0_read64(d); }; // DMFC0
 		case 4: return INSTR { RTYPE; cpu.c0_write32(d, cpu.r[t]); }; // MTC0
 		case 5: return INSTR { RTYPE; cpu.c0_write64(d, cpu.r[t]); }; // DMTC0	
@@ -526,7 +526,8 @@ vr4300_instr decode_regular(VR4300& proc, u32 opcode)
 			ITYPE;
 			auto res = cpu.read(cpu.r[s]+s16(imm16), 32);
 			if( !res ) { return; }
-			cpu.LL_ADDR = cpu.r[s] + s16(imm16);
+			cpu.LL_ADDR = (cpu.r[s] + s16(imm16)) & 0x1fffFFFF;
+			cpu.LL_ADDR >>= 4;
 			cpu.LLbit = true;
 			cpu.r[t] = s32(res);			
 		};
@@ -553,7 +554,8 @@ vr4300_instr decode_regular(VR4300& proc, u32 opcode)
 			ITYPE;
 			auto res = cpu.read(cpu.r[s]+s16(imm16), 64);
 			if( !res ) { return; }
-			cpu.LL_ADDR = cpu.r[s] + s16(imm16);
+			cpu.LL_ADDR = (cpu.r[s] + s16(imm16)) & 0x1fffFFFF;
+			cpu.LL_ADDR >>= 4;
 			cpu.LLbit = true;
 			cpu.r[t] = res;			
 		};
@@ -629,18 +631,14 @@ vr4300_instr decode_regular(VR4300& proc, u32 opcode)
 	return nullptr;
 }
 
+int countdiv = 0;
+
 void VR4300::step()
 {
 	r[0] = 0;
 	delay = ndelay;
 	ndelay = false;
 	BusResult opc;
-	
-	COUNT = (COUNT + 1) & 0x1FFFFffffull;
-	if( u32(COUNT>>1) == u32(COMPARE) )
-	{
-		CAUSE |= BIT(15);
-	}
 	
 	if( ((STATUS&7)==1) && (STATUS & CAUSE & 0xff00) )
 	{       // exception() will set npc
@@ -652,6 +650,13 @@ void VR4300::step()
 		printf("Exception reading opcode from $%X\n", u32(pc));
 		//exit(1);
 	} else {
+		countdiv ^= 1;
+		if( countdiv ) COUNT = (COUNT+1)&0xfffffFFFFull;
+		if( u32(COUNT) == u32(COMPARE) )
+		{
+			CAUSE |= BIT(15);
+		}
+	
 		if( (opc >> 26) == 0 )
 		{
 			decode_special(*this, opc)(*this, opc);
@@ -661,7 +666,7 @@ void VR4300::step()
 			decode_regular(*this, opc)(*this, opc);
 		}
 	}
-
+	
 	pc = npc;
 	npc = nnpc;
 	nnpc += 4;
@@ -708,17 +713,13 @@ void VR4300::exception(u32 ec, u32 vector)
 
 void VR4300::reset()
 {
-	for(u32 i = 0; i < 32; ++i) c[i] = 0;
-	STATUS = 0;
-	CAUSE = 0;
-	COUNT = 0;
-	COMPARE = 0;
+	for(u32 i = 0; i < 32; ++i) c[i] = r[i] = 0;
 	STATUS = 0x34000000;
 	cop1_half_mode = !(STATUS & BIT(26));
 	c[15] = 0x00000B22;
-	WIRED = 0;
 	RANDOM = 31;
 	CONFIG = 0x7006e463;
+	FCSR = 0;
 	fpu_cond = false;
 	
 	pc = 0xbfc00000;
@@ -785,8 +786,8 @@ u64 VR4300::c0_read64(u32 reg)
 	//fprintf(stderr, "cop0 read64 c%i = $%lX\n", reg, c[reg]);
 	switch( reg )
 	{
-	case 9: return u32(COUNT>>1);
-	case 11: return COMPARE;
+	case 9: return u32(COUNT);
+	case 11: return u32(COMPARE);
 	default: break;
 	}
 	return c[reg];
@@ -804,7 +805,7 @@ void VR4300::c0_write64(u32 reg, u64 v)
 	case 4: CONTEXT &= ((1ull<<23)-1); CONTEXT |= v&~((1ull<<23)-1); CONTEXT &= ~15; return;
 	
 	case 6: WIRED = v & 0x3F; RANDOM = 31; return;
-	case 9: COUNT = u32(v); COUNT <<= 1; return;
+	case 9: COUNT = u32(v); return;
 	case 11: CAUSE &= ~BIT(15); COMPARE = u32(v); return;
 	case 12: STATUS = u32(v); STATUS &= ~BITL(19); cop1_half_mode = !(STATUS & BIT(26)); return;
 	case 13: CAUSE &= ~(BIT(8)|BIT(9)); CAUSE |= v & (BIT(8)|BIT(9)); return;

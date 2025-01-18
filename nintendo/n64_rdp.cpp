@@ -12,15 +12,27 @@ void n64_rdp::run_commands(u64* list, u32 num)
 	while( i < num )
 	{
 		u64 cmd = __builtin_bswap64(list[i++]);
+		u8 cmdbyte = (cmd>>56)&0x3F;
 		//printf("RDP Cmd $%X\n", u8((cmd>>56)&0x3F));
 		switch( (cmd>>56)&0x3F )
 		{
+		case 0x09:
+		case 0x0A:
+		case 0x0B:
+		case 0x0C:
+		case 0x0D:
+		case 0x0E:
+		case 0x0F:
 		case 0x08:{ // basic non-anything flat triangle
 			u64 cmd1 = __builtin_bswap64(list[i++]);
 			u64 cmd2 = __builtin_bswap64(list[i++]);
 			u64 cmd3 = __builtin_bswap64(list[i++]);
 			flat_triangle(cmd, cmd1, cmd2, cmd3);
+			if( cmdbyte & 4 ) i += 8; // shading
+			if( cmdbyte & 2 ) i += 8; // texturing
+			if( cmdbyte & 1 ) i += 2; // depth
 			}break;
+					
 		case 0x24: // texture rectangle
 			texture_rect(cmd, __builtin_bswap64(list[i++]));
 			break;
@@ -29,10 +41,13 @@ void n64_rdp::run_commands(u64* list, u32 num)
 			break;
 			
 		case 0x2A: // Set Key GB
+			//printf("set key gb = $%lX\n", cmd);
 			break;
 		case 0x2B: // Set Key R
+			//printf("set key R = $%lX\n", cmd);
 			break;
 		case 0x2C: // set convert
+			//printf("set conv = $%lX\n", cmd);
 			break;
 		
 		case 0x2D: // scissor
@@ -50,6 +65,7 @@ void n64_rdp::run_commands(u64* list, u32 num)
 		case 0x2F: // other modes
 			other.cycle_type = (cmd>>52)&3;
 			other.alpha_compare_en = cmd&1;
+			other.force_blend = cmd&BITL(14);
 			//fprintf(stderr, "set other modes = $%lX, ctype = %i\n", cmd, other.cycle_type);
 			break;
 			
@@ -89,6 +105,7 @@ void n64_rdp::run_commands(u64* list, u32 num)
 			env_color = dc::from32(cmd);
 			break;	
 		case 0x3C: // set combine mode
+			//fprintf(stderr, "combine = $%lX\n", cmd&0x00ffFFFFffffFFFFull);
 			break;
 		
 		case 0x3D: // texture image
@@ -199,7 +216,7 @@ void n64_rdp::load_tile(u64 cmd)
 	T.TH = lrT;
 	
 	ulS >>= 2; ulT >>= 2; lrS >>= 2; lrT >>= 2;
-	fprintf(stderr, "LT Tile%i Size = (%i, %i) - (%i, %i)\n\n", u8((cmd>>24)&7), ulS, ulT, lrS, lrT);
+	//fprintf(stderr, "LT Tile%i Size = (%i, %i) - (%i, %i)\n\n", u8((cmd>>24)&7), ulS, ulT, lrS, lrT);
 	
 	u32 roffs = (((ulS*T.bpp)+7)/8) + teximg.addr;
 	u32 rdram_stride = ((teximg.width*T.bpp) + 7) / 8; 
@@ -218,7 +235,7 @@ void n64_rdp::set_tile(u64 cmd)
 	T.format = (cmd>>53)&7;
 	T.bpp = imgbpp[(cmd>>51)&3];
 	T.line = (cmd>>41)&0x1ff;
-	
+	if( T.bpp == 32 ) T.line <<= 1;
 	//fprintf(stderr, "set tile%i, addr = $%X, line = $%X\n\tformat = $%X, bpp=$%X\n", 
 	//	u8((cmd>>24)&7), T.addr, T.line, T.format, T.bpp);
 	
@@ -254,8 +271,8 @@ void n64_rdp::texture_rect(u64 cmd0, u64 cmd1)
 		lrX += 1;
 	}
 	
-	fprintf(stderr, "texrect t%i (%i, %i) to (%i, %i)\n\tst(%X, %X), d(%X,%X)\n\n", 
-		other.cycle_type, ulX, ulY, lrX, lrY, S, T, DsDx, DtDy);
+	//fprintf(stderr, "texrect t%i (%i, %i) to (%i, %i)\n\tst(%X, %X), d(%X,%X)\n\n", 
+	//	other.cycle_type, ulX, ulY, lrX, lrY, S, T, DsDx, DtDy);
 		
 	if( cimg.bpp == 16 )
 	{
@@ -265,10 +282,10 @@ void n64_rdp::texture_rect(u64 cmd0, u64 cmd1)
 			for(u32 X = ulX; X < lrX; ++X, Sl += DsDx)
 			{
 				u16 sample = tex_sample(tile, 16, Sl, T);
-				if( other.alpha_compare_en && (__builtin_bswap16(sample)&1) )
-				{
-					*(u16*)&rdram[cimg.addr + (Y*cimg.width*2) + X*2] = sample;
-				}
+				if( other.alpha_compare_en && !(__builtin_bswap16(sample)&1) ) continue;
+				if( other.force_blend && !(__builtin_bswap16(sample)&1)) continue;
+				
+				*(u16*)&rdram[cimg.addr + (Y*cimg.width*2) + X*2] = sample;
 			}
 		}	
 	} else if( cimg.bpp == 32 ) {
@@ -277,7 +294,11 @@ void n64_rdp::texture_rect(u64 cmd0, u64 cmd1)
 			s32 Sl = S;
 			for(u32 X = ulX; X < lrX; ++X, Sl += DsDx)
 			{
-				*(u32*)&rdram[cimg.addr + (Y*cimg.width*4) + X*4] = tex_sample(tile, 32, Sl, T);
+				u32 sample = tex_sample(tile, 32, Sl, T);
+				if( other.alpha_compare_en && !(__builtin_bswap32(sample)&0xff) ) continue;
+				if( other.force_blend && !(__builtin_bswap32(sample)&0xff) ) continue;
+				
+				*(u32*)&rdram[cimg.addr + (Y*cimg.width*4) + X*4] = sample;
 			}
 		}	
 	}
@@ -290,8 +311,8 @@ void n64_rdp::texture_rect_flip(u64 cmd0, u64 cmd1)
 	u32 lrY = ((cmd0>>32)&0xfff)>>2;
 	u32 ulX = ((cmd0>>12)&0xfff)>>2;
 	u32 ulY = (cmd0&0xfff)>>2;
-	s32 S = ((cmd1>>48)&0xffff); S <<= 16; S >>= 16; S <<= 5;
-	s32 T = ((cmd1>>32)&0xffff); S <<= 16; T >>= 16; T <<= 5;
+	s32 S = ((cmd1>>48)&0xffff)<<16; S >>= 16; S <<= 5;
+	s32 T = ((cmd1>>32)&0xffff)<<16; T >>= 16; T <<= 5;
 	s32 DsDx = ((cmd1>>16)&0xffff); DsDx <<= 16; DsDx >>= 16;
 	s32 DtDy = (cmd1&0xffff); DtDy <<= 16; DtDy >>= 16;
 	if( other.cycle_type == CYCLE_TYPE_COPY ) 
@@ -311,7 +332,7 @@ void n64_rdp::texture_rect_flip(u64 cmd0, u64 cmd1)
 			for(u32 X = ulX; X < lrX; ++X, Sl += DsDx)
 			{
 				u16 sample = tex_sample(tile, 16, T, Sl);
-				if( other.alpha_compare_en && (__builtin_bswap16(sample)&1) )
+				if( !other.alpha_compare_en || (other.alpha_compare_en && (__builtin_bswap16(sample)&1)) )
 				{
 					*(u16*)&rdram[(cimg.addr + (Y*cimg.width*2) + X*2)&0x7ffffe] = sample;
 				}
@@ -369,10 +390,8 @@ u32 n64_rdp::tex_sample(u32 tile, u32 bpp, s32 s, s32 t)
 	} else if( T.bpp == 8 ) {
 		if( T.format == 2 )
 		{
-			//u8 v = tmem[(T.addr*8 + (t*T.line*8) + s)&0xfff];
-			//res = dc::from16(__builtin_bswap16(*(u16*)&tmem[(0x100+v)*8]));
-			u8 v = tmem[(T.addr*8 + (t*T.line*8) + s)&0xfff]<<4;
-			res = dc::from32((v<<24)|(v<<16)|(v<<8)|v);
+			u8 v = tmem[(T.addr*8 + (t*T.line*8) + s)&0xfff];
+			res = dc::from16(__builtin_bswap16(*(u16*)&tmem[(0x100+v)*8]));
 		} else {
 			u8 v = tmem[(T.addr*8 + (t*T.line*8) + s)&0xfff];
 			res = dc::from32((v<<24)|(v<<16)|(v<<8)|v);
@@ -441,19 +460,43 @@ void n64_rdp::load_block(u64 cmd)
 	auto& T = tiles[(cmd>>24)&7];
 	u32 ulT = (cmd>>34)&0x3ff;
 	u32 ulS = (cmd>>46)&0x3ff;
-	u32 num_texels = lrS - ulS;
-	if( num_texels > 2048 ) return;
+	T.SL = ulS<<2;
+	T.TL = ulT<<2;
+	u32 num_texels = lrS - ulS + 1;
+	if( num_texels > 2048 ) 
+	{
+		printf("RDP: Num texels was >2048\n");
+		exit(1);
+		return;
+	}
 	u32 num_bytes = (num_texels*T.bpp)/8;
 	u32 rdram_stride = ((teximg.width*T.bpp) + 7) / 8; 
 	for(u32 i = 0; i < num_bytes; ++i)
 	{
-		tmem[(T.addr*8) + T.line*8 + i] = rdram[teximg.addr + (ulT*rdram_stride) + ((lrS*T.bpp)/8) + i];
+		tmem[(T.addr*8 + T.line*8 + i)&0xfff] = rdram[teximg.addr + (ulT*rdram_stride) + ((lrS*T.bpp+7)/8) + i];
 	}
 }
 
 void n64_rdp::load_tlut(u64 cmd)
 {
-
-
+	auto& T = tiles[(cmd>>24)&7];
+	u32 lrT = (cmd>>2) & 0x3ff;
+	u32 lrS = (cmd>>14) & 0x3ff;
+	u32 ulT = (cmd>>34) & 0x3ff;
+	u32 ulS = (cmd>>46) & 0x3ff;
+	
+	if( ulT != lrT || ulT != 0 || lrT != 0 )
+	{
+		printf("RDP: LoadTLUT with ulT != lrT != both 0\n");
+		exit(1);
+	}
+	
+	u32 num = (lrS - ulS + 1);
+	for(u32 i = 0; i < num; ++i)
+	{
+		u64 p = (*(u16*)&rdram[teximg.addr + i*2]);
+		p = (p<<48)|(p<<32)|(p<<16)|p;
+		*(u64*)&tmem[(T.addr*8 + i*8)&0xfff] = p;
+	}
 }
 

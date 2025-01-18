@@ -491,7 +491,7 @@ vr4300_instr cop1(VR4300& proc, u32 opcode)
 			if( !(cpu.STATUS & BIT(26)) )
 			{
 				fs = ((fs&~1)<<3) + ((fs&1)?4:0);
-			} else { 
+			} else {
 				fs <<= 3;
 			}
 			memcpy(&cpu.f[fs], &cpu.r[rt], 4);
@@ -602,7 +602,7 @@ vr4300_instr cop1_word(VR4300&, u32 opcode)
 			memcpy(&cpu.f[fd<<3], &b, 8);
 		};
 	default: 
-		printf("cop1_word unimpl opcode = $%X\n", opcode & 0x3F);
+		fprintf(stderr, "cop1_word unimpl opcode = $%X\n", opcode & 0x3F);
 		return INSTR {};
 	}
 }
@@ -628,7 +628,7 @@ vr4300_instr cop1_long(VR4300&, u32 opcode)
 			memcpy(&cpu.f[fd<<3], &b, 8);
 		};	
 	default: 
-		printf("cop1_long unimpl opcode = $%X\n", opcode & 0x3F);
+		fprintf(stderr, "cop1_long unimpl opcode = $%X\n", opcode & 0x3F);
 		return INSTR {};
 	}
 }

@@ -7,6 +7,7 @@ typedef void (*rsp_instr)(n64_rsp&, u32);
 #define VUWC2 u32 vt = (opc>>16)&0x1f; u32 base = (opc>>21)&0x1f; u32 e = (opc>>7)&15; s32 offs = s8(opc<<1)>>1
 #define VUFC2 u32 rt = (opc>>16)&0x1f; u32 vs = (opc>>11)&0x1f; u32 e = (opc>>7)&15
 #define VOPP u32 e=(opc>>21)&15; u32 vt=(opc>>16)&0x1f; u32 vs=(opc>>11)&0x1f; u32 vd=(opc>>6)&0x1f
+#define VSING u32 e = (opc>>21)&15; u32 vt = (opc>>16)&0x1f; u32 vd_elem = (opc>>11)&15; u32 vd = (opc>>6)&0x1f
 
 u32 broadcast[] = {
 	0,1,2,3,4,5,6,7,
@@ -132,6 +133,21 @@ rsp_instr rsp_cop2(n64_rsp& rsp, u32 opcode)
 				res.w(i) = clamp_unsigned(rsp.a[i]>>16);
 			}		
 			rsp.v[vd] = res;
+		};
+	case 0x03: // VMULQ
+		return INSTR {
+			VOPP;
+			vreg res;
+			for(u32 i = 0; i < 8; ++i)
+			{
+				s64 prod = rsp.v[vs].sw(i);
+				prod *= rsp.v[vt].sw(BC(i));
+				if( prod & BIT(31) ) prod += 0x1F;
+				rsp.a[i] = prod<<16;
+				rsp.a[i] &= 0xffffFFFFffffull;
+				res.w(i) = clamp_signed(prod>>1) & 0xfff0;
+			}
+			rsp.v[vd] = res;		
 		};
 	case 0x04: // VMUDL
 		return INSTR {
@@ -301,6 +317,34 @@ rsp_instr rsp_cop2(n64_rsp& rsp, u32 opcode)
 			rsp.v[vd] = res;
 		};
 		
+	case 0x13: // VABS
+		return INSTR {
+			VOPP;
+			vreg res;
+			for(u32 i = 0; i < 8; ++i)
+			{
+				rsp.a[i] &= ~0xffffull;
+				
+				s16 abs = rsp.v[vs].sw(i);
+				if( abs > 0 )
+				{
+					rsp.a[i] |= res.w(i) = rsp.v[vt].w(BC(i));
+				} else if( abs < 0 ) {
+					if( rsp.v[vt].w(BC(i)) == 0x8000 )
+					{
+						res.w(i) = 0x7fff;
+						rsp.a[i] |= 0x8000;
+					} else {
+						res.w(i) = -rsp.v[vt].sw(BC(i));
+						rsp.a[i] |= res.w(i);
+					}
+				} else {
+					res.w(i) = 0;		
+				}			
+			}
+			rsp.v[vd] = res;
+		};
+
 	case 0x14: // VADDC
 		return INSTR {
 			VOPP;
@@ -506,10 +550,17 @@ rsp_instr rsp_cop2(n64_rsp& rsp, u32 opcode)
 			rsp.v[vd] = res;
 		};
 		
-	case 0x32: // VRCPH  //TODO
+	case 0x33: // VMOV
 		return INSTR {
-			VOPP;		
+			VSING;
+			for(u32 i = 0; i < 8; ++i) 
+			{
+				rsp.a[i] &= ~0xffffull;
+				rsp.a[i] |= rsp.v[vt].w(BC(i));
+			}
+			rsp.v[vd].w(7&vd_elem) = rsp.v[vt].w(BC(7&vd_elem));
 		};
+		
 	case 0x37: return INSTR {}; // VNOP??
 	default:
 		printf("RSP: unimpl cop2 opcode = $%X\n", opcode&0x3F);
