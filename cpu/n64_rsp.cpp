@@ -7,7 +7,6 @@
 #define ITYPE u32 t = (opc>>16)&0x1f; u32 s = (opc>>21)&0x1f; u16 imm16 = opc
 #define LINK (cpu.nnpc&0xffc)
 #define DS_REL_ADDR (cpu.npc + (s32(s16(imm16))<<2))
-#define LIKELY cpu.npc = cpu.nnpc; cpu.nnpc += 4;
 
 typedef void (*rsp_instr)(n64_rsp&, u32);
 #define INSTR [](n64_rsp& cpu, u32 opc)
@@ -55,56 +54,8 @@ rsp_instr rsp_regimm(n64_rsp&, u32 opcode)
 	{
 	case 0x00: return INSTR { ITYPE; if( s32(cpu.r[s]) < 0 ) { cpu.branch(DS_REL_ADDR); } }; // BLTZ
 	case 0x01: return INSTR { ITYPE; if( s32(cpu.r[s]) >= 0 ) { cpu.branch(DS_REL_ADDR); } }; // BGEZ
-	case 0x02: // BLTZL
-		return INSTR 
-		{
-			ITYPE;
-			if( s32(cpu.r[s]) < 0 )
-			{
-				cpu.branch(DS_REL_ADDR);
-			} else {
-				LIKELY;
-			}
-		};
-	case 0x03: // BGEZL
-		return INSTR 
-		{
-			ITYPE;
-			if( s32(cpu.r[s]) >= 0 )
-			{
-				cpu.branch(DS_REL_ADDR);
-			} else {
-				LIKELY;
-			}
-		};
 	case 0x10: return INSTR { ITYPE; u32 temp = LINK; if( s32(cpu.r[s]) < 0 ) { cpu.branch(DS_REL_ADDR); } cpu.r[31] = temp; }; // BLTZAL
 	case 0x11: return INSTR { ITYPE; u32 temp = LINK; if( s32(cpu.r[s]) >= 0 ) { cpu.branch(DS_REL_ADDR); } cpu.r[31] = temp; }; // BGEZAL
-	case 0x12: // BLTZALL
-		return INSTR 
-		{
-			ITYPE;
-			u32 temp = LINK;
-			if( s32(cpu.r[s]) < 0 )
-			{
-				cpu.branch(DS_REL_ADDR);
-			} else {
-				LIKELY;
-			}
-			cpu.r[31] = temp;		
-		};
-	case 0x13: // BGEZALL
-		return INSTR 
-		{
-			ITYPE;
-			u32 temp = LINK;
-			if( s32(cpu.r[s]) >= 0 )
-			{
-				cpu.branch(DS_REL_ADDR);
-			} else {
-				LIKELY;
-			}
-			cpu.r[31] = temp;		
-		};
 	default: printf("RSP: unimpl regimm opc $%X\n", (opcode>>16) & 0x1F); exit(1);
 	}
 	return nullptr;
@@ -158,47 +109,6 @@ rsp_instr rsp_regular(n64_rsp& proc, u32 opcode)
 	case 0x11: return INSTR {}; // COP1 / FPU todo
 	case 0x12: return rsp_cop2(proc, opcode); // vector ops
 	case 0x13: return INSTR {}; // COP3??		
-	
-	case 0x14:  // BEQL 
-		return INSTR {
-			ITYPE;
-			if( cpu.r[s] == cpu.r[t] ) 
-			{ 
-				cpu.branch(DS_REL_ADDR); 
-			} else { 
-				LIKELY;
-			}
-		};
-	case 0x15:  // BNEL 
-		return INSTR {
-			ITYPE;
-			if( cpu.r[s] != cpu.r[t] ) 
-			{ 
-				cpu.branch(DS_REL_ADDR); 
-			} else { 
-				LIKELY;
-			}
-		};
-	case 0x16: // BLEZL
-		return INSTR {
-			ITYPE;
-			if( s32(cpu.r[s]) <= 0 )
-			{
-				cpu.branch(DS_REL_ADDR);
-			} else {
-				LIKELY;
-			}
-		};
-	case 0x17: // BGTZL
-		return INSTR {
-			ITYPE;
-			if( s32(cpu.r[s]) > 0 )
-			{
-				cpu.branch(DS_REL_ADDR);
-			} else {
-				LIKELY;
-			}
-		};
 
 	case 0x20: return INSTR { ITYPE; u8 res = cpu.DMEM[(cpu.r[s]+s16(imm16))&0xfff]; cpu.r[t] = s8(res); }; // LB	
 	case 0x21:  // LH

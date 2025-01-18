@@ -14,6 +14,18 @@ struct vreg
 class n64_rsp
 {
 public:
+	n64_rsp()
+	{
+		for(u32 i = 0; i < 8; ++i) a[i] = 0;
+		for(u32 i = 0; i < 32; ++i) 
+		{
+			r[i] = 0;
+			for(u32 e = 0; e < 8; ++e) v[i].w(e) = 0;
+		}
+		VCO = VCC = VCE = 0;
+		IMEM = DMEM = nullptr;
+		pc = npc = nnpc = 0;
+	}
 	u64 a[8];
 	vreg v[32];
 	u16 VCO, VCC, VCE;

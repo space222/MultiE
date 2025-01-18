@@ -217,6 +217,7 @@ bool n64::loadROM(const std::string fname)
 		return false;
 	}
 
+	mem.clear();
 	mem.resize(8*1024*1024);
 	
 	fseek(fp, 0, SEEK_END);
@@ -331,7 +332,7 @@ void n64::run_frame()
 			if( ai_output_cycles >= (93750000/44100) )
 			{
 				ai_output_cycles = 0; // -= (93750000/44100);
-				audio_add(ai_L, ai_R);
+				//audio_add(ai_L, ai_R);
 			}
 		}
 	}
@@ -343,6 +344,9 @@ void n64::run_frame()
 
 void n64::reset()
 {
+	mem.clear();
+	mem.resize(8*1024*1024);
+
 	curwidth = 320;
 	curheight = 240;
 	curbpp = 16;
@@ -368,7 +372,7 @@ void n64::reset()
 	DP_STATUS = 0x80;
 	
 	for(u32 i = 0; i < 8; ++i) sp_regs[i] = 0;
-	SP_STATUS |= 1;
+	SP_STATUS = 1;
 	RSP.broke = [&]() 
 		{ 
 			if( SP_STATUS & BIT(6) ) 

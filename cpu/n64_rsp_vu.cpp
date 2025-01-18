@@ -9,6 +9,12 @@ typedef void (*rsp_instr)(n64_rsp&, u32);
 #define VOPP u32 e=(opc>>21)&15; u32 vt=(opc>>16)&0x1f; u32 vs=(opc>>11)&0x1f; u32 vd=(opc>>6)&0x1f
 #define VSING u32 e = (opc>>21)&15; u32 vt = (opc>>16)&0x1f; u32 vd_elem = (opc>>11)&15; u32 vd = (opc>>6)&0x1f
 
+#define VCO_BIT (rsp.VCO & BIT(i))
+#define VCO_HI_BIT (rsp.VCO & BIT(i+8))
+#define VCC_BIT (rsp.VCC & BIT(i))
+#define VCC_HI_BIT (rsp.VCC & BIT(i+8))
+#define VCE_BIT (rsp.VCE & BIT(i))
+
 u32 broadcast[] = {
 	0,1,2,3,4,5,6,7,
 	0,1,2,3,4,5,6,7,
@@ -28,7 +34,6 @@ u32 broadcast[] = {
 	7,7,7,7,7,7,7,7 
 };
 #define BC(b) broadcast[((e<<3)+(b))]
-#define VCO_BIT(b) ((rsp.VCO>>(b))&1)
 
 s16 clamp_signed(s32 accum)
 {
@@ -54,7 +59,7 @@ u16 clamp_unsigned_x(s64 accum)
 	return 65535;
 }
 
-rsp_instr rsp_cop2(n64_rsp& rsp, u32 opcode)
+rsp_instr rsp_cop2(n64_rsp&, u32 opcode)
 {
 	if( !(opcode & BIT(25)) )
 	{
@@ -132,6 +137,21 @@ rsp_instr rsp_cop2(n64_rsp& rsp, u32 opcode)
 				rsp.a[i] = prod + 0x8000;
 				res.w(i) = clamp_unsigned(rsp.a[i]>>16);
 			}		
+			rsp.v[vd] = res;
+		};
+	case 0x02: // VRNDP
+		return INSTR {
+			VOPP;
+			vreg res;
+			for(u32 i = 0; i < 8; ++i)
+			{
+				s64 prod = rsp.v[vt].sw(BC(i));
+				if( vs & 1 ) prod <<= 16;
+				//rsp.a[i] &= 0xffffFFFFffffull;
+				//prod &= 0xffffFFFFffffull;
+				if( !(rsp.a[i] & BITL(47)) ) rsp.a[i] += prod;
+				res.w(i) = clamp_signed(rsp.a[i]>>16);
+			}	
 			rsp.v[vd] = res;
 		};
 	case 0x03: // VMULQ
@@ -231,6 +251,38 @@ rsp_instr rsp_cop2(n64_rsp& rsp, u32 opcode)
 			}		
 			rsp.v[vd] = res;
 		};
+	case 0x0A: // VRNDN
+		return INSTR {
+			VOPP;
+			vreg res;
+			for(u32 i = 0; i < 8; ++i)
+			{
+				s64 prod = rsp.v[vt].sw(BC(i));
+				if( vs & 1 ) prod <<= 16;
+				if( (rsp.a[i] & BITL(47)) ) rsp.a[i] += prod;
+				res.w(i) = clamp_signed(rsp.a[i]>>16);
+			}	
+			rsp.v[vd] = res;
+		};
+	case 0x0B: // VMACQ
+		return INSTR {
+			VOPP;
+			vreg res;
+			for(u32 i = 0; i < 8; ++i)
+			{
+				s32 prod = rsp.a[i]>>16;
+				if( prod < -0x20 && ((prod & 0x20) == 0))
+				{
+				    prod += 0x20;
+				} else if (prod > 0x20 && (prod & 0x20) == 0) {
+				    prod -= 0x20;
+				}
+				rsp.a[i] &= 0xffffull;
+				rsp.a[i] |= u64(u32(prod))<<16;
+				res.w(i) = clamp_signed(prod>>1)&0xfff0;
+			}
+			rsp.v[vd] = res;
+		};
 	case 0x0C: // VMADL
 		return INSTR {
 			VOPP;
@@ -292,7 +344,7 @@ rsp_instr rsp_cop2(n64_rsp& rsp, u32 opcode)
 			{
 				s32 r = rsp.v[vs].sw(i);
 				r += rsp.v[vt].sw(BC(i));
-				r += VCO_BIT(i);
+				r += VCO_BIT ? 1 : 0;
 				rsp.a[i] &= ~0xffffull;
 				rsp.a[i] |= r&0xffff;
 				res.sw(i) = clamp_signed(r);			
@@ -308,7 +360,7 @@ rsp_instr rsp_cop2(n64_rsp& rsp, u32 opcode)
 			{
 				s32 r = rsp.v[vs].sw(i);
 				r -= rsp.v[vt].sw(BC(i));
-				r -= VCO_BIT(i);
+				r -= VCO_BIT ? 1 : 0;
 				rsp.a[i] &= ~0xffffull;
 				rsp.a[i] |= r&0xffff;
 				res.sw(i) = clamp_signed(r);			
@@ -386,6 +438,36 @@ rsp_instr rsp_cop2(n64_rsp& rsp, u32 opcode)
 				else { rsp.v[vd].w(i) = rsp.a[i]>>32; }
 			}		
 		};
+	
+	case 0x12: // VSUT
+	case 0x16: // VADDB
+	case 0x17: // VSUBB
+	case 0x18: // VACCB
+	case 0x19: // VSUCB
+	case 0x1A: // VSAD
+	case 0x1B: // VSAC
+	case 0x1C: // VSUM
+	case 30: // V30	
+	case 31: // V31
+	case 46: // V46
+	case 47: // V47
+	case 59: // V59
+	case 0x38: // VEXTT
+	case 0x39: // VEXTQ
+	case 0x3A: // VEXTN
+	case 0x3C: // VINST
+	case 0x3D: // VINSQ
+	case 0x3E: // VINSN
+		return INSTR {
+			VOPP;
+			for(u32 i = 0; i < 8; ++i)
+			{
+				rsp.a[i] &= ~0xffffull;
+				rsp.a[i] |= (rsp.v[vs].w(i) + rsp.v[vt].w(BC(i)))&0xffff;
+			}
+			for(u32 i = 0; i < 8; ++i) rsp.v[vd].w(i) = 0;
+		};
+		
 	case 0x20: // VLT
 		return INSTR {
 			VOPP;
@@ -450,6 +532,32 @@ rsp_instr rsp_cop2(n64_rsp& rsp, u32 opcode)
 			rsp.VCO = 0;
 			rsp.v[vd] = res;
 		};
+	case 0x24: // VCL
+		return INSTR {
+			VOPP;
+			vreg res;
+			for(u32 i = 0; i < 8; ++i)
+			{
+				if( !VCO_BIT && !VCO_HI_BIT )
+				{
+					rsp.VCC &= ~BIT(i+8);
+					rsp.VCC |= ((rsp.v[vs].w(i) >= rsp.v[vt].w(BC(i))) ? BIT(i+8) : 0);
+				}
+				if( VCO_BIT && !VCO_HI_BIT )
+				{
+					bool lte = (rsp.v[vs].w(i) <= -rsp.v[vt].w(BC(i)));
+					bool eql = (rsp.v[vs].w(i) == -rsp.v[vt].w(BC(i)));
+					rsp.VCC &= ~BIT(i);
+					rsp.VCC |= (((rsp.VCE&BIT(i))?lte:eql)?BIT(i):0);	
+				}
+				bool clip = (VCO_BIT ? VCC_BIT : VCC_HI_BIT);
+				u16 vtabs = (VCO_BIT ? -rsp.v[vt].sw(BC(i)) : rsp.v[vt].sw(BC(i)));
+				rsp.a[i] &= ~0xffffull;
+				rsp.a[i] |= res.w(i) = (clip ? vtabs : rsp.v[vs].w(i));
+			}
+			rsp.VCE = 0;		
+			rsp.v[vd] = res;		
+		};		
 	case 0x25: // VCH  //todo: not correct
 		return INSTR {
 			VOPP;
@@ -457,15 +565,15 @@ rsp_instr rsp_cop2(n64_rsp& rsp, u32 opcode)
 			rsp.VCC = rsp.VCE = rsp.VCO = 0;
 			for(u32 i = 0; i < 8; ++i)
 			{
-				rsp.VCO |= (rsp.v[vs].w(i) ^ rsp.v[vt].w(BC(i)) & BIT(15)) ? (1<<i) : 0;
-				s16 vtabs = (rsp.VCO&BIT(i)) ? -rsp.v[vt].sw(BC(i)) : rsp.v[vt].sw(BC(i));
-				rsp.VCE |= ((rsp.VCO&BIT(i)) && (rsp.v[vs].sw(i) == (-rsp.v[vt].sw(BC(i)) - 1))) ? (1<<i):0;
-				rsp.VCO |= (!(rsp.VCE&BIT(i)) && (rsp.v[vs].sw(i) != vtabs)) ? (1<<(i+8)) : 0;
-				rsp.VCC |= (rsp.v[vs].sw(i) <= -rsp.v[vt].sw(BC(i))) ? (1<<i):0;
-				rsp.VCC |= (rsp.v[vs].sw(i) >= rsp.v[vt].sw(BC(i))) ? (1<<(i+8)):0;
-				u16 clip = (rsp.VCO&BIT(i)) ? (rsp.VCC&BIT(i)) : (rsp.VCC&BIT(i+8));
+				rsp.VCO |= (((rsp.v[vs].sw(i) ^ rsp.v[vt].sw(BC(i)))<0) ? BIT(i) : 0);
+				s16 vtabs = (VCO_BIT ? -rsp.v[vt].sw(BC(i)) : rsp.v[vt].sw(BC(i)));
+				rsp.VCE |= ((VCO_BIT && (rsp.v[vs].sw(i) == (-rsp.v[vt].sw(BC(i)) - 1)))?BIT(i):0);
+				rsp.VCO |= ((!VCE_BIT && (rsp.v[vs].sw(i) != vtabs))?BIT(i+8):0);
+				rsp.VCC |= ((rsp.v[vs].sw(i) <= -rsp.v[vt].sw(BC(i)))?BIT(i):0);
+				rsp.VCC |= ((rsp.v[vs].sw(i) >= rsp.v[vt].sw(BC(i)))?BIT(i+8):0);
+				bool clip = (VCO_BIT ? VCC_BIT : VCC_HI_BIT);
 				rsp.a[i] &= ~0xffffull;
-				rsp.a[i] |= res.w(i) = (clip ? u16(vtabs) : rsp.v[vs].w(i));
+				rsp.a[i] |= res.w(i) = u16(clip ? vtabs : rsp.v[vs].w(i));
 			}
 			rsp.v[vd] = res;
 		};
@@ -570,7 +678,7 @@ rsp_instr rsp_cop2(n64_rsp& rsp, u32 opcode)
 	return INSTR {};
 }
 
-rsp_instr rsp_lwc2(n64_rsp& rsp, u32 opcode)
+rsp_instr rsp_lwc2(n64_rsp&, u32 opcode)
 {
 	switch( (opcode>>11) & 0x1f )
 	{
@@ -656,7 +764,7 @@ rsp_instr rsp_lwc2(n64_rsp& rsp, u32 opcode)
 	}
 }
 
-rsp_instr rsp_swc2(n64_rsp& rsp, u32 opcode)
+rsp_instr rsp_swc2(n64_rsp&, u32 opcode)
 {
 	switch( (opcode>>11) & 0x1f )
 	{
