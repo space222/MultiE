@@ -42,6 +42,7 @@
 #include "CreatiVision.h"
 #include "apple2e.h"
 #include "n64.h"
+#include "aes.h"
 void try_kirq();
 
 namespace fs = std::filesystem;
@@ -477,6 +478,22 @@ void imgui_run()
 			}
 			if( ImGui::BeginMenu("Experimental") ) 
 			{
+				if( ImGui::MenuItem("Neo-Geo AES") )
+				{
+					std::string f = getOpenFile("Neo-Geo AES");
+					if( !f.empty() )
+					{
+						delete sys;
+						sys = new AES;
+						if( ! sys->loadROM(f) ) 
+						{
+							printf("unable to load ROM\n");
+							exit(1);
+						}
+						else newinstance = true;
+						crt_scale = 1.5f;
+					}				
+				}
 				if( ImGui::MenuItem("Nintendo 64") )
 				{
 					std::string f = getOpenFile("Nintendo 64");

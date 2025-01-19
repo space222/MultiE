@@ -23,12 +23,13 @@ nintendo/gba.cpp cpu/arm7tdmi.cpp cpu/arm7tdmi_arm.cpp cpu/nvc.cpp nintendo/virt
 other/WonderSwan.cpp other/CreatiVision.cpp cpu/6502coru.cpp other/apple2e.cpp other/wozfile.cpp
 cpu/VR4300.cpp nintendo/n64.cpp nintendo/n64_vi.cpp nintendo/n64_pi.cpp nintendo/n64_ai.cpp nintendo/n64_si.cpp
 cpu/VR4300_fpu.cpp nintendo/n64_rdp.cpp nintendo/n64_dp.cpp nintendo/n64_sp.cpp cpu/n64_rsp.cpp cpu/n64_rsp_vu.cpp
+neogeo/aes.cpp
 )
 
 add_library(ym3438 SHARED sega/ym3438.cpp)
 
 target_include_directories(test PUBLIC . ./imgui ./include ./sony ./other ./coleco
-	./cpu ./atari ./commodore ./sega ./ibm ./nintendo ./mattel ${SDL2_INCLUDE_DIRS} )
+	./cpu ./atari ./commodore ./sega ./ibm ./nintendo ./mattel ./neogeo ${SDL2_INCLUDE_DIRS} )
 target_link_libraries(test PRIVATE ym3438 dl GL GLEW ${SDL2_LIBRARIES})
 #${CMAKE_SOURCE_DIR}/libfmt.a 
 
