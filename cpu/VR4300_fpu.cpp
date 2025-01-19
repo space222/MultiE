@@ -182,7 +182,7 @@ vr4300_instr cop1_d(VR4300& proc, u32 opcode)
 				}
 				if( cpu.signal_fpu(cpu.FPU_INVALID) ) return;
 				memcpy(&c, &dnan, 8);
-			} else if( fpclassify(a) == FP_INFINITE || fpclassify(b) == FP_INFINITE ) {
+			} else if( fpclassify(a) == FP_INFINITE && fpclassify(b) == FP_INFINITE ) {
 				if( cpu.signal_fpu(cpu.FPU_INVALID) ) return;
 				memcpy(&c, &dnan, 8);
 			} else {
