@@ -321,7 +321,7 @@ vr4300_instr decode_regular(VR4300& proc, u32 opcode)
 	case 0x10: // COP0 instructions
 		switch( (opcode>>21) & 0x1F )
 		{
-		case 0: return INSTR { RTYPE; cpu.r[t] = (u32(cpu.c0_read32(d))); }; // MFC0
+		case 0: return INSTR { RTYPE; cpu.r[t] = s32(u32(cpu.c0_read32(d))); }; // MFC0
 		case 1: return INSTR { RTYPE; cpu.r[t] = cpu.c0_read64(d); }; // DMFC0
 		case 4: return INSTR { RTYPE; cpu.c0_write32(d, cpu.r[t]); }; // MTC0
 		case 5: return INSTR { RTYPE; cpu.c0_write64(d, cpu.r[t]); }; // DMTC0	
@@ -347,8 +347,8 @@ vr4300_instr decode_regular(VR4300& proc, u32 opcode)
 			//exit(1);
 		}
 	case 0x11: return cop1(proc, opcode); // COP1 / FPU todo
-	case 0x12: return INSTR { cpu.CAUSE &= ~(BIT(28)|BIT(29)); cpu.CAUSE |= BIT(29); cpu.exception(11); }; // COP2??		
-	case 0x13: return INSTR { cpu.CAUSE &= ~(BIT(28)|BIT(29)); cpu.CAUSE |= BIT(28)|BIT(29); cpu.exception(11); }; // COP3??		
+	case 0x12: return INSTR { if( cpu.COPUnusable(2) ) return; }; // COP2??		
+	case 0x13: return INSTR { cpu.exception(10); }; // COP3??		
 	
 	case 0x14:  // BEQL 
 		return INSTR {
