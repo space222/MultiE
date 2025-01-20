@@ -235,6 +235,14 @@ Status: Boots and displays mouse cursor + floppy question mark.
 
 
 
+Neo-Geo AES Todo List
+------------------------
+1. Start gfx output
+2. Actually run the z80?
+Status: Gets through the system rom bootup by lame hack of RTC function.
+
+
+
 Nintendo 64 Todo List
 ------------------------
 Overall:
