@@ -41,9 +41,10 @@ bool VR4300::isQNaN_f(float a)
 
 bool VR4300::isQNaN_d(double a)
 {
+	const u64 mask = 0x7FF8000000000000ull;
 	u64 v;
 	memcpy(&v, &a, 8);
-	return (fpclassify(a)==FP_NAN) && (v & BITL(51));
+	return /*(fpclassify(a)==FP_NAN) &&*/ ((v & mask)==mask); //BITL(51));
 }
 
 vr4300_instr cop1_d(VR4300& proc, u32 opcode)
@@ -80,7 +81,7 @@ vr4300_instr cop1_d(VR4300& proc, u32 opcode)
 				cpu.signal_fpu(cpu.FPU_UNIMPL);
 				return;	
 			} else if( fpclassify(a) == FP_NAN || fpclassify(b) == FP_NAN ) {
-				if( !cpu.isQNaN_d(a) || !cpu.isQNaN_d(b) )
+				if( (fpclassify(a) == FP_NAN && !cpu.isQNaN_d(a)) || (fpclassify(b) == FP_NAN && !cpu.isQNaN_d(b)) )
 				{
 					cpu.signal_fpu(cpu.FPU_UNIMPL);
 					return;
@@ -114,7 +115,7 @@ vr4300_instr cop1_d(VR4300& proc, u32 opcode)
 				cpu.signal_fpu(cpu.FPU_UNIMPL);
 				return;	
 			} else if( fpclassify(a) == FP_NAN || fpclassify(b) == FP_NAN ) {
-				if( !cpu.isQNaN_d(a) || !cpu.isQNaN_d(b) )
+				if( (fpclassify(a) == FP_NAN && !cpu.isQNaN_d(a)) || (fpclassify(b) == FP_NAN && !cpu.isQNaN_d(b)) )
 				{
 					cpu.signal_fpu(cpu.FPU_UNIMPL);
 					return;
@@ -143,7 +144,7 @@ vr4300_instr cop1_d(VR4300& proc, u32 opcode)
 				cpu.signal_fpu(cpu.FPU_UNIMPL);
 				return;	
 			} else if( fpclassify(a) == FP_NAN || fpclassify(b) == FP_NAN ) {
-				if( !cpu.isQNaN_d(a) || !cpu.isQNaN_d(b) )
+				if( (fpclassify(a) == FP_NAN && !cpu.isQNaN_d(a)) || (fpclassify(b) == FP_NAN && !cpu.isQNaN_d(b)) )
 				{
 					cpu.signal_fpu(cpu.FPU_UNIMPL);
 					return;
@@ -172,7 +173,7 @@ vr4300_instr cop1_d(VR4300& proc, u32 opcode)
 				cpu.signal_fpu(cpu.FPU_UNIMPL);
 				return;	
 			} else if( fpclassify(a) == FP_NAN || fpclassify(b) == FP_NAN ) {
-				if( !cpu.isQNaN_d(a) || !cpu.isQNaN_d(b) )
+				if( (fpclassify(a) == FP_NAN && !cpu.isQNaN_d(a)) || (fpclassify(b) == FP_NAN && !cpu.isQNaN_d(b)) )
 				{
 					cpu.signal_fpu(cpu.FPU_UNIMPL);
 					return;
@@ -183,11 +184,17 @@ vr4300_instr cop1_d(VR4300& proc, u32 opcode)
 				if( cpu.signal_fpu(cpu.FPU_INVALID) ) return;
 				memcpy(&c, &dnan, 8);
 			} else {
-				if( b == 0 ) { cpu.signal_fpu(cpu.FPU_DIVZERO); return; }
-				c = a / b;
-				if( fetestexcept(FE_OVERFLOW) && cpu.signal_fpu(cpu.FPU_INEXACT|cpu.FPU_OVERFLOW) ) return;
-				if( fetestexcept(FE_UNDERFLOW) && cpu.signal_fpu(cpu.FPU_INEXACT|cpu.FPU_UNDERFLOW) ) return;
-				if( fetestexcept(FE_INEXACT) && cpu.signal_fpu(cpu.FPU_INEXACT) ) return;
+				if( b == 0 ) 
+				{ 
+					if( cpu.signal_fpu(cpu.FPU_DIVZERO) ) return;
+					c = std::numeric_limits<double>::infinity();
+					if( a < 0 ) c = -c;
+				} else {
+					c = a / b;
+					if( fetestexcept(FE_OVERFLOW) && cpu.signal_fpu(cpu.FPU_INEXACT|cpu.FPU_OVERFLOW) ) return;
+					if( fetestexcept(FE_UNDERFLOW) && cpu.signal_fpu(cpu.FPU_INEXACT|cpu.FPU_UNDERFLOW) ) return;
+					if( fetestexcept(FE_INEXACT) && cpu.signal_fpu(cpu.FPU_INEXACT) ) return;
+				}
 			}
 			memcpy(&cpu.f[fd<<3], &c, 8);
 		};
@@ -477,7 +484,11 @@ vr4300_instr cop1_d(VR4300& proc, u32 opcode)
 			FITYPE;
 			double a;
 			memcpy(&a, &cpu.f[fs<<3], 8);
-			if( fpclassify(a) == FP_SUBNORMAL || fpclassify(a) == FP_INFINITE ) { cpu.signal_fpu(cpu.FPU_UNIMPL); return; }
+			if( fpclassify(a) == FP_SUBNORMAL ) //|| fpclassify(a) == FP_INFINITE ) 
+			{ 
+				cpu.signal_fpu(cpu.FPU_UNIMPL); 
+				return; 
+			}
 			else if( fpclassify(a) == FP_NAN )
 			{
 				if( !cpu.isQNaN_d(a) ) { cpu.signal_fpu(cpu.FPU_UNIMPL); return; }
@@ -558,7 +569,7 @@ vr4300_instr cop1_s(VR4300& proc, u32 opcode)
 				cpu.signal_fpu(cpu.FPU_UNIMPL);
 				return;	
 			} else if( fpclassify(a) == FP_NAN || fpclassify(b) == FP_NAN ) {
-				if( !cpu.isQNaN_f(a) || !cpu.isQNaN_f(b) )
+				if( (fpclassify(a) == FP_NAN && !cpu.isQNaN_f(a)) || (fpclassify(b) == FP_NAN && !cpu.isQNaN_f(b)) )
 				{
 					cpu.signal_fpu(cpu.FPU_UNIMPL);
 					return;
@@ -592,7 +603,7 @@ vr4300_instr cop1_s(VR4300& proc, u32 opcode)
 				cpu.signal_fpu(cpu.FPU_UNIMPL);
 				return;	
 			} else if( fpclassify(a) == FP_NAN || fpclassify(b) == FP_NAN ) {
-				if( !cpu.isQNaN_f(a) || !cpu.isQNaN_f(b) )
+				if( (fpclassify(a) == FP_NAN && !cpu.isQNaN_f(a)) || (fpclassify(b) == FP_NAN && !cpu.isQNaN_f(b)) )
 				{
 					cpu.signal_fpu(cpu.FPU_UNIMPL);
 					return;
@@ -621,7 +632,7 @@ vr4300_instr cop1_s(VR4300& proc, u32 opcode)
 				cpu.signal_fpu(cpu.FPU_UNIMPL);
 				return;	
 			} else if( fpclassify(a) == FP_NAN || fpclassify(b) == FP_NAN ) {
-				if( !cpu.isQNaN_f(a) || !cpu.isQNaN_f(b) )
+				if( (fpclassify(a) == FP_NAN && !cpu.isQNaN_f(a)) || (fpclassify(b) == FP_NAN && !cpu.isQNaN_f(b)) )
 				{
 					cpu.signal_fpu(cpu.FPU_UNIMPL);
 					return;
@@ -650,7 +661,7 @@ vr4300_instr cop1_s(VR4300& proc, u32 opcode)
 				cpu.signal_fpu(cpu.FPU_UNIMPL);
 				return;	
 			} else if( fpclassify(a) == FP_NAN || fpclassify(b) == FP_NAN ) {
-				if( !cpu.isQNaN_f(a) || !cpu.isQNaN_f(b) )
+				if( (fpclassify(a) == FP_NAN && !cpu.isQNaN_f(a)) || (fpclassify(b) == FP_NAN && !cpu.isQNaN_f(b)) )
 				{
 					cpu.signal_fpu(cpu.FPU_UNIMPL);
 					return;
@@ -661,11 +672,17 @@ vr4300_instr cop1_s(VR4300& proc, u32 opcode)
 				if( cpu.signal_fpu(cpu.FPU_INVALID) ) return;
 				memcpy(&c, &fnan, 4);
 			} else {
-				if( b == 0 ) { cpu.signal_fpu(cpu.FPU_DIVZERO); return; }
-				c = a / b;
-				if( fetestexcept(FE_OVERFLOW) && cpu.signal_fpu(cpu.FPU_INEXACT|cpu.FPU_OVERFLOW) ) return;
-				if( fetestexcept(FE_UNDERFLOW) && cpu.signal_fpu(cpu.FPU_INEXACT|cpu.FPU_UNDERFLOW) ) return;
-				if( fetestexcept(FE_INEXACT) && cpu.signal_fpu(cpu.FPU_INEXACT) ) return;
+				if( b == 0 ) 
+				{ 
+					if( cpu.signal_fpu(cpu.FPU_DIVZERO) ) return;
+					c = std::numeric_limits<double>::infinity();
+					if( a < 0 ) c = -c;
+				} else {
+					c = a / b;
+					if( fetestexcept(FE_OVERFLOW) && cpu.signal_fpu(cpu.FPU_INEXACT|cpu.FPU_OVERFLOW) ) return;
+					if( fetestexcept(FE_UNDERFLOW) && cpu.signal_fpu(cpu.FPU_INEXACT|cpu.FPU_UNDERFLOW) ) return;
+					if( fetestexcept(FE_INEXACT) && cpu.signal_fpu(cpu.FPU_INEXACT) ) return;
+				}
 			}
 			memcpy(&cpu.f[fd<<3], &c, 4);
 		};
@@ -714,9 +731,6 @@ vr4300_instr cop1_s(VR4300& proc, u32 opcode)
 				}
 				if( cpu.signal_fpu(cpu.FPU_INVALID) ) return;
 				memcpy(&c, &fnan, 4);
-			//} else if( fpclassify(a) == FP_INFINITE ) {
-			//	if( cpu.signal_fpu(cpu.FPU_INVALID) ) return;
-			//	memcpy(&c, &fnan, 4);
 			} else {
 				c = fabs(a);
 				if( fetestexcept(FE_OVERFLOW) && cpu.signal_fpu(cpu.FPU_INEXACT|cpu.FPU_OVERFLOW) ) return;
@@ -955,7 +969,7 @@ vr4300_instr cop1_s(VR4300& proc, u32 opcode)
 			FITYPE;
 			float a;
 			memcpy(&a, &cpu.f[fs<<3], 4);
-			if( fpclassify(a) == FP_SUBNORMAL || fpclassify(a) == FP_INFINITE ) 
+			if( fpclassify(a) == FP_SUBNORMAL ) //|| fpclassify(a) == FP_INFINITE ) 
 			{ 
 				cpu.signal_fpu(cpu.FPU_UNIMPL); return; 
 			} else if( fpclassify(a) == FP_NAN ) {
