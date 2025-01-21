@@ -491,7 +491,7 @@ void imgui_run()
 							exit(1);
 						}
 						else newinstance = true;
-						crt_scale = 1.5f;
+						crt_scale = 2.f;
 					}				
 				}
 				if( ImGui::MenuItem("Nintendo 64") )

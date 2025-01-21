@@ -237,9 +237,15 @@ Status: Boots and displays mouse cursor + floppy question mark.
 
 Neo-Geo AES Todo List
 ------------------------
-1. Start gfx output
-2. Actually run the z80?
-Status: Gets through the system rom bootup by lame hack of RTC function.
+1. Load c-rom(s) 
+2. Start sprites
+3. Figure out the .neo format
+4. Actually run the z80?
+Status:
+	Only supporting the pile-of-files with particular naming conventions for now, and must be unzipped.
+	Fix layer done, minus support for system ROM graphics or any bankswitching.
+	Gets through the system rom bootup by lame hack of RTC function: Once the first 
+command gets strobed in, begin alternating the output pin every 30 frames.
 
 
 

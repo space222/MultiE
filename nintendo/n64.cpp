@@ -332,7 +332,7 @@ void n64::run_frame()
 			if( ai_output_cycles >= (93750000/44100) )
 			{
 				ai_output_cycles = 0; // -= (93750000/44100);
-				//audio_add(ai_L, ai_R);
+				audio_add(ai_L, ai_R);
 			}
 		}
 	}

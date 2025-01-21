@@ -7,6 +7,72 @@ extern console* sys;
 int irq_count = 0;
 bool rtc_active = false;
 
+static u32 c16to32(u16 c)
+{
+	u8 DB = (c&BIT(15))?4:0;
+	u8 r = (c>>8)&0xf;
+	r <<= 4;
+	r |= (c&BIT(14))?8:0;
+	r |= DB;
+	u8 g = (c>>4)&0xf;
+	g <<= 4;
+	g |= (c&BIT(13))?8:0;
+	g |= DB;
+	u8 b = c & 15;
+	b <<= 4;
+	b |= (c&BIT(12))?8:0;
+	b |= DB;
+	return (r<<24)|(g<<16)|(b<<8);
+}
+
+static u8 sprite_hshrink[] = {
+0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,
+0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,
+0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,
+0,0,1,0,1,0,0,0,1,0,0,0,1,0,0,0,
+0,0,1,0,1,0,0,0,1,0,0,0,1,0,1,0,
+0,0,1,0,1,0,1,0,1,0,0,0,1,0,1,0,
+0,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,
+1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,
+1,0,1,0,1,0,1,0,1,1,1,0,1,0,1,0,
+1,0,1,1,1,0,1,0,1,1,1,0,1,0,1,0,
+1,0,1,1,1,0,1,0,1,1,1,0,1,0,1,1,
+1,0,1,1,1,0,1,1,1,1,1,0,1,0,1,1,
+1,0,1,1,1,0,1,1,1,1,1,0,1,1,1,1,
+1,1,1,1,1,0,1,1,1,1,1,0,1,1,1,1,
+1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,
+1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
+};
+
+void AES::draw_scanline(int line)
+{
+	const u32 backdrop = c16to32(__builtin_bswap16(*(u16*)&palette[palbank*0x2000 + 0x1ffe]));
+	for(u32 i = 0; i < 320; ++i) fbuf[line*320 + i] = backdrop;
+	if( bios_grom ) { return; } // not yet supporting bios graphics
+	//todo: sprites
+	
+	
+	
+	if( s1.empty() ) return;
+	for(int i = 0; i < 320; ++i)
+	{
+		int tX = i/8;
+		int tY = 2 + line/8;
+		
+		int map_entry = vram[0x7000 + tX*0x20 + tY];
+		int tile_num = map_entry & 0x7ff;
+		int palnum = map_entry >> 12;
+		
+		int x = i&7;
+		u8 b = s1[(tile_num<<5) | ((x&4)?0:BIT(4)) | ((x&2)?BIT(3):0) | (line&7)];
+		b >>= (x&1)?4:0;
+		b &= 15;
+		if( b == 0 ) continue;
+		u16 c = (palette[palbank*0x2000 + palnum*32 + b*2]<<8)|palette[palbank*0x2000 + palnum*32 + b*2 + 1];
+		fbuf[line*320 + i] = c16to32(c);
+	}
+}
+
 void AES::write(u32 addr, u32 v, int size)
 {
 	addr &= 0xffFFff;
@@ -21,12 +87,18 @@ void AES::write(u32 addr, u32 v, int size)
 		wram[addr] = v;
 		return;
 	}
+	if( addr >= 0x200000 && addr <= 0x2FFFFF )
+	{
+		pbank = v&3;
+		return;
+	}
 	if( addr >= 0x300000 && addr <= 0x3FFFFF )
 	{
 		if( addr == 0x300001 ) { return; } // kick watchdog
 		if( addr == 0x320000 ) { z80_cmd = v; if( v==1) z80_reply = 1; return; }
 		if( addr == 0x380031 || addr == 0x380041 ) { return; } // LED stuff?
 		if( addr == 0x380065 || addr == 0x380067 ) { return; } // coin lockout?
+		if( addr == 0x3A0001 ) { return; } // normal (nondarkened) gfx
 		if( addr == 0x3A0003 ) { bios_vectors = true; return; }
 		if( addr == 0x3A0013 ) { bios_vectors = false; return; }
 		if( addr == 0x3A0007 || addr == 0x3A0015 ) { return; } // disable memory card
@@ -47,7 +119,7 @@ void AES::write(u32 addr, u32 v, int size)
 		}
 		if( addr == 0x3C000C )
 		{
-			if( size != 16 ) { printf("AES: 3C000C, non-16bit write = $%X\n", v); exit(1); }
+			//if( size != 16 ) { printf("AES: 3C000C, non-16bit write = $%X\n", v); exit(1); }
 			if( v & 1 ) irq3_active = false;
 			if( v & 2 ) timer_irq_active = false;
 			if( v & 4 ) vblank_irq_active = false;			
@@ -124,13 +196,29 @@ u32 AES::read(u32 addr, int size)
 		}
 		return res|wram[addr];
 	}
+	if( addr >= 0x200000 && addr <= 0x2FFFFF )
+	{
+		u16 res = 0;
+		addr &= 0xffff;
+		if( size == 16 )
+		{
+			res = p1[pbank*0x100000 + (addr&0xfffff)]<<8;
+			addr += 1;
+		}
+		return res|p1[pbank*0x100000 + (addr&0xfffff)];
+	}
 	if( addr >= 0x300000 && addr <= 0x3FFFFF )
 	{
 		if( addr == 0x300001 ) { return 0xff; } // dip switches (active low)
 		if( addr == 0x320000 ) { return z80_reply; }
 		if( addr == 0x300081 ) { return 0; } // not active low?
 		if( addr == 0x3C0004 && size == 16 ) { return REG_VRAMMOD; }
-		if( addr == 0x3C0002 && size == 16 ) { printf("VRAM read $%X\n", REG_VRAMADDR); return vram[REG_VRAMADDR]; }
+		if( (addr == 0x3C0002 || addr == 0x3C0008 || addr == 0x3C000A ) && size == 16 ) 
+		{ 
+			printf("VRAM read $%X\n", REG_VRAMADDR); 
+			return vram[REG_VRAMADDR]; 
+		}
+		if( addr == 0x3C0006 ) { return line_counter<<7; }
 		if( addr == 0x380000 ) { return 0x7f; } // STATUS_B
 		
 		if( addr == 0x300000 ) { return 0xff; } // joypad 1
@@ -176,6 +264,39 @@ u32 AES::read(u32 addr, int size)
 	return 0;
 }
 
+bool AES::loadNEO(const std::string fname)
+{
+	FILE* fp = fopen(fname.c_str(), "rb");
+	if( !fp )
+	{
+		printf("Unable to load <%s>\n", fname.c_str());
+		return false;
+	}
+
+	fseek(fp, 0, SEEK_END);
+	auto fsz = ftell(fp);
+	fseek(fp, 4, SEEK_SET); // skip ident bytes
+	
+	u32 psize, s1size, csize, v1size, v2size, msize;
+	int unu = fread(&psize, 1, 4, fp);
+	unu = fread(&s1size, 1, 4, fp);
+	unu = fread(&msize, 1, 4, fp);
+	unu = fread(&v1size, 1, 4, fp);
+	unu = fread(&v2size, 1, 4, fp);
+	unu = fread(&csize, 1, 4, fp);
+	fseek(fp, 4096, SEEK_SET);
+	
+	p1.resize(psize);
+	unu = fread(p1.data(), 1, psize, fp);
+	for(u32 i = 0; i < p1.size(); i+=2)
+	{
+		*(u16*)&p1[i] = __builtin_bswap16(*(u16*)&p1[i]);
+	}
+	s1.resize(s1size);
+	unu = fread(s1.data(), 1, s1size, fp);
+	return true;
+}
+
 bool AES::loadROM(const std::string fname)
 {
 	std::string sysrom = "./bios/aes.bios";
@@ -192,8 +313,13 @@ bool AES::loadROM(const std::string fname)
 		*(u16*)&bios[i] = __builtin_bswap16(*(u16*)&bios[i]);
 	}
 	
-	std::string prefix = fname.substr(0, fname.rfind('-'));
-	std::string promfile = prefix + "-p1.p1";
+	if( fname.ends_with(".neo") )
+	{
+		return loadNEO(fname);	
+	}
+	
+	std::string prefix = fname.substr(0, fname.rfind('.'));
+	std::string promfile = prefix + ".p1";
 	fp = fopen(promfile.c_str(), "rb");
 	if( !fp )
 	{
@@ -215,7 +341,7 @@ bool AES::loadROM(const std::string fname)
 		*(u16*)&p1[i] = __builtin_bswap16(*(u16*)&p1[i]);
 	}
 	
-	std::string zfile = prefix + "-m1.m1";
+	std::string zfile = prefix + ".m1";
 	fp = fopen(zfile.c_str(), "rb");
 	if( !fp )
 	{
@@ -230,7 +356,7 @@ bool AES::loadROM(const std::string fname)
 	unu = fread(m1.data(), 1, fsz, fp);
 	fclose(fp);
 	
-	std::string fixfile = prefix + "-s1.s1";
+	std::string fixfile = prefix + ".s1";
 	fp = fopen(fixfile.c_str(), "rb");
 	if( !fp )
 	{
@@ -248,17 +374,21 @@ bool AES::loadROM(const std::string fname)
 
 void AES::run_frame()
 {
-	u64 cycles = 0;
-	do {
-		cpu.step();
-		cycles += cpu.icycles;
-	} while( cycles < 200000 );
-	cpu.pending_irq = 1;
-		
-	if( !vblank_irq_active )
+	for(u32 line = 0; line < 262; ++line)
 	{
-		vblank_irq_active = true;	
+		line_counter = line;
+		u64 target = last_target + 763;
+		while( mstamp < target )
+		{
+			cpu.step();
+			mstamp += cpu.icycles;
+		}
+		last_target = target;
+		if( line < 224 ) draw_scanline(line);	
 	}
+	
+	cpu.pending_irq = 1; //todo: only fire if last one still not ack'd?
+		
 	if( rtc_active && irq_count )
 	{
 		irq_count--;
@@ -292,6 +422,7 @@ void AES::reset()
 	printf("AES: Start PC = $%X\n", cpu.pc);
 	printf("AES: Start SP = $%X\n", cpu.r[15]);
 	palbank = 0;
+	pbank = 0;
 	spu.reset();
 	
 	rtc_val = 0x40;

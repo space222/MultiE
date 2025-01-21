@@ -152,7 +152,9 @@ void n64_rdp::run_commands(u64* list, u32 num)
 		case 0x20:
 		case 0x21:
 		case 0x22:
-		case 0x23: break; // lots of nop
+		case 0x23: 
+		case 0x31:
+			break; // lots of nop
 		
 		case 0x26: // sync load
 			break;

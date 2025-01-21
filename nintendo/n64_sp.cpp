@@ -7,11 +7,11 @@ void n64::sp_read_dma()
 {	// to RSP
 	u32 skip = (sp_regs[2]>>20)&0xff8;
 	u32 count = ((sp_regs[2]>>12)&0xff)+1;
-	u32 rdlen = (sp_regs[2]&0xfff);
+	u32 rdlen = (sp_regs[2]&0xfff)+1;
 	rdlen = (rdlen + 7) & ~7;
 	
 	u8* rmem = ((sp_regs[0]&BIT(12)) ? IMEM : DMEM);
-	u32 ram_offset = sp_regs[1] & 0x3ffFFf8;
+	u32 ram_offset = sp_regs[1] & 0x7ffff8;
 	u32 sp_offset = sp_regs[0] & 0xff8;
 	
 	for(u32 c = 0; c < count; ++c)
@@ -33,11 +33,11 @@ void n64::sp_write_dma()
 {	// to RDRAM
 	u32 skip = (sp_regs[3]>>20)&0xff8;
 	u32 count = ((sp_regs[3]>>12)&0xff)+1;
-	u32 wrlen = (sp_regs[3]&0xfff);
+	u32 wrlen = (sp_regs[3]&0xfff)+1;
 	wrlen = (wrlen + 7) & ~7;
 	
 	u8* rmem = ((sp_regs[0]&BIT(12)) ? IMEM : DMEM);
-	u32 ram_offset = sp_regs[1] & 0x3ffFFf8;
+	u32 ram_offset = sp_regs[1] & 0x7ffff8;
 	u32 sp_offset = sp_regs[0] & 0xff8;
 	
 	for(u32 c = 0; c < count; ++c)
