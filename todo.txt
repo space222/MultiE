@@ -239,7 +239,7 @@ Neo-Geo AES Todo List
 ------------------------
 1. Load c-rom(s) 
 2. Start sprites
-3. Figure out the .neo format
+3. Figure out the .neo format (looks like a straight concat of the various files. p1 starts at the 0x1000 mark)
 4. Actually run the z80?
 Status:
 	Only supporting the pile-of-files with particular naming conventions for now, and must be unzipped.
@@ -252,26 +252,25 @@ command gets strobed in, begin alternating the output pin every 30 frames.
 Nintendo 64 Todo List
 ------------------------
 Overall:
-1. switch all round/cvt/ceil/etc.LandW to signal UNIMPL instead of INVALID and see if tests get better
+1. Begin TLB.
 2. Continue implementing vector instructions to pass the relevant systemtests.
 3. Debug and maybe rewrite RDP DMA handling (non instant?).
 VR4300:
-1. Continue to improve FPU instructions. Had some NaN handling but it wasn't good, so I've stripped out FPU exceptions for now.
+1. Continue to improve FPU instructions, figure out underflow. Other than TLB, that's about all that's left for CPU.
 2. TLB?
 RCP Subsystems:
 1. VI: currently just all registers being r/w so I can display output. Actually do things per-line and v-int.
 2. PIF: The rest of the buttons, and support controllers. Still need the framework support for input customization.
 3. RI: RI_SELECT returns 0x14 to help skip other setup in IPL, but should make all regs r/w.
-4. SP: Rewrite SP_STATUS handling. Continue vector ops.
+4. SP: Rewrite DMA. Rewrite SP_STATUS handling. Continue vector ops.
 5. DP: Shaded triangles, textured triangles, zbuffering. Improve texture loading. Eventually proper BL and CC units. Coverage
-6. AI: Doneish? Not supporting the delayed carry hardware bug for now. 
 Status:
-SP: everything done except the vector unit. Like all the rest of the DMAs (except AI), DMA is instant.
+SP: a few vector ops and vector loads left. Like all the rest of the DMAs (except AI), DMA is instant.
 DP: Enough 16bit textures and rectangles to run Flappy Bird. 8bit textures do enough to run the Bad Apple video.
 MI: done except for MI_MODE's repeat feature
 PI: basic aligned cart->RAM implemented along with interrupt.
 SI: done (PIF now gets its own todo item). Not supporting the single-word xfer regs.
-AI: Audio works.. ish. Most things it does. Namco's title screen has a few boops, but no music. In-game like pac-man and galaga have sound.
+AI: Audio works. Not supporting the delayed carry hardware bug.
 PIF: one controller and only D-pad + a/b/z/start currently implemented and working in namco.
 	If the cmd byte in pifram gets the bit zero cleared, namco stops getting input.
 Notes (latest first):
