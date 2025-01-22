@@ -91,14 +91,13 @@ u64 n64::read(u32 addr, int size)
 	{
 		if( size == 16 )
 		{
-			return __builtin_bswap16(*(u16*)&ROM[addr-0x10000000]);
+			return __builtin_bswap32(*(u32*)&ROM[addr-0x10000000]) >> (((addr&2)^2)*8);
 		}
-		if( size != 32 )
+		if( size == 32 )
 		{
-			printf("%ibit read from cart!\n", size);
-			//exit(1);
+			return __builtin_bswap32(*(u32*)&ROM[addr-0x10000000]);
 		}
-		return __builtin_bswap32(*(u32*)&ROM[addr-0x10000000]);
+		return (__builtin_bswap32(*(u32*)&ROM[(addr&~1)-0x10000000]) >> (((addr&3)^3)*8)) & 0xff;
 	}
 	
 	if( addr >= 0x1FC00000 && addr <= 0x1FCFFFFF )
