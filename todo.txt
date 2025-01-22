@@ -252,7 +252,9 @@ command gets strobed in, begin alternating the output pin every 30 frames.
 Nintendo 64 Todo List
 ------------------------
 Overall:
-1. Continue implementing vector instructions to pass the relevant systemtests.
+1. switch all round/cvt/ceil/etc.LandW to signal UNIMPL instead of INVALID and see if tests get better
+2. Continue implementing vector instructions to pass the relevant systemtests.
+3. Debug and maybe rewrite RDP DMA handling (non instant?).
 VR4300:
 1. Continue to improve FPU instructions. Had some NaN handling but it wasn't good, so I've stripped out FPU exceptions for now.
 2. TLB?
