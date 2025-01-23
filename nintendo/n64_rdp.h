@@ -1,5 +1,6 @@
 #pragma once
 #include <functional>
+#include <vector>
 #include "itypes.h"
 
 class n64_rdp
@@ -15,13 +16,14 @@ public:
 		u16 to16() const { return ((b>>3)<<11)|((g>>3)<<6)|((r>>3)<<1)|(a?1:0); }
 	};
 
-	void run_commands(u64* cmd, u32 dwords);
+	void recv(u64);
 	std::function<void()> rdp_irq;
 
 	u8* rdram;
 	u8 tmem[0x1000];
 
 private:
+	std::vector<u64> cmdbuf;
 	void fill_rect(u64);
 	void set_tile(u64);
 	void load_tile(u64);

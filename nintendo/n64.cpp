@@ -283,7 +283,8 @@ void n64::run_frame()
 			{
 				RSP.step();
 			}
-			if( pi_cycles_til_irq )
+			//dp_send();
+			/*if( pi_cycles_til_irq )
 			{
 				pi_cycles_til_irq -= 1;
 				if( pi_cycles_til_irq == 0 )
@@ -301,6 +302,7 @@ void n64::run_frame()
 					raise_mi_bit(MI_INTR_SI_BIT);
 				}			
 			}
+			*/
 			if( ai_dma_enabled && ai_buf[0].valid )
 			{
 				ai_cycles += 1;
@@ -366,10 +368,12 @@ void n64::reset()
 	MI_INTERRUPT = 0;
 	MI_MASK = 0;
 	
-	RDP.rdp_irq = [&](){ raise_mi_bit(MI_INTR_DP_BIT); DP_STATUS &= ~BIT(5); };
+	RDP.rdp_irq = [&](){ raise_mi_bit(MI_INTR_DP_BIT); DP_STATUS &= ~(BIT(3)|BIT(5)|BIT(7)); };
 	RDP.rdram = mem.data();
+	for(u32 i = 0; i < 8; ++i) dp_regs[i] = 0;
 	DP_STATUS = 0x80;
-	
+	dp_xfer.valid = false;
+
 	for(u32 i = 0; i < 8; ++i) sp_regs[i] = 0;
 	SP_STATUS = 1;
 	RSP.broke = [&]() 
@@ -456,6 +460,7 @@ void n64::mi_write(u32 r, u32 v)
 		if( v & BIT(11) )
 		{
 			clear_mi_bit(MI_INTR_DP_BIT);
+			printf("MI: cleared DP irq\n");
 		}
 		return;
 	}

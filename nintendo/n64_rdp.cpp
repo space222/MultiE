@@ -6,168 +6,166 @@
 
 const u32 imgbpp[] = { 4, 8, 16, 32 };
 
-void n64_rdp::run_commands(u64* list, u32 num)
+void n64_rdp::recv(u64 cmd)
 {
-	u32 i = 0;
-	while( i < num )
+	u8 cmdbyte = 0;
+	if( cmdbuf.empty() ) 
 	{
-		u64 cmd = __builtin_bswap64(list[i++]);
-		u8 cmdbyte = (cmd>>56)&0x3F;
-		//printf("RDP Cmd $%X\n", u8((cmd>>56)&0x3F));
-		switch( (cmd>>56)&0x3F )
-		{
-		case 0x09:
-		case 0x0A:
-		case 0x0B:
-		case 0x0C:
-		case 0x0D:
-		case 0x0E:
-		case 0x0F:
-		case 0x08:{ // basic non-anything flat triangle
-			u64 cmd1 = __builtin_bswap64(list[i++]);
-			u64 cmd2 = __builtin_bswap64(list[i++]);
-			u64 cmd3 = __builtin_bswap64(list[i++]);
-			flat_triangle(cmd, cmd1, cmd2, cmd3);
-			if( cmdbyte & 4 ) i += 8; // shading
-			if( cmdbyte & 2 ) i += 8; // texturing
-			if( cmdbyte & 1 ) i += 2; // depth
-			}break;
-					
-		case 0x24: // texture rectangle
-			texture_rect(cmd, __builtin_bswap64(list[i++]));
-			break;
-		case 0x25: // texture flipped rect
-			texture_rect_flip(cmd, __builtin_bswap64(list[i++]));
-			break;
-			
-		case 0x2A: // Set Key GB
-			//printf("set key gb = $%lX\n", cmd);
-			break;
-		case 0x2B: // Set Key R
-			//printf("set key R = $%lX\n", cmd);
-			break;
-		case 0x2C: // set convert
-			//printf("set conv = $%lX\n", cmd);
-			break;
-		
-		case 0x2D: // scissor
-			scissor.ulX = (cmd>>46)&0x3ff;
-			scissor.ulY = (cmd>>34)&0x3ff;
-			scissor.field = cmd & BITL(25);
-			scissor.odd = cmd & BITL(24);
-			scissor.lrX = (cmd>>14)&0x3ff;
-			scissor.lrY = (cmd>>2)&0x3ff;
-			break;
-		case 0x2E: // primitive depth
-			prim_z = cmd>>16;
-			prim_delta_z = cmd;
-			break;
-		case 0x2F: // other modes
-			other.cycle_type = (cmd>>52)&3;
-			other.alpha_compare_en = cmd&1;
-			other.force_blend = cmd&BITL(14);
-			//fprintf(stderr, "set other modes = $%lX, ctype = %i\n", cmd, other.cycle_type);
-			break;
-			
-		case 0x30: // Load TLUT
-			load_tlut(cmd);
-			break;
-		case 0x33: // Load Block
-			load_block(cmd);
-			break;
-		case 0x32: // set tile size
-			set_tile_size(cmd);
-			break;
-			
-		case 0x34: // load tile
-			load_tile(cmd);
-			break;
-		case 0x35: // set tile
-			set_tile(cmd);		
-			break;
-			
-		case 0x36: // fill rect
-			fill_rect(cmd);
-			break;
-		
-		case 0x37: // fill color
-			fill_color = cmd;
-			break;
-		case 0x38: // fog color
-			fog_color = dc::from32(cmd);
-			break;
-		case 0x39: // blend color
-			blend_color = dc::from32(cmd);
-			break;
-		case 0x3A: // primitive color
-			break;
-		case 0x3B: // environment color
-			env_color = dc::from32(cmd);
-			break;	
-		case 0x3C: // set combine mode
-			//fprintf(stderr, "combine = $%lX\n", cmd&0x00ffFFFFffffFFFFull);
-			break;
-		
-		case 0x3D: // texture image
-			teximg.addr = cmd & 0x7ffff8;
-			teximg.width = ((cmd>>32)&0x3ff)+1;
-			teximg.bpp = imgbpp[((cmd>>51)&3)];
-			teximg.format = ((cmd>>53)&7);
-			break;
-		case 0x3E: // depth image
-			depth_image = cmd & 0x7ffff8;
-			break;
-		case 0x3F: // color image
-			cimg.addr = cmd & 0x7ffff8;
-			cimg.width = ((cmd>>32)&0x3ff)+1;
-			cimg.bpp = imgbpp[((cmd>>51)&3)];
-			cimg.format = ((cmd>>53)&7);
-			break;
-
-
-		case 0:
-		case 1:
-		case 2:
-		case 3:
-		case 4:
-		case 5:
-		case 6:
-		case 7: 
-		case 0x10:
-		case 0x11:
-		case 0x12:
-		case 0x13:
-		case 0x14:
-		case 0x15:
-		case 0x16:
-		case 0x17:
-		case 0x18:
-		case 0x19:
-		case 0x1A:
-		case 0x1B:
-		case 0x1C:
-		case 0x1D:
-		case 0x1E:
-		case 0x1F: 
-		case 0x20:
-		case 0x21:
-		case 0x22:
-		case 0x23: 
-		case 0x31:
-			break; // lots of nop
-		
-		case 0x26: // sync load
-			break;
-		case 0x27: // sync pipe
-			break;
-		case 0x28: // sync tile
-			break;
-		case 0x29: // sync full
-			rdp_irq();
-			break;
-		default: printf("RDP: Unimpl cmd = $%X\n", u32((cmd>>56)&0x3F)); exit(1);
-		}	
+		cmdbyte = (cmd>>56)&0x3F;
+	} else {
+		cmdbyte = (cmdbuf[0]>>56)&0x3F;
 	}
+	//printf("RDP Cmd $%X\n", u8((cmd>>56)&0x3F));
+	switch( cmdbyte )
+	{
+	case 0x08:{ // basic non-anything flat triangle
+		cmdbuf.push_back(cmd);
+		if( cmdbuf.size() < 4 ) return;
+		flat_triangle(cmdbuf[0], cmdbuf[1], cmdbuf[2], cmdbuf[3]);
+		//if( cmdbyte & 4 ) i += 8; // shading
+		//if( cmdbyte & 2 ) i += 8; // texturing
+		//if( cmdbyte & 1 ) i += 2; // depth
+		}break;
+				
+	case 0x24: // texture rectangle
+		cmdbuf.push_back(cmd);
+		if( cmdbuf.size() < 2 ) return;
+		texture_rect(cmdbuf[0], cmdbuf[1]);
+		break;
+	case 0x25: // texture flipped rect
+		cmdbuf.push_back(cmd);
+		if( cmdbuf.size() < 2 ) return;
+		texture_rect_flip(cmdbuf[0], cmdbuf[1]);
+		break;
+		
+	case 0x2A: // Set Key GB
+		//printf("set key gb = $%lX\n", cmd);
+		break;
+	case 0x2B: // Set Key R
+		//printf("set key R = $%lX\n", cmd);
+		break;
+	case 0x2C: // set convert
+		//printf("set conv = $%lX\n", cmd);
+		break;
+	
+	case 0x2D: // scissor
+		scissor.ulX = (cmd>>46)&0x3ff;
+		scissor.ulY = (cmd>>34)&0x3ff;
+		scissor.field = cmd & BITL(25);
+		scissor.odd = cmd & BITL(24);
+		scissor.lrX = (cmd>>14)&0x3ff;
+		scissor.lrY = (cmd>>2)&0x3ff;
+		break;
+	case 0x2E: // primitive depth
+		prim_z = cmd>>16;
+		prim_delta_z = cmd;
+		break;
+	case 0x2F: // other modes
+		other.cycle_type = (cmd>>52)&3;
+		other.alpha_compare_en = cmd&1;
+		other.force_blend = cmd&BITL(14);
+		//fprintf(stderr, "set other modes = $%lX, ctype = %i\n", cmd, other.cycle_type);
+		break;
+		
+	case 0x30: // Load TLUT
+		load_tlut(cmd);
+		break;
+	case 0x33: // Load Block
+		load_block(cmd);
+		break;
+	case 0x32: // set tile size
+		set_tile_size(cmd);
+		break;
+		
+	case 0x34: // load tile
+		load_tile(cmd);
+		break;
+	case 0x35: // set tile
+		set_tile(cmd);		
+		break;
+		
+	case 0x36: // fill rect
+		fill_rect(cmd);
+		break;
+	
+	case 0x37: // fill color
+		fill_color = cmd;
+		break;
+	case 0x38: // fog color
+		fog_color = dc::from32(cmd);
+		break;
+	case 0x39: // blend color
+		blend_color = dc::from32(cmd);
+		break;
+	case 0x3A: // primitive color
+		break;
+	case 0x3B: // environment color
+		env_color = dc::from32(cmd);
+		break;	
+	case 0x3C: // set combine mode
+		//fprintf(stderr, "combine = $%lX\n", cmd&0x00ffFFFFffffFFFFull);
+		break;
+	
+	case 0x3D: // texture image
+		teximg.addr = cmd & 0x7ffff8;
+		teximg.width = ((cmd>>32)&0x3ff)+1;
+		teximg.bpp = imgbpp[((cmd>>51)&3)];
+		teximg.format = ((cmd>>53)&7);
+		break;
+	case 0x3E: // depth image
+		depth_image = cmd & 0x7ffff8;
+		break;
+	case 0x3F: // color image
+		cimg.addr = cmd & 0x7ffff8;
+		cimg.width = ((cmd>>32)&0x3ff)+1;
+		cimg.bpp = imgbpp[((cmd>>51)&3)];
+		cimg.format = ((cmd>>53)&7);
+		break;
+
+
+	case 0:
+	case 1:
+	case 2:
+	case 3:
+	case 4:
+	case 5:
+	case 6:
+	case 7: 
+	case 0x10:
+	case 0x11:
+	case 0x12:
+	case 0x13:
+	case 0x14:
+	case 0x15:
+	case 0x16:
+	case 0x17:
+	case 0x18:
+	case 0x19:
+	case 0x1A:
+	case 0x1B:
+	case 0x1C:
+	case 0x1D:
+	case 0x1E:
+	case 0x1F: 
+	case 0x20:
+	case 0x21:
+	case 0x22:
+	case 0x23: 
+	case 0x31:
+		break; // lots of nop
+	
+	case 0x26: // sync load
+		break;
+	case 0x27: // sync pipe
+		break;
+	case 0x28: // sync tile
+		break;
+	case 0x29: // sync full
+		rdp_irq();
+		break;
+	default: printf("RDP: Unimpl cmd = $%X\n", u32(cmdbyte)); exit(1);
+	}
+	cmdbuf.clear();	
 }
 
 

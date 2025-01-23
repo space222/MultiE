@@ -104,20 +104,20 @@ void n64::si_write(u32 addr, u32 v)
 	{	// SI_PIF_AD_RD64B: run the pif and read the results back to ram
 		pif_run();
 		memcpy(mem.data()+(si_regs[0]&0x7fffff), pifram, 64);
-		//raise_mi_bit(MI_INTR_SI_BIT);
-		//si_regs[0] += 60;  // "points to last word written to" ?
-		si_cycles_til_irq = 0x2000;
-		SI_STATUS |= 1;
+		raise_mi_bit(MI_INTR_SI_BIT);
+		si_regs[0] += 60;  // "points to last word written to" ?
+		//si_cycles_til_irq = 0x2000;
+		//SI_STATUS |= 1;
 		return;
 	}
 	
 	if( addr == 4 )
 	{	// SI_PIF_AD_WR64B
 		memcpy(pifram, mem.data()+(si_regs[0]&0x7fffff), 64);
-		//raise_mi_bit(MI_INTR_SI_BIT);
-		//si_regs[0] += 60; // ??
-		si_cycles_til_irq = 0x2000;
-		SI_STATUS |= 1;
+		raise_mi_bit(MI_INTR_SI_BIT);
+		si_regs[0] += 60; // ??
+		//si_cycles_til_irq = 0x2000;
+		//SI_STATUS |= 1;
 		return;
 	}	
 }

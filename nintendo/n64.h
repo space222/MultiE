@@ -130,6 +130,11 @@ public:
 	u32& DP_STATUS = dp_regs[3];
 	u32 dp_read(u32);
 	void dp_write(u32, u32);
+	void dp_send();
 	n64_rdp RDP;
+	struct {
+		u32 start, end, current;
+		bool valid;
+	} dp_xfer;
 };
 

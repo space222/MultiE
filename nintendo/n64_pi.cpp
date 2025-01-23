@@ -28,9 +28,9 @@ void n64::pi_dma(bool write)
 		PI_DRAM_ADDR += (len+7)&~7;
 	}
 	
-	pi_cycles_til_irq = len * 4;
-	PI_STATUS |= 3;
-	//raise_mi_bit(MI_INTR_PI_BIT);
+	//pi_cycles_til_irq = len * 4;
+	//PI_STATUS |= 3;
+	raise_mi_bit(MI_INTR_PI_BIT);
 	//printf("PI irq raised. mask = $%X, intr = $%X\n", MI_MASK, MI_INTERRUPT);
 }
 
