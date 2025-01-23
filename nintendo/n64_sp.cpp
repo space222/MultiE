@@ -16,17 +16,17 @@ void n64::sp_read_dma()
 	
 	for(u32 c = 0; c < count; ++c)
 	{
+		if( c ) ram_offset += skip;
 		for(u32 i = 0; i < rdlen; ++i, ++sp_offset, ++ram_offset) 
 		{
 			rmem[sp_offset&0xfff] = (ram_offset < 0x800000 ) ? mem[ram_offset] : 0;
-			sp_regs[0] = (sp_regs[0]&~0xfff) | ((sp_regs[0]+1)&0xfff); 
 		}
-		ram_offset += skip;
 	}
+	
+	sp_regs[0] &= ~0xfff;
+	sp_regs[0] |= sp_offset&0xfff;
 	sp_regs[1] = ram_offset;	
-	sp_regs[0] &= ~7;
-	sp_regs[2] |= 0xff8;
-	sp_regs[2] &= ~0xff007;
+	sp_regs[2] = (skip<<20)|0xff8;
 }
 
 void n64::sp_write_dma()
@@ -42,17 +42,17 @@ void n64::sp_write_dma()
 	
 	for(u32 c = 0; c < count; ++c)
 	{
+		if( c ) ram_offset += skip;
 		for(u32 i = 0; i < wrlen; ++i, ++sp_offset, ++ram_offset) 
 		{
 			if( ram_offset < 0x800000 ) mem[ram_offset] = rmem[sp_offset&0xfff];
-			sp_regs[0] = (sp_regs[0]&~0xfff) | ((sp_regs[0]+1)&0xfff);
 		}
-		ram_offset += skip;
 	}
+	
+	sp_regs[0] &= ~0xfff;
+	sp_regs[0] |= sp_offset&0xfff;
 	sp_regs[1] = ram_offset;
-	sp_regs[0] &= ~7;
-	sp_regs[3] |= 0xff8;
-	sp_regs[3] &= ~0xff007;
+	sp_regs[3] = (skip<<20)|0xff8;
 }
 
 void n64::sp_write(u32 addr, u32 v)

@@ -490,7 +490,7 @@ void n64_rdp::load_tlut(u64 cmd)
 	if( ulT != lrT || ulT != 0 || lrT != 0 )
 	{
 		printf("RDP: LoadTLUT with ulT != lrT != both 0\n");
-		exit(1);
+		//exit(1);
 	}
 	
 	u32 num = (lrS - ulS + 1);
