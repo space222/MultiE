@@ -30,7 +30,7 @@ rsp_instr rsp_special(n64_rsp&, u32 opcode)
 	case 0x08: return INSTR { RTYPE; cpu.branch(cpu.r[s]); }; // JR
 	case 0x09: return INSTR { RTYPE; u32 temp = cpu.r[s]; cpu.r[d] = LINK; cpu.branch(temp); }; // JALR
 	
-	case 0x0D: return INSTR { cpu.broke(); }; // BREAK
+	case 0x0D: return INSTR { /*printf("rsp: break\n");*/ cpu.broke(); }; // BREAK
 	
 	case 0x20: return INSTR { RTYPE; cpu.r[d] = (cpu.r[t]) + (cpu.r[s]); };  // ADD
 	case 0x21: return INSTR { RTYPE; cpu.r[d] = (cpu.r[t]) + (cpu.r[s]); }; // ADDU

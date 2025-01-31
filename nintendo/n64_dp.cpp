@@ -8,11 +8,9 @@
 #define PIPE_BUSY (BIT(5)|BIT(3))
 #define XBUS BIT(0)
 
-u16 orv = 1;
-
 u32 n64::dp_read(u32 addr)
 {
-	printf("dp_read <$%X\n", addr);
+	//printf("$%X:$%X: dp_read <$%X\n", u32(cpu.pc), RSP.pc, addr);
 	addr = (addr&0x1F)>>2;
 	switch(addr)
 	{
@@ -20,7 +18,7 @@ u32 n64::dp_read(u32 addr)
 	case 1: return DP_END;
 	case 2: return DP_CURRENT;
 	
-	case 3: orv = std::rotl(orv, 1); return orv;
+	case 3: return DP_STATUS;
 	case 4:
 	case 5:
 	case 6:
@@ -34,7 +32,7 @@ u32 n64::dp_read(u32 addr)
 
 void n64::dp_write(u32 addr, u32 v)
 {
-	printf("dp_write $%X = $%X\n", addr, v);
+	//printf("dp_write $%X = $%X\n", addr, v);
 	addr = (addr&0x1f)>>2;
 	if( addr == 0 )
 	{
@@ -69,23 +67,23 @@ void n64::dp_write(u32 addr, u32 v)
 		if( v & BIT(5) )
 		{
 			printf("Did a flush!\n");
-			exit(1);
+			//exit(1);
 			DP_STATUS &= ~START_PENDING;
 		}
 		if( v & BIT(3) )
 		{
 			printf("dp: froze!\n");
-			exit(1);
+			//exit(1);
 		}
 		if( v & BIT(7) ) DP_STATUS &= ~PIPE_BUSY;
-		if( v & 0xfc ) printf("DP_STATUS = $%X\n", v);
+		//if( v & 0xfc ) printf("DP_STATUS = $%X\n", v);
 		return;
 	}
 }
 
 void n64::dp_send()
 {
-	//DP_STATUS |= PIPE_BUSY;
+	DP_STATUS |= PIPE_BUSY;
 	
 	while( DP_CURRENT < DP_END )
 	{
@@ -98,7 +96,7 @@ void n64::dp_send()
 		DP_CURRENT += 8;
 	}
 	
-	//DP_STATUS |= CBUF_READY;
+	DP_STATUS |= CBUF_READY;
 }
 
 

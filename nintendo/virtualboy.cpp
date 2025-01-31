@@ -736,6 +736,8 @@ void virtualboy::reset()
 	DPSTTS = 0;
 	which_buffer = 0;
 	frame_divider = 0;
+	sample_cycles = 0;
+	for(u32 i = 0; i < 6; ++i) chan_int_cycles[i] = chancycles[i] = 0;
 	
 	timer_ctrl = 0;
 	timer_value = 0xffff;

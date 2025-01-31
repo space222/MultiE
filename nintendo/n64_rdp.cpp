@@ -18,13 +18,18 @@ void n64_rdp::recv(u64 cmd)
 	//printf("RDP Cmd $%X\n", u8((cmd>>56)&0x3F));
 	switch( cmdbyte )
 	{
-	case 0x08:{ // basic non-anything flat triangle
+	case 0x08:
+	case 0x09:
+	case 0x0A:
+	case 0x0B:
+	case 0x0C:
+	case 0x0D:
+	case 0x0E:
+	case 0x0F:
+		{ // basic non-anything flat triangle
 		cmdbuf.push_back(cmd);
-		if( cmdbuf.size() < 4 ) return;
+		if( cmdbuf.size() < u32(4 + ((cmdbyte&4)?8:0) + ((cmdbyte&2)?8:0) + ((cmdbyte&1)?2:0) ) ) return;
 		flat_triangle(cmdbuf[0], cmdbuf[1], cmdbuf[2], cmdbuf[3]);
-		//if( cmdbyte & 4 ) i += 8; // shading
-		//if( cmdbyte & 2 ) i += 8; // texturing
-		//if( cmdbyte & 1 ) i += 2; // depth
 		}break;
 				
 	case 0x24: // texture rectangle
@@ -218,6 +223,12 @@ void n64_rdp::load_tile(u64 cmd)
 	ulS >>= 2; ulT >>= 2; lrS >>= 2; lrT >>= 2;
 	//fprintf(stderr, "LT Tile%i Size = (%i, %i) - (%i, %i)\n\n", u8((cmd>>24)&7), ulS, ulT, lrS, lrT);
 	
+	if( T.bpp == 32 )
+	{
+		printf("Loading 32bit tile\n");
+		//exit(1);
+	}
+	
 	u32 roffs = (((ulS*T.bpp)+7)/8) + teximg.addr;
 	u32 rdram_stride = ((teximg.width*T.bpp) + 7) / 8; 
 
@@ -235,7 +246,7 @@ void n64_rdp::set_tile(u64 cmd)
 	T.format = (cmd>>53)&7;
 	T.bpp = imgbpp[(cmd>>51)&3];
 	T.line = (cmd>>41)&0x1ff;
-	if( T.bpp == 32 ) T.line <<= 1;
+	//if( T.bpp == 32 ) T.line <<= 1;
 	//fprintf(stderr, "set tile%i, addr = $%X, line = $%X\n\tformat = $%X, bpp=$%X\n", 
 	//	u8((cmd>>24)&7), T.addr, T.line, T.format, T.bpp);
 	
@@ -250,7 +261,8 @@ void n64_rdp::set_tile(u64 cmd)
 	
 	//if( T.clampT || T.mirrorT || T.clampS || T.mirrorS )
 	//	fprintf(stderr, "cT = %i, mT = %i, cS = %i, mS = %i\n", !!T.clampT, !!T.mirrorT, !!T.clampS, !!T.mirrorS);
-	//fprintf(stderr, "maskT = $%X, maskS = $%X\n", T.maskT, T.maskS);
+	if( T.shiftS || T.shiftT )
+		fprintf(stderr, "shiftS = %X, shiftT = %X\n", T.shiftS, T.shiftT);
 }
 
 void n64_rdp::texture_rect(u64 cmd0, u64 cmd1)
@@ -266,6 +278,11 @@ void n64_rdp::texture_rect(u64 cmd0, u64 cmd1)
 	s32 DtDy = (cmd1&0xffff); DtDy <<= 16; DtDy >>= 16;
 	if( other.cycle_type == CYCLE_TYPE_COPY ) 
 	{	// convert copy mode to 1/2cycle mode values.
+		if( tiles[tile].bpp != 16 ) 
+		{
+			printf("RDP: COPY mode in bpp %i\n", tiles[tile].bpp);
+			exit(1);
+		}
 		DsDx /= 4;  // probably need other values for when bpp != 16
 		lrY += 1;
 		lrX += 1;
@@ -332,10 +349,10 @@ void n64_rdp::texture_rect_flip(u64 cmd0, u64 cmd1)
 			for(u32 X = ulX; X < lrX; ++X, Sl += DsDx)
 			{
 				u16 sample = tex_sample(tile, 16, T, Sl);
-				if( !other.alpha_compare_en || (other.alpha_compare_en && (__builtin_bswap16(sample)&1)) )
-				{
-					*(u16*)&rdram[(cimg.addr + (Y*cimg.width*2) + X*2)&0x7ffffe] = sample;
-				}
+				if( other.alpha_compare_en && !(__builtin_bswap16(sample)&1) ) continue;
+				if( other.force_blend && !(__builtin_bswap16(sample)&1)) continue;
+				
+				*(u16*)&rdram[cimg.addr + (Y*cimg.width*2) + X*2] = sample;
 			}
 		}	
 	} else if( cimg.bpp == 32 ) {
@@ -377,8 +394,22 @@ u32 n64_rdp::tex_sample(u32 tile, u32 bpp, s32 s, s32 t)
 	t >>= 10;
 	s -= T.SL>>2;
 	t -= T.TL>>2;
-	if( T.maskS ) s &= (1<<T.maskS)-1;
-	if( T.maskT ) t &= (1<<T.maskT)-1;
+	if( T.mirrorS )
+	{
+		u32 mbit = s & (1u<<(T.maskS+0));
+		s &= (1<<T.maskS)-1;
+		if( mbit ) s ^= (1<<T.maskS)-1;
+	} else if( T.maskS ) {
+		s &= (1<<T.maskS)-1;
+	}
+	if( T.mirrorT )
+	{
+		u32 mbit = t & (1u<<(T.maskT+0));
+		t &= (1<<T.maskT)-1;
+		if( mbit ) t ^= (1<<T.maskT)-1;
+	} else if( T.maskT ) {
+		t &= (1<<T.maskT)-1;
+	}
 	
 	dc res;
 	if( T.bpp == 16 )
@@ -469,11 +500,18 @@ void n64_rdp::load_block(u64 cmd)
 		exit(1);
 		return;
 	}
-	u32 num_bytes = (num_texels*T.bpp)/8;
-	u32 rdram_stride = ((teximg.width*T.bpp) + 7) / 8; 
-	for(u32 i = 0; i < num_bytes; ++i)
+	u32 num_bytes = ((num_texels*T.bpp)+7)/8;
+	u32 swpcnt = dxt;
+	u32 ramoff = teximg.addr + ((ulS*T.bpp+7)/8);
+	u32 t = 0;
+	for(u32 i = 0; i < ((num_bytes+7)/8); ++i)
 	{
-		tmem[(T.addr*8 + T.line*8 + i)&0xfff] = rdram[teximg.addr + (ulT*rdram_stride) + ((lrS*T.bpp+7)/8) + i];
+		u64 dw = *(u64*)&rdram[ramoff + ((ulT*teximg.width*T.bpp+7)/8) + (i*8)];
+		u32 taddr = (T.addr + T.line*t + i)*8;
+		//if( swpcnt & BIT(11) ) dw = (dw<<32)|(dw>>32);
+		*(u64*)&tmem[taddr&0xfff] = dw;
+		swpcnt += dxt;
+		//if( swpcnt & BIT(11) ) { ulT+=1; t += 1; }
 	}
 }
 

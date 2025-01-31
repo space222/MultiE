@@ -269,17 +269,17 @@ void n64::run_frame()
 {
 	for(u32 line = 0; line < 262; ++line)
 	{
-		if( VI_CTRL & 3 )
+		if( (VI_CTRL & 3) > 1 )
 		{
 			VI_V_CURRENT = (VI_V_CURRENT&1) | (line<<1);
 			if( (VI_V_CURRENT>>1) == (VI_V_INTR>>1) ) raise_mi_bit(MI_INTR_VI_BIT);
 		} else {
 			VI_V_CURRENT = 0;
 		}
-		for(u32 i = 0; i < 5000; ++i)
+		for(u32 i = 0; i < 6000; ++i)
 		{
 			cpu.step();
-			if( !(SP_STATUS & 1) ) 
+			if( !(SP_STATUS & 1) && (i & 1) )
 			{
 				RSP.step();
 			}
@@ -338,7 +338,7 @@ void n64::run_frame()
 		}
 	}
 	
-	if( !(VI_V_TOTAL & 1) && (VI_CTRL&3) ) VI_V_CURRENT ^= 1;
+	//if( !(VI_V_TOTAL & 1) && (VI_CTRL&3) ) VI_V_CURRENT ^= 1;
 	
 	vi_draw_frame();
 }
@@ -371,7 +371,7 @@ void n64::reset()
 	RDP.rdp_irq = [&](){ raise_mi_bit(MI_INTR_DP_BIT); DP_STATUS &= ~(BIT(3)|BIT(5)|BIT(7)); };
 	RDP.rdram = mem.data();
 	for(u32 i = 0; i < 8; ++i) dp_regs[i] = 0;
-	DP_STATUS = 0x80;
+	DP_STATUS = 0;//0x80;
 	dp_xfer.valid = false;
 
 	for(u32 i = 0; i < 8; ++i) sp_regs[i] = 0;
@@ -460,7 +460,7 @@ void n64::mi_write(u32 r, u32 v)
 		if( v & BIT(11) )
 		{
 			clear_mi_bit(MI_INTR_DP_BIT);
-			printf("MI: cleared DP irq\n");
+			//printf("MI: cleared DP irq\n");
 		}
 		return;
 	}

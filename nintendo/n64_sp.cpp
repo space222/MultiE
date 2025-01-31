@@ -11,7 +11,7 @@ void n64::sp_read_dma()
 	rdlen = (rdlen + 7) & ~7;
 	
 	u8* rmem = ((sp_regs[0]&BIT(12)) ? IMEM : DMEM);
-	u32 ram_offset = sp_regs[1] & 0x7ffff8;
+	u32 ram_offset = sp_regs[1] & 0xfffff8;
 	u32 sp_offset = sp_regs[0] & 0xff8;
 	
 	for(u32 c = 0; c < count; ++c)
@@ -37,7 +37,7 @@ void n64::sp_write_dma()
 	wrlen = (wrlen + 7) & ~7;
 	
 	u8* rmem = ((sp_regs[0]&BIT(12)) ? IMEM : DMEM);
-	u32 ram_offset = sp_regs[1] & 0x7ffff8;
+	u32 ram_offset = sp_regs[1] & 0xfffff8;
 	u32 sp_offset = sp_regs[0] & 0xff8;
 	
 	for(u32 c = 0; c < count; ++c)

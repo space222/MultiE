@@ -41,7 +41,7 @@ public:
 	z80 spu;
 	m68k cpu;
 	std::vector<u8> p1;
-	u32 pbank;
+	u32 pbank1, pbank2;
 	std::vector<u8> s1;
 	std::vector<u8> m1;
 	

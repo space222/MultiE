@@ -252,15 +252,16 @@ command gets strobed in, begin alternating the output pin every 30 frames.
 Nintendo 64 Todo List
 ------------------------
 Overall:
-1. Begin TLB.
-2. Continue implementing vector instructions to pass the relevant systemtests.
-3. Debug and maybe rewrite RDP DMA handling (non instant?).
+1. Triangle shading.
+2. Triangle texturing.
+3. Triangle zbuffing.
 VR4300:
 1. Continue to improve FPU instructions, figure out underflow. Other than TLB, that's about all that's left for CPU.
 2. TLB?
 RCP Subsystems:
 1. VI: currently just all registers being r/w so I can display output. Actually do things per-line and v-int.
 2. PIF: The rest of the buttons, and support controllers. Still need the framework support for input customization.
+	Proper EEPROM and Controller paks and see if more games boot.
 3. RI: RI_SELECT returns 0x14 to help skip other setup in IPL, but should make all regs r/w.
 4. SP: Rewrite DMA. Rewrite SP_STATUS handling. Continue vector ops.
 5. DP: Shaded triangles, textured triangles, zbuffering. Improve texture loading. Eventually proper BL and CC units. Coverage
@@ -274,6 +275,8 @@ AI: Audio works. Not supporting the delayed carry hardware bug.
 PIF: one controller and only D-pad + a/b/z/start currently implemented and working in namco.
 	If the cmd byte in pifram gets the bit zero cleared, namco stops getting input.
 Notes (latest first):
+	After c/p'ing pif hle code from dillonb/n64 to see how far off I was, there was no change until I
+	zero'd out the response to EEPROM/Pak commands and now a bunch of games boot.
 	After implementing LWC1/MTC1 and friends half mode odd registers, Namco's title screen and menu button music/sounds function.
 		Looks like odd register access isn't undefined in half mode; it's for getting data into upper parts of a double.
 	If RI_SELECT is nonzero to skip rdram init, IPL3 never writes RAM size to $80000318 which makes libdragon 

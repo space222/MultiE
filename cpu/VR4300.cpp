@@ -651,10 +651,11 @@ void VR4300::step()
 		//exit(1);
 	} else {
 		countdiv ^= 1;
-		if( countdiv ) COUNT = (COUNT+1)&0xfffffFFFFull;
+		if( countdiv & 1 ) COUNT = (COUNT+1)&0xffffFFFFull;
 		if( u32(COUNT) == u32(COMPARE) )
 		{
 			CAUSE |= BIT(15);
+			//printf("compare irq!\n");
 		}
 	
 		if( (opc >> 26) == 0 )
@@ -680,11 +681,15 @@ void VR4300::branch(u64 target)
 
 void VR4300::overflow()
 {
+	printf("overflow\n");
+	//exit(1);
 	exception(12);
 }
 
 void VR4300::address_error(bool write)
 {
+	printf("ae\n");
+	//exit(1);
 	exception(write ? 5 : 4);
 }
 
@@ -743,8 +748,9 @@ BusResult VR4300::read(u64 addr, int size)
 	}
 	if( u32(addr) < 0x8000'0000u || u32(addr) >= 0xc000'0000u )
 	{
-		printf("VR4300:$%X: tlb not yet supported, read%i <$%lX\n", u32(pc), size, addr);
-		exit(1);
+		//printf("VR4300:$%X: tlb not yet supported, read%i <$%lX\n", u32(pc), size, addr);
+		//exit(1);
+		addr -= 0x3C70000; // saves the mario64 head from crashing. really just need a tlb.
 	}
 	u32 phys_addr = addr&0x1FFFffff;
 	return phys_read(phys_addr, size);
@@ -765,8 +771,9 @@ BusResult VR4300::write(u64 addr, u64 v, int size)
 	}
 	if( u32(addr) < 0x8000'0000u || u32(addr) >= 0xc000'0000u )
 	{
-		printf("VR4300:$%X: tlb not yet supported, write%i $%lX = $%lX\n", u32(pc), size, addr, v);
-		exit(1);
+		//printf("VR4300:$%X: tlb not yet supported, write%i $%lX = $%lX\n", u32(pc), size, addr, v);
+		//exit(1);
+		addr -= 0x3C70000; // saves the mario64 head from crashing. really just need a tlb.
 	}
 	u32 phys_addr = addr&0x1FFFffff;
 	phys_write(phys_addr, v, size);

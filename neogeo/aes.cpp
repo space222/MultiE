@@ -60,7 +60,7 @@ void AES::draw_scanline(int line)
 		int tY = 2 + line/8;
 		
 		int map_entry = vram[0x7000 + tX*0x20 + tY];
-		int tile_num = map_entry & 0x7ff;
+		int tile_num = map_entry & 0xfff;
 		int palnum = map_entry >> 12;
 		
 		int x = i&7;
@@ -89,7 +89,7 @@ void AES::write(u32 addr, u32 v, int size)
 	}
 	if( addr >= 0x200000 && addr <= 0x2FFFFF )
 	{
-		pbank = v&3;
+		pbank2 = v&3;
 		return;
 	}
 	if( addr >= 0x300000 && addr <= 0x3FFFFF )
@@ -182,8 +182,8 @@ u32 AES::read(u32 addr, int size)
 			if( size == 16 ) { res = bios[addr]<<8; addr += 1; }
 			return res|bios[addr];
 		}
-		if( size == 16 ) { res = p1[addr]<<8; addr+=1; }
-		return res|p1[addr];
+		if( size == 16 ) { res = p1[pbank1*0x100000 + addr]<<8; addr+=1; }
+		return res|p1[pbank1*0x100000 + addr];
 	}
 	if( addr >= 0x100000 && addr <= 0x1FFFFF )
 	{
@@ -202,10 +202,10 @@ u32 AES::read(u32 addr, int size)
 		addr &= 0xffff;
 		if( size == 16 )
 		{
-			res = p1[pbank*0x100000 + (addr&0xfffff)]<<8;
+			res = p1[(pbank2+1)*0x100000 + (addr&0xfffff)]<<8;
 			addr += 1;
 		}
-		return res|p1[pbank*0x100000 + (addr&0xfffff)];
+		return res|p1[(pbank2+1)*0x100000 + (addr&0xfffff)];
 	}
 	if( addr >= 0x300000 && addr <= 0x3FFFFF )
 	{
@@ -387,7 +387,7 @@ void AES::run_frame()
 		if( line < 224 ) draw_scanline(line);	
 	}
 	
-	cpu.pending_irq = 1; //todo: only fire if last one still not ack'd?
+	if( !vblank_irq_active ) cpu.pending_irq = 1; //only if not ack'd or not?
 		
 	if( rtc_active && irq_count )
 	{
@@ -422,7 +422,8 @@ void AES::reset()
 	printf("AES: Start PC = $%X\n", cpu.pc);
 	printf("AES: Start SP = $%X\n", cpu.r[15]);
 	palbank = 0;
-	pbank = 0;
+	pbank1 = 0;
+	pbank2 = 0;
 	spu.reset();
 	
 	rtc_val = 0x40;

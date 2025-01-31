@@ -29,6 +29,8 @@ public:
 	u64 a[8];
 	vreg v[32];
 	u16 VCO, VCC, VCE;
+	u16 DIV_OUT, DIV_IN;
+	bool divinloaded;
 	
 	u32 r[32];
 	u32 pc, npc, nnpc;
