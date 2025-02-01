@@ -29,6 +29,14 @@ void n64_rdp::recv(u64 cmd)
 		{ // basic non-anything flat triangle
 		cmdbuf.push_back(cmd);
 		if( cmdbuf.size() < u32(4 + ((cmdbyte&4)?8:0) + ((cmdbyte&2)?8:0) + ((cmdbyte&1)?2:0) ) ) return;
+		if( cmdbyte&4 )
+		{
+			u8 r = cmdbuf[4]>>48;
+			u8 g = cmdbuf[4]>>32;
+			u8 b = cmdbuf[4]>>16;
+			fill_color = ( (r<<24)|(g<<16)|(b<<8)|0xff );
+			blend_color = dc::from32(fill_color);
+		}
 		flat_triangle(cmdbuf[0], cmdbuf[1], cmdbuf[2], cmdbuf[3]);
 		}break;
 				
@@ -225,16 +233,18 @@ void n64_rdp::load_tile(u64 cmd)
 	
 	if( T.bpp == 32 )
 	{
-		printf("Loading 32bit tile\n");
-		//exit(1);
+		//todo: but currently have a barely functional hack of increasing
+		//	line size*2 for 32bpp in Set Tile.
 	}
+	
+	u32 linesize = T.line*8;
 	
 	u32 roffs = (((ulS*T.bpp)+7)/8) + teximg.addr;
 	u32 rdram_stride = ((teximg.width*T.bpp) + 7) / 8; 
 
 	for(u32 Y = ulT; Y <= lrT; ++Y)
 	{
-		memcpy(tmem+T.addr*8+((Y-ulT)*T.line*8), rdram+roffs+(Y*rdram_stride), rdram_stride);
+		memcpy(tmem+(T.addr*8+((Y-ulT)*linesize)), rdram+roffs+(Y*rdram_stride), rdram_stride);
 	}
 }
 
@@ -246,7 +256,10 @@ void n64_rdp::set_tile(u64 cmd)
 	T.format = (cmd>>53)&7;
 	T.bpp = imgbpp[(cmd>>51)&3];
 	T.line = (cmd>>41)&0x1ff;
-	//if( T.bpp == 32 ) T.line <<= 1;
+	if( T.bpp == 32 ) 
+	{	//todo: remove once load tile and sampling can handle the 32bpp rg/ba split bank layout
+		T.line <<= 1;
+	}
 	//fprintf(stderr, "set tile%i, addr = $%X, line = $%X\n\tformat = $%X, bpp=$%X\n", 
 	//	u8((cmd>>24)&7), T.addr, T.line, T.format, T.bpp);
 	
@@ -261,8 +274,8 @@ void n64_rdp::set_tile(u64 cmd)
 	
 	//if( T.clampT || T.mirrorT || T.clampS || T.mirrorS )
 	//	fprintf(stderr, "cT = %i, mT = %i, cS = %i, mS = %i\n", !!T.clampT, !!T.mirrorT, !!T.clampS, !!T.mirrorS);
-	if( T.shiftS || T.shiftT )
-		fprintf(stderr, "shiftS = %X, shiftT = %X\n", T.shiftS, T.shiftT);
+	//if( T.shiftS || T.shiftT )
+	//	fprintf(stderr, "shiftS = %X, shiftT = %X\n", T.shiftS, T.shiftT);
 }
 
 void n64_rdp::texture_rect(u64 cmd0, u64 cmd1)
@@ -272,24 +285,27 @@ void n64_rdp::texture_rect(u64 cmd0, u64 cmd1)
 	u32 lrY = ((cmd0>>32)&0xfff)>>2;
 	u32 ulX = ((cmd0>>12)&0xfff)>>2;
 	u32 ulY = (cmd0&0xfff)>>2;
-	s32 S = ((cmd1>>48)&0xffff); S <<= 16; S >>= 16; S <<= 5;
-	s32 T = ((cmd1>>32)&0xffff); T <<= 16; T >>= 16; T <<= 5;
-	s32 DsDx = ((cmd1>>16)&0xffff); DsDx <<= 16; DsDx >>= 16;
-	s32 DtDy = (cmd1&0xffff); DtDy <<= 16; DtDy >>= 16;
+	s32 S = ((cmd1>>48)&0xffff)<<16; S >>= 16; S <<= 5;
+	s32 T = ((cmd1>>32)&0xffff)<<16; T >>= 16; T <<= 5;
+	s32 DsDx = ((cmd1>>16)&0xffff)<<16; DsDx >>= 16;
+	s32 DtDy = (cmd1&0xffff)<<16; DtDy >>= 16;
 	if( other.cycle_type == CYCLE_TYPE_COPY ) 
 	{	// convert copy mode to 1/2cycle mode values.
 		if( tiles[tile].bpp != 16 ) 
 		{
-			printf("RDP: COPY mode in bpp %i\n", tiles[tile].bpp);
-			exit(1);
+			//printf("RDP: COPY mode in bpp %i\n", tiles[tile].bpp);
+			//exit(1);
 		}
 		DsDx /= 4;  // probably need other values for when bpp != 16
 		lrY += 1;
 		lrX += 1;
+	} else {
+		//lrY += 1;
+		//lrX += 1;
 	}
 	
 	//fprintf(stderr, "texrect t%i (%i, %i) to (%i, %i)\n\tst(%X, %X), d(%X,%X)\n\n", 
-	//	other.cycle_type, ulX, ulY, lrX, lrY, S, T, DsDx, DtDy);
+	//	other.cycle_type, ulX, ulY, lrX, lrY, S>>10, T>>10, DsDx, DtDy);
 		
 	if( cimg.bpp == 16 )
 	{
@@ -306,7 +322,7 @@ void n64_rdp::texture_rect(u64 cmd0, u64 cmd1)
 			}
 		}	
 	} else if( cimg.bpp == 32 ) {
-		for(u32 Y = ulY; Y <= lrY; ++Y, T += DtDy)
+		for(u32 Y = ulY; Y < lrY; ++Y, T += DtDy)
 		{
 			s32 Sl = S;
 			for(u32 X = ulX; X < lrX; ++X, Sl += DsDx)
@@ -330,15 +346,16 @@ void n64_rdp::texture_rect_flip(u64 cmd0, u64 cmd1)
 	u32 ulY = (cmd0&0xfff)>>2;
 	s32 S = ((cmd1>>48)&0xffff)<<16; S >>= 16; S <<= 5;
 	s32 T = ((cmd1>>32)&0xffff)<<16; T >>= 16; T <<= 5;
-	s32 DsDx = ((cmd1>>16)&0xffff); DsDx <<= 16; DsDx >>= 16;
-	s32 DtDy = (cmd1&0xffff); DtDy <<= 16; DtDy >>= 16;
+	s32 DsDx = ((cmd1>>16)&0xffff)<<16; DsDx >>= 16;
+	s32 DtDy = (cmd1&0xffff)<<16; DtDy >>= 16;
 	if( other.cycle_type == CYCLE_TYPE_COPY ) 
 	{	// convert copy mode to 1/2cycle mode values.
 		DsDx /= 4;  // probably need other values for when bpp != 16
 		lrY += 1;
 		lrX += 1;
 	} else {
-		//DtDy *= 4;
+		//lrY += 1;
+		//lrX += 1;
 	}
 	
 	if( cimg.bpp == 16 )
@@ -356,12 +373,16 @@ void n64_rdp::texture_rect_flip(u64 cmd0, u64 cmd1)
 			}
 		}	
 	} else if( cimg.bpp == 32 ) {
-		for(u32 Y = ulY; Y <= lrY; ++Y, T += DtDy)
+		for(u32 Y = ulY; Y < lrY; ++Y, T += DtDy)
 		{
 			s32 Sl = S;
 			for(u32 X = ulX; X < lrX; ++X, Sl += DsDx)
 			{
-				*(u32*)&rdram[(cimg.addr + (Y*cimg.width*4) + X*4)&0x7ffffc] = tex_sample(tile, 32, T, Sl);
+				u32 sample = tex_sample(tile, 32, T, Sl);
+				if( other.alpha_compare_en && !(__builtin_bswap32(sample)&0xff) ) continue;
+				if( other.force_blend && !(__builtin_bswap32(sample)&0xff) ) continue;
+				
+				*(u32*)&rdram[(cimg.addr + (Y*cimg.width*4) + X*4)&0x7ffffc] = sample;
 			}
 		}	
 	}	
@@ -392,8 +413,24 @@ u32 n64_rdp::tex_sample(u32 tile, u32 bpp, s32 s, s32 t)
 	//t += 0x400;
 	s >>= 10;
 	t >>= 10;
+	
 	s -= T.SL>>2;
 	t -= T.TL>>2;
+
+	if( T.shiftS < 11 ) 
+	{
+		s >>= T.shiftS;
+	} else {
+		s <<= 16-T.shiftS;
+	}
+	if( T.shiftT < 11 ) 
+	{
+		t >>= T.shiftT;
+	} else {
+		t <<= 16-T.shiftT;
+	}
+
+	
 	if( T.mirrorS )
 	{
 		u32 mbit = s & (1u<<(T.maskS+0));
@@ -431,7 +468,7 @@ u32 n64_rdp::tex_sample(u32 tile, u32 bpp, s32 s, s32 t)
 		if( T.format == 2 )
 		{
 			u8 v = tmem[(T.addr*8 + (t*T.line*8) + (s>>1))&0xfff];
-			v >>= (s&1)*4;
+			v >>= ((s^1)&1)*4;
 			v &= 15;
 			res = dc::from16(__builtin_bswap16(*(u16*)&tmem[((0x100+T.palette*16+v)*8)&0xfff]));
 		}
@@ -491,8 +528,8 @@ void n64_rdp::load_block(u64 cmd)
 	auto& T = tiles[(cmd>>24)&7];
 	u32 ulT = (cmd>>34)&0x3ff;
 	u32 ulS = (cmd>>46)&0x3ff;
-	T.SL = ulS<<2;
-	T.TL = ulT<<2;
+	//T.SL = ulS<<2;
+	//T.TL = ulT<<2;
 	u32 num_texels = lrS - ulS + 1;
 	if( num_texels > 2048 ) 
 	{
@@ -500,14 +537,25 @@ void n64_rdp::load_block(u64 cmd)
 		exit(1);
 		return;
 	}
-	u32 num_bytes = ((num_texels*T.bpp)+7)/8;
-	u32 swpcnt = dxt;
-	u32 ramoff = teximg.addr + ((ulS*T.bpp+7)/8);
-	u32 t = 0;
-	for(u32 i = 0; i < ((num_bytes+7)/8); ++i)
+	if( T.bpp == 32 )
 	{
-		u64 dw = *(u64*)&rdram[ramoff + ((ulT*teximg.width*T.bpp+7)/8) + (i*8)];
-		u32 taddr = (T.addr + T.line*t + i)*8;
+		//printf("32bit load block\n");
+		//exit(1);
+	}
+	if( ulS != 0 )
+	{
+		printf("ulT was $%X\n", ulT);
+		exit(1);
+	}
+	//fprintf(stderr, "load_block: $%X, $%X, $%X, %ibpp, num_texels = $%X\n", ulS, ulT, lrS, T.bpp, num_texels);
+	u32 num_bytes = num_texels*8; // TIMES EIGHT?? WTF. yep, times8 makes both mario, starfox, and lcars work
+	u32 swpcnt = dxt;
+	u32 ramoff = teximg.addr;// + ((ulS*T.bpp+7)/8);// + ((ulT*teximg.width*T.bpp+7)/8);
+	u32 t = 0;
+	u32 taddr = (T.addr + T.line*t)*8;
+	for(u32 i = 0; i < ((num_bytes+7)/8); ++i, taddr+=8, ramoff+=8)
+	{
+		u64 dw = *(u64*)&rdram[ramoff];
 		//if( swpcnt & BIT(11) ) dw = (dw<<32)|(dw>>32);
 		*(u64*)&tmem[taddr&0xfff] = dw;
 		swpcnt += dxt;
@@ -537,4 +585,12 @@ void n64_rdp::load_tlut(u64 cmd)
 		*(u64*)&tmem[(T.addr*8 + i*8)&0xfff] = p;
 	}
 }
+
+
+
+
+
+
+
+
 

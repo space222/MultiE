@@ -275,6 +275,8 @@ AI: Audio works. Not supporting the delayed carry hardware bug.
 PIF: one controller and only D-pad + a/b/z/start currently implemented and working in namco.
 	If the cmd byte in pifram gets the bit zero cleared, namco stops getting input.
 Notes (latest first):
+	Load Block having num_bytes be num_texels*8 instead of an actual bpp calc makes mario, starfox, and LCARS look way better.
+		This is probably papering over a different bug?
 	After c/p'ing pif hle code from dillonb/n64 to see how far off I was, there was no change until I
 	zero'd out the response to EEPROM/Pak commands and now a bunch of games boot.
 	After implementing LWC1/MTC1 and friends half mode odd registers, Namco's title screen and menu button music/sounds function.

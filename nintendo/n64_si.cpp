@@ -92,10 +92,14 @@ void n64::pif_run()
 				if( keys[SDL_SCANCODE_Z] ) res[0] ^= 0x40; // B
 				if( keys[SDL_SCANCODE_A] ) res[0] ^= 0x20; // Z
 				if( keys[SDL_SCANCODE_S] ) res[0] ^= 0x10; // Start
-				if( keys[SDL_SCANCODE_UP] ) res[0] ^= 8;
-				if( keys[SDL_SCANCODE_DOWN] ) res[0] ^= 4;
-				if( keys[SDL_SCANCODE_LEFT] ) res[0] ^= 2;
-				if( keys[SDL_SCANCODE_RIGHT] ) res[0] ^= 1;
+				//if( keys[SDL_SCANCODE_UP] ) res[0] ^= 8;
+				//if( keys[SDL_SCANCODE_DOWN] ) res[0] ^= 4;
+				//if( keys[SDL_SCANCODE_LEFT] ) res[0] ^= 2;
+				//if( keys[SDL_SCANCODE_RIGHT] ) res[0] ^= 1;
+				if( keys[SDL_SCANCODE_UP] ) res[3] = 120;
+				else if( keys[SDL_SCANCODE_DOWN] ) res[3] = -120;
+				if( keys[SDL_SCANCODE_LEFT] ) res[2] = -120;
+				else if( keys[SDL_SCANCODE_RIGHT] ) res[2] = 120;
 			} else {
 				res[0] = res[1] = res[2] = res[3] = 0;	
 			}
