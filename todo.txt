@@ -255,6 +255,13 @@ Overall:
 1. Triangle shading.
 2. Triangle texturing.
 3. Triangle zbuffing.
+4. Fix last few vector instructions.
+5. Fix FPU rounding and conversions.
+6. Implement FPU underflow and flushing.
+7. Pass PI DMA small and unaligned tests.
+8. Optimize any low hanging fruit (RSP instruction caching? RDP on sep. thread?)
+9. Fix EEPROM and Pak joybus/pif access.
+10. Fix any segfaults.
 VR4300:
 1. Continue to improve FPU instructions, figure out underflow. Other than TLB, that's about all that's left for CPU.
 2. TLB?

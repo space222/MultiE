@@ -590,7 +590,7 @@ rsp_instr rsp_cop2(n64_rsp&, u32 opcode)
 			vreg res;
 			for(u32 i = 0; i < 8; ++i)
 			{
-				if( !VCO_BIT && !VCO_HI_BIT )
+				/*if( !VCO_BIT && !VCO_HI_BIT )
 				{
 					rsp.VCC &= ~BIT(i+8);
 					rsp.VCC |= ((rsp.v[vs].w(i) >= rsp.v[vt].w(BC(i))) ? BIT(i+8) : 0);
@@ -606,8 +606,41 @@ rsp_instr rsp_cop2(n64_rsp&, u32 opcode)
 				u16 vtabs = (VCO_BIT ? -rsp.v[vt].sw(BC(i)) : rsp.v[vt].sw(BC(i)));
 				rsp.a[i] &= ~0xffffull;
 				rsp.a[i] |= res.w(i) = (clip ? vtabs : rsp.v[vs].w(i));
+				*/
+				u16 vs_element = rsp.v[vs].w(i);// vs->elements[i];
+				u16 vte_element = rsp.v[vt].w(BC(i)); // vte.elements[i];
+				rsp.a[i] &= ~0xffffull;
+				
+				if( VCO_BIT ) //N64RSP.vco.l.elements[i]) 
+				{
+					if( VCO_HI_BIT ) //N64RSP.vco.h.elements[i]) 
+					{
+						rsp.a[i] |= u16(VCC_BIT ? -vte_element : vs_element);
+					} else {
+						u16 clamped_sum = vs_element + vte_element;
+						bool overflow = (vs_element + vte_element) != clamped_sum;
+						rsp.VCC &= ~BIT(i);
+						if( VCE_BIT ) {
+							rsp.VCC |= (!clamped_sum || !overflow) ? BIT(i) : 0;
+							rsp.a[i] |= u16(VCC_BIT ? -vte_element : vs_element);
+						} else {
+							rsp.VCC |= (!clamped_sum && !overflow) ? BIT(i) : 0;
+							rsp.a[i] |= u16(VCC_BIT ? -vte_element : vs_element);
+						}
+					}
+				} else {
+					if( VCO_HI_BIT ) //N64RSP.vco.h.elements[i]) 
+					{
+						rsp.a[i] |= u16(VCC_HI_BIT ? vte_element : vs_element);
+					} else {
+						rsp.VCC &= ~BIT(i+8);
+						rsp.VCC |= ((s32)vs_element - (s32)vte_element >= 0) ? BIT(i+8) : 0;
+						rsp.a[i] |= u16(VCC_HI_BIT ? vte_element : vs_element);
+					}
+				}   
+				res.w(i) = rsp.a[i] & 0xffff;
 			}
-			rsp.VCE = 0;		
+			rsp.VCE = rsp.VCO = 0;		
 			rsp.v[vd] = res;		
 		};		
 	case 0x25: // VCH  //todo: not correct
@@ -617,7 +650,7 @@ rsp_instr rsp_cop2(n64_rsp&, u32 opcode)
 			rsp.VCC = rsp.VCE = rsp.VCO = 0;
 			for(u32 i = 0; i < 8; ++i)
 			{
-				rsp.VCO |= (((rsp.v[vs].sw(i) ^ rsp.v[vt].sw(BC(i)))<0) ? BIT(i) : 0);
+				/*rsp.VCO |= (((rsp.v[vs].sw(i) ^ rsp.v[vt].sw(BC(i)))<0) ? BIT(i) : 0);
 				s16 vtabs = (VCO_BIT ? -rsp.v[vt].sw(BC(i)) : rsp.v[vt].sw(BC(i)));
 				rsp.VCE |= ((VCO_BIT && (rsp.v[vs].sw(i) == (-rsp.v[vt].sw(BC(i)) - 1)))?BIT(i):0);
 				rsp.VCO |= ((!VCE_BIT && (rsp.v[vs].sw(i) != vtabs))?BIT(i+8):0);
@@ -625,7 +658,30 @@ rsp_instr rsp_cop2(n64_rsp&, u32 opcode)
 				rsp.VCC |= ((rsp.v[vs].sw(i) >= rsp.v[vt].sw(BC(i)))?BIT(i+8):0);
 				bool clip = (VCO_BIT ? VCC_BIT : VCC_HI_BIT);
 				rsp.a[i] &= ~0xffffull;
-				rsp.a[i] |= res.w(i) = u16(clip ? vtabs : rsp.v[vs].w(i));
+				rsp.a[i] |= res.w(i) = u16(clip ? vtabs : rsp.v[vs].w(i));*/
+				s16 vs_element = rsp.v[vs].sw(i);// vs->signed_elements[i];
+				s16 vte_element = rsp.v[vt].sw(BC(i)); //vte.signed_elements[i];
+
+				rsp.a[i] &= ~0xffffull;
+
+				if ((vs_element ^ vte_element) < 0) {
+				    s16 result = vs_element + vte_element;
+
+				    rsp.a[i] |= u16(result <= 0 ? -vte_element : vs_element);
+				    rsp.VCC |= (result <= 0) ? BIT(i) : 0;
+				    rsp.VCC |= (vte_element < 0) ? BIT(i+8) : 0;
+				    rsp.VCO |= BIT(i);
+				    rsp.VCO |= (result != 0 && (u16)vs_element != ((u16)vte_element ^ 0xFFFF)) ? BIT(i+8) : 0;
+					rsp.VCE |= (result == -1) ? BIT(i) : 0;				    
+				} else {
+				    s16 result = vs_element - vte_element;
+				    rsp.a[i] |= u16(result >= 0 ? vte_element : vs_element);
+				    rsp.VCC |= (vte_element < 0) ? BIT(i) : 0;
+				    rsp.VCC |= (result >= 0) ? BIT(i+8) : 0;
+				    rsp.VCO |= (result != 0 && (u16)vs_element != ((u16)vte_element ^ 0xFFFF)) ? BIT(i+8) : 0;
+				}
+
+				res.w(i) = rsp.a[i] & 0xffff;
 			}
 			rsp.v[vd] = res;
 		};
@@ -636,7 +692,7 @@ rsp_instr rsp_cop2(n64_rsp&, u32 opcode)
 			rsp.VCC = 0;
 			for(u32 i = 0; i < 8; ++i)
 			{
-				s16 s = rsp.v[vs].w(i);
+				/*s16 s = rsp.v[vs].w(i);
 				s16 t = rsp.v[vt].w(BC(i));
 				u32 sign = (s ^ t) & BIT(15);
 				u32 nt = t ^ (sign ? 0xffff : 0);
@@ -647,7 +703,31 @@ rsp_instr rsp_cop2(n64_rsp&, u32 opcode)
 				u16 result = (sign ? le : ge) ? nt : s;
 				rsp.a[i] &= ~0xffffull;
 				rsp.a[i] |= result;
+				res.w(i) = result;*/
+				u16 vs_element = rsp.v[vs].w(i); //vs->elements[i];
+				u16 vte_element = rsp.v[vt].w(BC(i)); //vte.elements[i];
+
+				bool sign_different = (0x8000 & (vs_element ^ vte_element)) == 0x8000;
+
+				// If vte and vs have different signs, make this negative vte
+				u16 vt_abs = sign_different ? ~vte_element : vte_element;
+
+				// Compare using one's complement
+				bool gte = (s16)vte_element <= (s16)(sign_different ? 0xFFFF : vs_element);
+				bool lte = (((sign_different ? vs_element : 0) + vte_element) & 0x8000) == 0x8000;
+
+				// If the sign is different, check LTE, otherwise, check GTE.
+				bool check = sign_different ? lte : gte;
+				u16 result = check ? vt_abs : vs_element;
+
+				rsp.a[i] &= ~0xffffull;
+				rsp.a[i] |= result;
 				res.w(i) = result;
+	
+				rsp.VCC |= gte ? BIT(i+8) : 0;
+				rsp.VCC |= lte ? BIT(i) : 0;
+				//N64RSP.vcc.h.elements[i] = FLAGREG_BOOL(gte);
+				//N64RSP.vcc.l.elements[i] = FLAGREG_BOOL(lte);
 			}
 			rsp.v[vd] = res;
 			rsp.VCE = rsp.VCO = 0;
@@ -924,7 +1004,7 @@ rsp_instr rsp_lwc2(n64_rsp&, u32 opcode)
 	
 	case 10: return INSTR {}; // LWV doesn't do anything
 	
-	default: printf("RSP LWC2: fme unimpl opcode $%X\n", (opcode>>11)&0x1f);
+	default: //printf("RSP LWC2: fme unimpl opcode $%X\n", (opcode>>11)&0x1f);
 		 //exit(1);
 		 return INSTR {};
 	}
@@ -1023,7 +1103,7 @@ rsp_instr rsp_swc2(n64_rsp&, u32 opcode)
 		};
 		
 	
-	default: printf("RSP SWC2: unimpl opcode $%X\n", (opcode>>11)&0x1f);
+	default: //printf("RSP SWC2: unimpl opcode $%X\n", (opcode>>11)&0x1f);
 		 //exit(1);
 		 return INSTR {};
 	}

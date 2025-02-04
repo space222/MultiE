@@ -1,3 +1,4 @@
+#include <print>
 #include <string>
 #include <cstdio>
 #include <cstring>
@@ -6,15 +7,19 @@
 
 const u32 imgbpp[] = { 4, 8, 16, 32 };
 
+#define field(f, d, a) (((f)>>(d))&(a))
+
 void n64_rdp::recv(u64 cmd)
 {
-	u8 cmdbyte = 0;
-	if( cmdbuf.empty() ) 
+	//u8 cmdbyte = 0;
+	/*if( cmdbuf.empty() ) 
 	{
 		cmdbyte = (cmd>>56)&0x3F;
 	} else {
 		cmdbyte = (cmdbuf[0]>>56)&0x3F;
-	}
+	}*/
+	cmdbuf.push_back(cmd);
+	u8 cmdbyte = (cmdbuf[0]>>56)&0x3F;
 	//printf("RDP Cmd $%X\n", u8((cmd>>56)&0x3F));
 	switch( cmdbyte )
 	{
@@ -27,26 +32,72 @@ void n64_rdp::recv(u64 cmd)
 	case 0x0E:
 	case 0x0F:
 		{ // basic non-anything flat triangle
-		cmdbuf.push_back(cmd);
 		if( cmdbuf.size() < u32(4 + ((cmdbyte&4)?8:0) + ((cmdbyte&2)?8:0) + ((cmdbyte&1)?2:0) ) ) return;
-		if( cmdbyte&4 )
-		{
-			u8 r = cmdbuf[4]>>48;
-			u8 g = cmdbuf[4]>>32;
-			u8 b = cmdbuf[4]>>16;
-			fill_color = ( (r<<24)|(g<<16)|(b<<8)|0xff );
-			blend_color = dc::from32(fill_color);
+		RS.cmd = cmdbyte;
+		RS.y3 = s32(((cmdbuf[0]>>32)&0x3FFF) << 19); RS.y3 >>= 5;
+		RS.y2 = s32(((cmdbuf[0]>>16)&0x3FFF) << 19); RS.y2 >>= 5;
+		RS.y1 = s32((cmdbuf[0]&0x3FFF) << 19); RS.y1 >>= 5;
+		RS.xl = s32((cmdbuf[1]>>32)<<4); RS.xl >>= 4;
+		RS.xm = s32((cmdbuf[3]>>32)<<4); RS.xm >>= 4;
+		RS.xh = s32((cmdbuf[2]>>32)<<4); RS.xh >>= 4;
+		RS.DxlDy = s32((cmdbuf[1]<<2)); RS.DxlDy >>= 2;
+		RS.DxhDy = s32((cmdbuf[2]<<2)); RS.DxhDy >>= 2;
+		RS.DxmDy = s32((cmdbuf[3]<<2)); RS.DxmDy >>= 2;
+		TX.tile = (cmdbuf[0]>>48)&7;
+		u32 i = 4;
+		
+		if( cmdbyte & 4 )
+		{ // grab shade attributes
+			RS.r = (field(cmdbuf[i], 48, 0xffff)<<16)|field(cmdbuf[i+2], 48, 0xffff);
+			RS.g = (field(cmdbuf[i], 32, 0xffff)<<16)|field(cmdbuf[i+2], 32, 0xffff);
+			RS.b = (field(cmdbuf[i], 16, 0xffff)<<16)|field(cmdbuf[i+2], 16, 0xffff);
+			RS.a = (field(cmdbuf[i], 0, 0xffff)<<16)|field(cmdbuf[i+2], 0, 0xffff);
+			//std::println("r{:X}, g{:X}, b{:X}", RS.r, RS.g, RS.b);
+			RS.DrDx = s32(field(cmdbuf[i+1], 48, 0xffff)<<16)|field(cmdbuf[i+3], 48, 0xffff);
+			RS.DgDx = s32(field(cmdbuf[i+1], 32, 0xffff)<<16)|field(cmdbuf[i+3], 32, 0xffff);
+			RS.DbDx = s32(field(cmdbuf[i+1], 16, 0xffff)<<16)|field(cmdbuf[i+3], 16, 0xffff);
+			RS.DaDx = s32(field(cmdbuf[i+1], 0, 0xffff)<<16)|field(cmdbuf[i+3], 0, 0xffff);
+			RS.DrDe = s32(field(cmdbuf[i+4], 48, 0xffff)<<16)|field(cmdbuf[i+6], 48, 0xffff);
+			RS.DgDe = s32(field(cmdbuf[i+4], 32, 0xffff)<<16)|field(cmdbuf[i+6], 32, 0xffff);
+			RS.DbDe = s32(field(cmdbuf[i+4], 16, 0xffff)<<16)|field(cmdbuf[i+6], 16, 0xffff);
+			RS.DaDe = s32(field(cmdbuf[i+4], 0, 0xffff)<<16)|field(cmdbuf[i+6], 0, 0xffff);
+			RS.DrDy = s32(field(cmdbuf[i+5], 48, 0xffff)<<16)|field(cmdbuf[i+7], 48, 0xffff);
+			RS.DgDy = s32(field(cmdbuf[i+5], 32, 0xffff)<<16)|field(cmdbuf[i+7], 32, 0xffff);
+			RS.DbDy = s32(field(cmdbuf[i+5], 16, 0xffff)<<16)|field(cmdbuf[i+7], 16, 0xffff);
+			RS.DaDy = s32(field(cmdbuf[i+5], 0, 0xffff)<<16)|field(cmdbuf[i+7], 0, 0xffff);	
+			i += 8;
 		}
-		flat_triangle(cmdbuf[0], cmdbuf[1], cmdbuf[2], cmdbuf[3]);
+		if( cmdbyte & 2 )
+		{  // grab tex attributes
+			RS.s = s32(field(cmdbuf[i], 48, 0xffff)<<16)|field(cmdbuf[i+2], 48, 0xffff);
+			RS.t = s32(field(cmdbuf[i], 32, 0xffff)<<16)|field(cmdbuf[i+2], 32, 0xffff);
+			RS.w = s32(field(cmdbuf[i], 16, 0xffff)<<16)|field(cmdbuf[i+2], 16, 0xffff);
+			RS.DsDx =s32(field(cmdbuf[i+1],48,0xffff)<<16)|field(cmdbuf[i+3],48,0xffff);
+			RS.DtDx =s32(field(cmdbuf[i+1],32,0xffff)<<16)|field(cmdbuf[i+3],32,0xffff);
+			RS.DwDx =s32(field(cmdbuf[i+1],16,0xffff)<<16)|field(cmdbuf[i+3],16,0xffff);
+			RS.DsDe =s32(field(cmdbuf[i+4],48,0xffff)<<16)|field(cmdbuf[i+6],48,0xffff);
+			RS.DtDe =s32(field(cmdbuf[i+4],32,0xffff)<<16)|field(cmdbuf[i+6],32,0xffff);
+			RS.DwDe =s32(field(cmdbuf[i+4],16,0xffff)<<16)|field(cmdbuf[i+6],16,0xffff);
+			RS.DsDy =s32(field(cmdbuf[i+5],48,0xffff)<<16)|field(cmdbuf[i+7],48,0xffff);
+			RS.DtDy =s32(field(cmdbuf[i+5],32,0xffff)<<16)|field(cmdbuf[i+7],32,0xffff);
+			RS.DwDy =s32(field(cmdbuf[i+5],16,0xffff)<<16)|field(cmdbuf[i+7],16,0xffff);
+			i += 8;
+		}
+		if( cmdbyte & 1 )
+		{ // grab z attributes
+			RS.z = s32(cmdbuf[i]>>32);
+			RS.DzDx = s32(cmdbuf[i]);
+			RS.DzDe = s32(cmdbuf[i+1]>>32);
+			RS.DzDy = s32(cmdbuf[i+1]);
+		}
+		triangle();
 		}break;
 				
 	case 0x24: // texture rectangle
-		cmdbuf.push_back(cmd);
 		if( cmdbuf.size() < 2 ) return;
 		texture_rect(cmdbuf[0], cmdbuf[1]);
 		break;
 	case 0x25: // texture flipped rect
-		cmdbuf.push_back(cmd);
 		if( cmdbuf.size() < 2 ) return;
 		texture_rect_flip(cmdbuf[0], cmdbuf[1]);
 		break;
@@ -77,6 +128,8 @@ void n64_rdp::recv(u64 cmd)
 		other.cycle_type = (cmd>>52)&3;
 		other.alpha_compare_en = cmd&1;
 		other.force_blend = cmd&BITL(14);
+		other.z_compare = cmd&BITL(4);
+		other.z_write = cmd&BITL(5);
 		//fprintf(stderr, "set other modes = $%lX, ctype = %i\n", cmd, other.cycle_type);
 		break;
 		
@@ -314,11 +367,11 @@ void n64_rdp::texture_rect(u64 cmd0, u64 cmd1)
 			s32 Sl = S;
 			for(u32 X = ulX; X < lrX; ++X, Sl += DsDx)
 			{
-				u16 sample = tex_sample(tile, 16, Sl, T);
-				if( other.alpha_compare_en && !(__builtin_bswap16(sample)&1) ) continue;
-				if( other.force_blend && !(__builtin_bswap16(sample)&1)) continue;
+				u16 sample = tex_sample(tile, Sl, T).to16();
+				if( other.alpha_compare_en && !(sample&1) ) continue;
+				if( other.force_blend && !(sample&1) ) continue;
 				
-				*(u16*)&rdram[cimg.addr + (Y*cimg.width*2) + X*2] = sample;
+				*(u16*)&rdram[cimg.addr + (Y*cimg.width*2) + X*2] = __builtin_bswap16(sample);
 			}
 		}	
 	} else if( cimg.bpp == 32 ) {
@@ -327,11 +380,11 @@ void n64_rdp::texture_rect(u64 cmd0, u64 cmd1)
 			s32 Sl = S;
 			for(u32 X = ulX; X < lrX; ++X, Sl += DsDx)
 			{
-				u32 sample = tex_sample(tile, 32, Sl, T);
-				if( other.alpha_compare_en && !(__builtin_bswap32(sample)&0xff) ) continue;
-				if( other.force_blend && !(__builtin_bswap32(sample)&0xff) ) continue;
+				u32 sample = tex_sample(tile, Sl, T).to32();
+				if( other.alpha_compare_en && !(sample&0xff) ) continue;
+				if( other.force_blend && !(sample&0xff) ) continue;
 				
-				*(u32*)&rdram[cimg.addr + (Y*cimg.width*4) + X*4] = sample;
+				*(u32*)&rdram[cimg.addr + (Y*cimg.width*4) + X*4] = __builtin_bswap32(sample);
 			}
 		}	
 	}
@@ -365,11 +418,11 @@ void n64_rdp::texture_rect_flip(u64 cmd0, u64 cmd1)
 			s32 Sl = S;
 			for(u32 X = ulX; X < lrX; ++X, Sl += DsDx)
 			{
-				u16 sample = tex_sample(tile, 16, T, Sl);
-				if( other.alpha_compare_en && !(__builtin_bswap16(sample)&1) ) continue;
-				if( other.force_blend && !(__builtin_bswap16(sample)&1)) continue;
+				u16 sample = tex_sample(tile, T, Sl).to16();
+				if( other.alpha_compare_en && !(sample&1) ) continue;
+				if( other.force_blend && !(sample&1) ) continue;
 				
-				*(u16*)&rdram[cimg.addr + (Y*cimg.width*2) + X*2] = sample;
+				*(u16*)&rdram[cimg.addr + (Y*cimg.width*2) + X*2] = __builtin_bswap16(sample);
 			}
 		}	
 	} else if( cimg.bpp == 32 ) {
@@ -378,11 +431,11 @@ void n64_rdp::texture_rect_flip(u64 cmd0, u64 cmd1)
 			s32 Sl = S;
 			for(u32 X = ulX; X < lrX; ++X, Sl += DsDx)
 			{
-				u32 sample = tex_sample(tile, 32, T, Sl);
-				if( other.alpha_compare_en && !(__builtin_bswap32(sample)&0xff) ) continue;
-				if( other.force_blend && !(__builtin_bswap32(sample)&0xff) ) continue;
+				u32 sample = tex_sample(tile, T, Sl).to32();
+				if( other.alpha_compare_en && !(sample&0xff) ) continue;
+				if( other.force_blend && !(sample&0xff) ) continue;
 				
-				*(u32*)&rdram[(cimg.addr + (Y*cimg.width*4) + X*4)&0x7ffffc] = sample;
+				*(u32*)&rdram[(cimg.addr + (Y*cimg.width*4) + X*4)&0x7ffffc] = __builtin_bswap32(sample);
 			}
 		}	
 	}	
@@ -406,13 +459,16 @@ void n64_rdp::set_tile_size(u64 cmd)
 	//fprintf(stderr, "Set Tile%i Size = (%i, %i) - (%i, %i)\n", u8((cmd>>24)&7), ulS, ulT, lrS, lrT);
 }
 
-u32 n64_rdp::tex_sample(u32 tile, u32 bpp, s32 s, s32 t)
+n64_rdp::dc n64_rdp::tex_sample(u32 tile, s32 s, s32 t)
 {
 	auto& T = tiles[tile];
 	//s += 0x400;
 	//t += 0x400;
 	s >>= 10;
 	t >>= 10;
+	
+	if( s < 0 ) { s = ~s; }
+	if( t < 0 ) { t = ~t; }	
 	
 	s -= T.SL>>2;
 	t -= T.TL>>2;
@@ -429,7 +485,6 @@ u32 n64_rdp::tex_sample(u32 tile, u32 bpp, s32 s, s32 t)
 	} else {
 		t <<= 16-T.shiftT;
 	}
-
 	
 	if( T.mirrorS )
 	{
@@ -447,22 +502,40 @@ u32 n64_rdp::tex_sample(u32 tile, u32 bpp, s32 s, s32 t)
 	} else if( T.maskT ) {
 		t &= (1<<T.maskT)-1;
 	}
-	
-	dc res;
-	if( T.bpp == 16 )
+
+	if( s > (T.SH>>2) ) 
 	{
-		res = dc::from16(__builtin_bswap16( *(u16*)&tmem[(T.addr*8 + (t*T.line*8) + s*2)&0xffe] ));
+		if( T.clampS ) 
+		{
+			s = T.SH>>2;
+		} else {
+			s %= T.SH>>2;
+		}
+	}
+	if( t > (T.TH>>2) ) 
+	{
+		if( T.clampT ) 
+		{
+			t = T.TH>>2;
+		} else {
+			t %= T.TH>>2;
+		}		
+	}
+	
+	if( T.bpp == 16 ) 
+	{
+		return dc::from16(__builtin_bswap16( *(u16*)&tmem[(T.addr*8 + (t*T.line*8) + s*2)&0xffe] ));
 	} else if( T.bpp == 32 ) {
 		//todo: put the rg/ba in the separate banks
-		res = dc::from32( __builtin_bswap32( *(u32*)&tmem[(T.addr*8 + (t*T.line*8) + s*4)&0xffc] ));
+		return dc::from32( __builtin_bswap32( *(u32*)&tmem[(T.addr*8 + (t*T.line*8) + s*4)&0xffc] ));
 	} else if( T.bpp == 8 ) {
 		if( T.format == 2 )
 		{
 			u8 v = tmem[(T.addr*8 + (t*T.line*8) + s)&0xfff];
-			res = dc::from16(__builtin_bswap16(*(u16*)&tmem[(0x100+v)*8]));
+			return dc::from16(__builtin_bswap16(*(u16*)&tmem[(0x100+v)*8]));
 		} else {
 			u8 v = tmem[(T.addr*8 + (t*T.line*8) + s)&0xfff];
-			res = dc::from32((v<<24)|(v<<16)|(v<<8)|v);
+			return dc::from32((v<<24)|(v<<16)|(v<<8)|v);
 		}
 	} else if( T.bpp == 4 ) {
 		if( T.format == 2 )
@@ -470,54 +543,179 @@ u32 n64_rdp::tex_sample(u32 tile, u32 bpp, s32 s, s32 t)
 			u8 v = tmem[(T.addr*8 + (t*T.line*8) + (s>>1))&0xfff];
 			v >>= ((s^1)&1)*4;
 			v &= 15;
-			res = dc::from16(__builtin_bswap16(*(u16*)&tmem[((0x100+T.palette*16+v)*8)&0xfff]));
+			return dc::from16(__builtin_bswap16(*(u16*)&tmem[((0x100+T.palette*16+v)*8)&0xfff]));
 		}
 	}
 	
-	if( bpp == 32 ) return __builtin_bswap32(res.to32());
-	return ( __builtin_bswap16(res.to16()) );
+	if( !(T.bpp == 4 && T.format == 3) && !(T.bpp == 4 && T.format == 4) )
+	{
+		std::println(stderr, "tex_sample, tile bpp{}, format{} unsupported.", T.bpp, T.format);
+	}
+	return dc::from32(0);
 }
 
-void n64_rdp::flat_triangle(u64 cmd0, u64 cmd1, u64 cmd2, u64 cmd3)
+#define ATTR_YINC RS.r += RS.DrDe;  \
+		 RS.g += RS.DgDe;  \
+		 RS.b += RS.DbDe;  \
+		 RS.a += RS.DaDe;  \
+		 RS.s += (RS.DsDe>>5);  \
+		 RS.t += (RS.DtDe>>5); \
+		 RS.z += RS.DzDe
+		 
+#define ATTR_XDEC r -= RS.DrDx;  \
+		  g -= RS.DgDx;  \
+		  b -= RS.DbDx;  \
+		  a -= RS.DaDx;  \
+		  s -= (RS.DsDx>>5); \
+		  t -= (RS.DtDx>>5); \
+		  z -= RS.DzDx
+		  
+#define ATTR_XINC r += RS.DrDx;  \
+		  g += RS.DgDx;  \
+		  b += RS.DbDx;  \
+		  a += RS.DaDx;  \
+		  s += (RS.DsDx>>5); \
+		  t += (RS.DtDx>>5); \
+		  z += RS.DzDx
+
+void n64_rdp::triangle()
 {
-	//todo: actually use the settings to determine color outside fill mode
-	u32 flat_color = (other.cycle_type == CYCLE_TYPE_FILL) ? fill_color : ((blend_color.to16()<<16)|blend_color.to16());
-	bool left = cmd0 & BITL(55);
-	s64 Y3 = s32(((cmd0>>32)&0x3FFF) << 19); Y3 >>= 5;
-	s64 Y2 = s32(((cmd0>>16)&0x3FFF) << 19); Y2 >>= 5;
-	s64 Y1 = s32((cmd0&0x3FFF) << 19); Y1 >>= 5;
-	//printf("flattri %f, %f, %f\n", Y1/65536.f, Y2/65536.f, Y3/65536.f);
+	const bool right = (cmdbuf[0] & BITL(55));
+	
+	//RS.s *= 2;
+	//RS.t *= 2;
 		
-	s64 XL = s32((cmd1>>32)<<4); XL >>= 4;
-	s64 ISL = s32((cmd1<<2)); ISL >>= 2;
-	s64 XH = s32((cmd2>>32)<<4); XH >>= 4;
-	s64 ISH = s32((cmd2<<2)); ISH >>= 2;
-	s64 XM = s32((cmd3>>32)<<4); XM >>= 4;
-	s64 ISM = s32((cmd3<<2)); ISM >>= 2;
-	
-	if( !left ) { std::swap(XH, XM); std::swap(ISH, ISM); }
-	
-	s64 X1 = XH;
-	s64 X2 = XM;
-	for(s64 Y = Y1>>16; Y <= Y3>>16; ++Y)
+	if( !right )
 	{
-		if( Y >= scissor.lrY ) return;
-		if( Y >= scissor.ulY )
+		for(s64 y = RS.y1>>16; y < RS.y2>>16 && y < scissor.lrY; ++y)
 		{
-			for(s64 X = X1>>16; X <= X2>>16; ++X)
+			s64 r = RS.r;
+			s64 g = RS.g;
+			s64 b = RS.b;
+			s64 a = RS.a;
+			s64 s = RS.s;
+			s64 t = RS.t;
+			s64 z = RS.z;
+			if( y >= 0 )
+			for(s64 x = RS.xh>>16; x >= RS.xm>>16; --x)
 			{
-				if( X < scissor.ulX || X > scissor.lrX ) continue;
+				if( x < 0 || x > scissor.lrX ) break;
+				u16 Z = z>>16;//1/(z/65536.f);
+				if( other.z_compare && Z > *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] ) continue;
+				if( other.z_write) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = Z;
+				dc col = ((RS.cmd & 4) ? dc(r>>16,g>>16,b>>16,a>>16) : dc::from32(0xffffffffu));
+				if( RS.cmd & 2 ) col *= tex_sample(TX.tile, s>>5, t>>5);
 				if( cimg.bpp == 16 )
 				{
-					*(u16*)&rdram[cimg.addr + (Y*cimg.width*2) + X*2] = __builtin_bswap16(u16(flat_color>>((X&1)*16)));
+					//if( !other.alpha_compare_en || (col.to16()&1) ) 
+					if( !other.force_blend || (col.to16()&1) ) 
+						*(u16*)&rdram[cimg.addr + (cimg.width*2*y) + (x*2)]=__builtin_bswap16(col.to16());
 				} else {
-					*(u32*)&rdram[cimg.addr + (Y*cimg.width*4) + X*4] = __builtin_bswap32(flat_color);
+				//*(u32*)&rdram[cimg.addr + (cimg.width*4*y) + (x*4)] = __builtin_bswap32(col.to32());
 				}
+				ATTR_XDEC;
 			}
+			RS.xh += RS.DxhDy;
+			RS.xm += RS.DxmDy;
+			ATTR_YINC;
 		}
-		X1 += ISH;
-		X2 += ISM;
-		if( Y == Y2>>16 ) { if( left ) { X2 = XL; ISM = ISL; } else { X1 = XL; ISH=ISL; } }
+		for(s64 y = RS.y2>>16; y < RS.y3>>16 && y < scissor.lrY; ++y)
+		{
+			s64 r = RS.r;
+			s64 g = RS.g;
+			s64 b = RS.b;
+			s64 a = RS.a;
+			s64 s = RS.s;
+			s64 t = RS.t;
+			s64 z = RS.z;
+			if( y >= 0 )
+			for(s64 x = RS.xh>>16; x >= RS.xl>>16; --x)
+			{
+				if( x < 0 || x > scissor.lrX ) break;
+				u16 Z = z>>16;//1/(z/65536.f);
+				if( other.z_compare && Z > *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] ) continue;
+				if( other.z_write ) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = Z;
+				dc col = ((RS.cmd & 4) ? dc(r>>16,g>>16,b>>16,a>>16) : dc::from32(0xffffffffu));
+				if( RS.cmd & 2 ) col *= tex_sample(TX.tile, s>>5, t>>5);
+				if( cimg.bpp == 16 )
+				{
+					//if( !other.alpha_compare_en || (col.to16()&1) ) 
+					if( !other.force_blend || (col.to16()&1) ) 
+						*(u16*)&rdram[cimg.addr + (cimg.width*2*y) + (x*2)]=__builtin_bswap16(col.to16());
+				} else {
+				//*(u32*)&rdram[cimg.addr + (cimg.width*4*y) + (x*4)] = __builtin_bswap32(col.to32());
+				}
+				ATTR_XDEC;
+			}
+			RS.xh += RS.DxhDy;
+			RS.xl += RS.DxlDy;
+			ATTR_YINC;
+		}	
+	} else {
+		for(s64 y = RS.y1>>16; y < RS.y2>>16 && y < scissor.lrY; ++y)
+		{
+			s64 r = RS.r;
+			s64 g = RS.g;
+			s64 b = RS.b;
+			s64 a = RS.a;
+			s64 s = RS.s;
+			s64 t = RS.t;
+			s64 z = RS.z;
+			if( y >= 0 )
+			for(s64 x = RS.xh>>16; x <= RS.xm>>16; ++x)
+			{
+				if( x < 0 || x > scissor.lrX ) break;
+				u16 Z = z>>16;//1/(z/65536.f);
+				if( other.z_compare && Z > *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] ) continue;
+				if( other.z_write) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = Z;
+				dc col = ((RS.cmd & 4) ? dc(r>>16,g>>16,b>>16,a>>16) : dc::from32(0xffffffffu));
+				if( RS.cmd & 2 ) col *= tex_sample(TX.tile, s>>5, t>>5);
+				if( cimg.bpp == 16 )
+				{
+					//if( !other.alpha_compare_en || (col.to16()&1) ) 
+					if( !other.force_blend || (col.to16()&1) ) 
+						*(u16*)&rdram[cimg.addr + (cimg.width*2*y) + (x*2)]=__builtin_bswap16(col.to16());
+				} else {
+				//*(u32*)&rdram[cimg.addr + (cimg.width*4*y) + (x*4)] = __builtin_bswap32(col.to32());
+				}
+				ATTR_XINC;
+			}
+			RS.xh += RS.DxhDy;
+			RS.xm += RS.DxmDy;
+			ATTR_YINC;
+		}
+		for(s64 y = RS.y2>>16; y < RS.y3>>16 && y < scissor.lrY; ++y)
+		{
+			s64 r = RS.r;
+			s64 g = RS.g;
+			s64 b = RS.b;
+			s64 a = RS.a;
+			s64 s = RS.s;
+			s64 t = RS.t;
+			s64 z = RS.z;
+			if( y >= 0 )
+			for(s64 x = RS.xh>>16; x <= RS.xl>>16; ++x)
+			{
+				if( x < 0 || x > scissor.lrX ) break;
+				u16 Z = z>>16;//1/(z/65536.f);
+				if( other.z_compare && Z > *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] ) continue;
+				if( other.z_write) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = Z;
+				dc col = ((RS.cmd & 4) ? dc(r>>16,g>>16,b>>16,a>>16) : dc::from32(0xffffffffu));
+				if( RS.cmd & 2 ) col *= tex_sample(TX.tile, s>>5, t>>5);
+				if( cimg.bpp == 16 )
+				{
+					//if( !other.alpha_compare_en || (col.to16()&1) ) 
+					if( !other.force_blend || (col.to16()&1) ) 
+						*(u16*)&rdram[cimg.addr + (cimg.width*2*y) + (x*2)]=__builtin_bswap16(col.to16());
+				} else {
+				//*(u32*)&rdram[cimg.addr + (cimg.width*4*y) + (x*4)] = __builtin_bswap32(col.to32());
+				}
+				ATTR_XINC;
+			}
+			RS.xh += RS.DxhDy;
+			RS.xl += RS.DxlDy;
+			ATTR_YINC;
+		}
 	}
 }
 

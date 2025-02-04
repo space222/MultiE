@@ -114,21 +114,22 @@ void n64::pif_run()
                         //unimplemented(cmdlen != 35, "Mempak write with cmdlen != 35");
                         //unimplemented(reslen != 1, "Mempak write with reslen != 1");
                        // pif_mempak_write(cmd, res);
-                                               memset(res, 0, reslen);
+                       // memset(res, 0, reslen);
+                        res[0] = cmd[3]; // which byte in cmd?
                         break;
                     case PIF_COMMAND_EEPROM_READ:
                         //unimplemented(cmdlen != 2, "EEPROM read with cmdlen != 2");
                         //unimplemented(reslen != 8, "EEPROM read with reslen != 8");
-                        //unimplemented(n64sys.mem.save_data == NULL, "EEPROM read when save data is uninitialized! Is this game in the game DB?");		
-                                                memset(res, 0, reslen);
+                   //unimplemented(n64sys.mem.save_data == NULL, "EEPROM read when save data is uninitialized! Is this game in the game DB?");		
+                        memset(res, 0, reslen);
                         //pif_eeprom_read(cmd, res);
                         break;
                     case PIF_COMMAND_EEPROM_WRITE:
                        // unimplemented(cmdlen != 10, "EEPROM write with cmdlen != 10");
                         //unimplemented(reslen != 1,  "EEPROM write with reslen != 1");
-                        //unimplemented(n64sys.mem.save_data == NULL, "EEPROM write when save data is uninitialized! Is this game in the game DB?");
+                //unimplemented(n64sys.mem.save_data == NULL, "EEPROM write when save data is uninitialized! Is this game in the game DB?");
                         //pif_eeprom_write(cmd, res);
-                              memset(res, 0, reslen);
+                        memset(res, 0, reslen);
                         break;
                     default: break;
                        // logfatal("Invalid PIF command: %X", cmd[CMD_COMMAND_INDEX]);

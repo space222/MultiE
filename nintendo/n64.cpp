@@ -279,7 +279,9 @@ void n64::run_frame()
 		for(u32 i = 0; i < 6000; ++i)
 		{
 			cpu.step();
-			if( !(SP_STATUS & 1) && (i & 1) )
+			rspdiv += 1;
+			if( rspdiv == 3 ) rspdiv = 0;
+			if( !(SP_STATUS & 1) && (rspdiv != 2) )
 			{
 				RSP.step();
 			}
@@ -390,6 +392,7 @@ void n64::reset()
 	RSP.sp_write = [&](u32 a, u32 v) { sp_write(a, v); };
 	RSP.dp_read = [&](u32 a) -> u32 { return dp_read(a); };
 	RSP.sp_read = [&](u32 a) -> u32 { return sp_read(a); };
+	rspdiv = 0;
 		
 	*(u32*)&mem[0x318] = __builtin_bswap32(0x800000);
 	*(u32*)&mem[0x3f0] = __builtin_bswap32(0x800000);	

@@ -122,6 +122,7 @@ public:
 	void sp_read_dma();
 	void sp_write_dma();
 	n64_rsp RSP;
+	u32 rspdiv;
 	
 	u32 dp_regs[8];
 	u32& DP_START = dp_regs[0];
