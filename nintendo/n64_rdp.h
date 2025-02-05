@@ -9,7 +9,7 @@ public:
 
 	struct dc
 	{
-		dc() {}
+		dc() : b(255), g(255), r(255), a(255) {}
 		dc(s32 R, s32 G, s32 B, s32 A)
 		{
 			if( R < 0 ) R = 0; else if( R > 255 ) R = 255;
@@ -30,6 +30,33 @@ public:
 			g = ((g/255.f) * (p.g/255.f))*255;
 			r = ((r/255.f) * (p.r/255.f))*255;
 			a = ((a/255.f) * (p.a/255.f))*255;
+			return *this;
+		}
+		
+		dc operator+=(const dc& p)
+		{
+			r += p.r;
+			g += p.g;
+			b += p.b;
+			a += p.a;
+			return *this;
+		}
+		
+		dc operator-=(const dc& p)
+		{
+			r -= p.r;
+			g -= p.g;
+			b -= p.b;
+			a -= p.a;
+			return *this;
+		}
+		
+		dc operator*=(const float& f)
+		{
+			r *= f;
+			g *= f;
+			b *= f;
+			a *= f;
 			return *this;
 		}
 	};
@@ -55,6 +82,15 @@ private:
 	
 	dc tex_sample(u32 tile, s32 s, s32 t);
 	
+	void color_combiner();
+	dc cc_a(u32 cycle);
+	dc cc_b(u32 cycle);
+	dc cc_c(u32 cycle);
+	dc cc_d(u32 cycle);
+	float cc_alpha(u32 sel);
+	
+	bool blender();
+	
 	struct {
 		u32 addr, width, bpp, format;
 	} cimg, teximg;
@@ -74,6 +110,7 @@ private:
 		bool alpha_compare_en;
 		bool force_blend;
 		bool z_compare, z_write;
+		bool perspective;
 	} other;
 	
 	struct {
@@ -101,16 +138,45 @@ private:
 
 		s64 DzDx, DzDe, DzDy;
 		
+		dc shade_color;
+		s64 cx, cy;
+		
 		u8 cmd;
 	} RS;
 	
 	struct {
-		u32 tile;	
+		u32 tile;
+		dc tex_sample;	
 	} TX;
+	
+	struct {
+		dc out;
+		
+		u32 rgb_a[2];
+		u32 rgb_b[2];
+		u32 rgb_c[2];
+		u32 rgb_d[2];
+		u32 alpha_a[2];
+		u32 alpha_b[2];
+		u32 alpha_c[2];
+		u32 alpha_d[2];
+	} CC;
+	
+	struct {
+		dc out;
+		
+		u32 p[2];
+		u32 a[2];
+		u32 m[2];
+		u32 b[2];
+		
+		float A;
+	} BL;
 
 	u32 depth_image;
 	u32 fill_color;
 	dc blend_color, env_color, fog_color;
+	dc prim_color;
 	u16 prim_z, prim_delta_z;
 	
 	const u32 CYCLE_TYPE_1CYCLE = 0;

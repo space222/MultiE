@@ -7,6 +7,8 @@
 
 const u32 imgbpp[] = { 4, 8, 16, 32 };
 
+const n64_rdp::dc white(0xff, 0xff, 0xff, 0xff);
+
 #define field(f, d, a) (((f)>>(d))&(a))
 
 void n64_rdp::recv(u64 cmd)
@@ -130,6 +132,16 @@ void n64_rdp::recv(u64 cmd)
 		other.force_blend = cmd&BITL(14);
 		other.z_compare = cmd&BITL(4);
 		other.z_write = cmd&BITL(5);
+		other.perspective = cmd&BITL(51);
+		
+		BL.p[0] = field(cmd, 30, 3);
+		BL.p[1] = field(cmd, 28, 3);
+		BL.a[0] = field(cmd, 26, 3);
+		BL.a[1] = field(cmd, 24, 3);
+		BL.m[0] = field(cmd, 22, 3);
+		BL.m[1] = field(cmd, 20, 3);
+		BL.b[0] = field(cmd, 18, 3);
+		BL.b[1] = field(cmd, 16, 3);
 		//fprintf(stderr, "set other modes = $%lX, ctype = %i\n", cmd, other.cycle_type);
 		break;
 		
@@ -164,12 +176,29 @@ void n64_rdp::recv(u64 cmd)
 		blend_color = dc::from32(cmd);
 		break;
 	case 0x3A: // primitive color
+		prim_color = dc::from32(cmd);
 		break;
 	case 0x3B: // environment color
 		env_color = dc::from32(cmd);
 		break;	
 	case 0x3C: // set combine mode
 		//fprintf(stderr, "combine = $%lX\n", cmd&0x00ffFFFFffffFFFFull);
+		CC.alpha_d[1] = cmd&7;
+		CC.alpha_b[1] = field(cmd, 3, 7);
+		CC.rgb_d[1] = field(cmd, 6, 7);
+		CC.alpha_d[0] = field(cmd, 9, 7);
+		CC.alpha_b[0] = field(cmd, 12, 7);
+		CC.rgb_d[0] = field(cmd, 15, 7);
+		CC.alpha_c[1] = field(cmd, 18, 7);
+		CC.alpha_a[1] = field(cmd, 21, 7);
+		CC.rgb_b[1] = field(cmd, 24, 15);
+		CC.rgb_b[0] = field(cmd, 28, 15);
+		CC.rgb_c[1] = field(cmd, 32, 31);
+		CC.rgb_a[1] = field(cmd, 37, 15);
+		CC.alpha_c[0] = field(cmd, 41, 7);
+		CC.alpha_a[0] = field(cmd, 44, 7);
+		CC.rgb_c[0] = field(cmd, 47, 31);
+		CC.rgb_a[0] = field(cmd, 52, 15);
 		break;
 	
 	case 0x3D: // texture image
@@ -584,6 +613,7 @@ void n64_rdp::triangle()
 	
 	//RS.s *= 2;
 	//RS.t *= 2;
+	RS.shade_color = white;
 		
 	if( !right )
 	{
@@ -600,16 +630,20 @@ void n64_rdp::triangle()
 			for(s64 x = RS.xh>>16; x >= RS.xm>>16; --x)
 			{
 				if( x < 0 || x > scissor.lrX ) break;
+				RS.cx = x;
+				RS.cy = y;
 				u16 Z = z>>16;//1/(z/65536.f);
 				if( other.z_compare && Z > *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] ) continue;
-				if( other.z_write) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = Z;
-				dc col = ((RS.cmd & 4) ? dc(r>>16,g>>16,b>>16,a>>16) : dc::from32(0xffffffffu));
-				if( RS.cmd & 2 ) col *= tex_sample(TX.tile, s>>5, t>>5);
+				if( RS.cmd & 4 ) RS.shade_color = dc(r>>16,g>>16,b>>16,a>>16);
+				if( RS.cmd & 2 ) TX.tex_sample = tex_sample(TX.tile, s>>5, t>>5);
+				color_combiner();
+				if( !blender() ) continue;
 				if( cimg.bpp == 16 )
 				{
 					//if( !other.alpha_compare_en || (col.to16()&1) ) 
-					if( !other.force_blend || (col.to16()&1) ) 
-						*(u16*)&rdram[cimg.addr + (cimg.width*2*y) + (x*2)]=__builtin_bswap16(col.to16());
+					//if( !other.force_blend || (CC.out.to16()&1) ) 
+					if( other.z_write) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = Z;
+					*(u16*)&rdram[cimg.addr + (cimg.width*2*y) + (x*2)]= __builtin_bswap16(BL.out.to16());
 				} else {
 				//*(u32*)&rdram[cimg.addr + (cimg.width*4*y) + (x*4)] = __builtin_bswap32(col.to32());
 				}
@@ -632,16 +666,20 @@ void n64_rdp::triangle()
 			for(s64 x = RS.xh>>16; x >= RS.xl>>16; --x)
 			{
 				if( x < 0 || x > scissor.lrX ) break;
+				RS.cx = x;
+				RS.cy = y;
 				u16 Z = z>>16;//1/(z/65536.f);
 				if( other.z_compare && Z > *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] ) continue;
-				if( other.z_write ) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = Z;
-				dc col = ((RS.cmd & 4) ? dc(r>>16,g>>16,b>>16,a>>16) : dc::from32(0xffffffffu));
-				if( RS.cmd & 2 ) col *= tex_sample(TX.tile, s>>5, t>>5);
+				if( RS.cmd & 4 ) RS.shade_color = dc(r>>16,g>>16,b>>16,a>>16);
+				if( RS.cmd & 2 ) TX.tex_sample = tex_sample(TX.tile, s>>5, t>>5);
+				color_combiner();
+				if( !blender() ) continue;
 				if( cimg.bpp == 16 )
 				{
 					//if( !other.alpha_compare_en || (col.to16()&1) ) 
-					if( !other.force_blend || (col.to16()&1) ) 
-						*(u16*)&rdram[cimg.addr + (cimg.width*2*y) + (x*2)]=__builtin_bswap16(col.to16());
+					//if( !other.force_blend || (CC.out.to16()&1) ) 
+					if( other.z_write ) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = Z;
+					*(u16*)&rdram[cimg.addr + (cimg.width*2*y) + (x*2)]= __builtin_bswap16(BL.out.to16());
 				} else {
 				//*(u32*)&rdram[cimg.addr + (cimg.width*4*y) + (x*4)] = __builtin_bswap32(col.to32());
 				}
@@ -665,16 +703,20 @@ void n64_rdp::triangle()
 			for(s64 x = RS.xh>>16; x <= RS.xm>>16; ++x)
 			{
 				if( x < 0 || x > scissor.lrX ) break;
+				RS.cx = x;
+				RS.cy = y;
 				u16 Z = z>>16;//1/(z/65536.f);
 				if( other.z_compare && Z > *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] ) continue;
-				if( other.z_write) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = Z;
-				dc col = ((RS.cmd & 4) ? dc(r>>16,g>>16,b>>16,a>>16) : dc::from32(0xffffffffu));
-				if( RS.cmd & 2 ) col *= tex_sample(TX.tile, s>>5, t>>5);
+				if( RS.cmd & 4 ) RS.shade_color = dc(r>>16,g>>16,b>>16,a>>16);
+				if( RS.cmd & 2 ) TX.tex_sample = tex_sample(TX.tile, s>>5, t>>5);
+				color_combiner();
+				if( !blender() ) continue;
 				if( cimg.bpp == 16 )
 				{
 					//if( !other.alpha_compare_en || (col.to16()&1) ) 
-					if( !other.force_blend || (col.to16()&1) ) 
-						*(u16*)&rdram[cimg.addr + (cimg.width*2*y) + (x*2)]=__builtin_bswap16(col.to16());
+					//if( !other.force_blend || (CC.out.to16()&1) ) 
+					if( other.z_write) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = Z;
+					*(u16*)&rdram[cimg.addr + (cimg.width*2*y) + (x*2)]= __builtin_bswap16(BL.out.to16());
 				} else {
 				//*(u32*)&rdram[cimg.addr + (cimg.width*4*y) + (x*4)] = __builtin_bswap32(col.to32());
 				}
@@ -697,16 +739,20 @@ void n64_rdp::triangle()
 			for(s64 x = RS.xh>>16; x <= RS.xl>>16; ++x)
 			{
 				if( x < 0 || x > scissor.lrX ) break;
+				RS.cx = x;
+				RS.cy = y;
 				u16 Z = z>>16;//1/(z/65536.f);
 				if( other.z_compare && Z > *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] ) continue;
-				if( other.z_write) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = Z;
-				dc col = ((RS.cmd & 4) ? dc(r>>16,g>>16,b>>16,a>>16) : dc::from32(0xffffffffu));
-				if( RS.cmd & 2 ) col *= tex_sample(TX.tile, s>>5, t>>5);
+				if( RS.cmd & 4 ) RS.shade_color = dc(r>>16,g>>16,b>>16,a>>16);
+				if( RS.cmd & 2 ) TX.tex_sample = tex_sample(TX.tile, s>>5, t>>5);
+				color_combiner();
+				if( !blender() ) continue;
 				if( cimg.bpp == 16 )
 				{
 					//if( !other.alpha_compare_en || (col.to16()&1) ) 
-					if( !other.force_blend || (col.to16()&1) ) 
-						*(u16*)&rdram[cimg.addr + (cimg.width*2*y) + (x*2)]=__builtin_bswap16(col.to16());
+					//if( !other.force_blend || (CC.out.to16()&1) ) 
+					if( other.z_write) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = Z;
+					*(u16*)&rdram[cimg.addr + (cimg.width*2*y) + (x*2)]= __builtin_bswap16(BL.out.to16());
 				} else {
 				//*(u32*)&rdram[cimg.addr + (cimg.width*4*y) + (x*4)] = __builtin_bswap32(col.to32());
 				}
@@ -784,8 +830,157 @@ void n64_rdp::load_tlut(u64 cmd)
 	}
 }
 
+n64_rdp::dc n64_rdp::cc_a(u32 cycle)
+{
+	switch( CC.rgb_a[cycle] )
+	{
+	case 0: return CC.out;
+	case 1: return TX.tex_sample;
+	case 2: return white; //todo: tex1
+	case 3: return prim_color;
+	case 4: return RS.shade_color;
+	case 5: return env_color;
+	case 6: return white;
+	case 7: return white; //todo: noise
+	default: break;
+	}
+	return dc(0,0,0,0);
+}
 
+n64_rdp::dc n64_rdp::cc_d(u32 cycle)
+{
+	switch( CC.rgb_d[cycle] )
+	{
+	case 0: return CC.out;
+	case 1: return TX.tex_sample;
+	case 2: return white; //todo: tex1
+	case 3: return prim_color;
+	case 4: return RS.shade_color;
+	case 5: return env_color;
+	case 6: return white;
+	default: break;
+	}
+	return dc(0,0,0,0);
+}
 
+n64_rdp::dc n64_rdp::cc_b(u32 cycle)
+{
+	switch( CC.rgb_b[cycle] )
+	{
+	case 0: return CC.out;
+	case 1: return TX.tex_sample;
+	case 2: return white; //todo: tex1
+	case 3: return prim_color;
+	case 4: return RS.shade_color;
+	case 5: return env_color;
+	case 6: return white;
+	default: break;
+	}
+	return dc(0,0,0,0);
+}
+n64_rdp::dc n64_rdp::cc_c(u32 cycle)
+{
+	switch( CC.rgb_c[cycle] )
+	{
+	case 0: return CC.out;
+	case 1: return TX.tex_sample;
+	case 2: return white; //todo: tex1
+	case 3: return prim_color;
+	case 4: return RS.shade_color;
+	case 5: return env_color;
+	case 6: return white;
+	default: break;
+	}
+	return dc(0,0,0,0);
+}
+
+float n64_rdp::cc_alpha(u32 sel)
+{
+	switch( sel )
+	{
+	case 0: return CC.out.a/255.f;
+	case 1: return TX.tex_sample.a/255.f;
+	case 2: return 1; //todo: tex1
+	case 3: return prim_color.a/255.f;
+	case 4: return RS.shade_color.a/255.f;
+	case 5: return env_color.a/255.f;
+	case 6: return 1;
+	default: break;
+	}
+	return 0;
+}
+
+void n64_rdp::color_combiner()
+{
+	dc res;
+	{
+		dc a = cc_a(1);
+		dc b = cc_b(1);
+		dc c = cc_c(1);
+		dc d = cc_d(1);
+		res = a;
+		res -= b;
+		res *= c;
+		res += d;
+	}
+	
+	float a = cc_alpha(CC.alpha_a[1]);
+	float b = cc_alpha(CC.alpha_b[1]);
+	float c = cc_alpha(CC.alpha_c[1]);
+	float d = cc_alpha(CC.alpha_d[1]);
+	res.a = ((a - b) * c + d)*255;
+	CC.out = res;
+}
+
+bool n64_rdp::blender()
+{
+	if( !other.force_blend ) 
+	{
+		BL.out = CC.out;
+		return true;
+	}
+	
+	dc P, M;
+	switch( BL.p[1] )
+	{
+	case 0: P = CC.out; break;
+	case 1: P = (cimg.bpp == 16) ? dc::from16(__builtin_bswap16(*(u16*)&rdram[cimg.addr + (cimg.width*RS.cy*2) + (RS.cx*2)])) :
+				    dc::from32(__builtin_bswap32(*(u32*)&rdram[cimg.addr + (cimg.width*RS.cy*4) + (RS.cx*4)])); 
+				    break;
+	case 2: P = blend_color; break;
+	case 3: P = fog_color; break;
+	}
+	switch( BL.m[1] )
+	{
+	case 0: M = CC.out; break;
+	case 1: M = (cimg.bpp == 16) ? dc::from16(__builtin_bswap16(*(u16*)&rdram[cimg.addr + (cimg.width*RS.cy*2) + (RS.cx*2)])) :
+				    dc::from32(__builtin_bswap32(*(u32*)&rdram[cimg.addr + (cimg.width*RS.cy*4) + (RS.cx*4)])); 
+				    break;
+	case 2: M = blend_color; break;
+	case 3: M = fog_color; break;
+	}
+	float A=1, B=1;
+	switch( BL.a[1] )
+	{
+	case 0: A = CC.out.a/255.f; break;
+	case 1: A = fog_color.a/255.f; break;
+	case 2: A = RS.shade_color.a/255.f; break;
+	case 3: A = 0; break;
+	}
+	switch( BL.b[1] )
+	{
+	case 0: B = 1.f - A; break;
+	case 1: B = 1; break;  //todo: coverage
+	case 2: B = 1; break;
+	case 3: B = 0; break;
+	}
+	
+	BL.out = P;
+	BL.out *= A;
+	M *= B;
+	BL.out += M;
+	return true;
+}
 
 
 
