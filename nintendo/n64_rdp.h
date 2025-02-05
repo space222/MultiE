@@ -80,7 +80,7 @@ private:
 	void load_block(u64);
 	void triangle();
 	
-	dc tex_sample(u32 tile, s32 s, s32 t);
+	dc tex_sample(u32 tile, s64 s, s64 t);
 	
 	void color_combiner();
 	dc cc_a(u32 cycle);
@@ -111,6 +111,7 @@ private:
 		bool force_blend;
 		bool z_compare, z_write;
 		bool perspective;
+		bool tlut_type_ia16;
 	} other;
 	
 	struct {

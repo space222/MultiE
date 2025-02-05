@@ -133,6 +133,7 @@ void n64_rdp::recv(u64 cmd)
 		other.z_compare = cmd&BITL(4);
 		other.z_write = cmd&BITL(5);
 		other.perspective = cmd&BITL(51);
+		other.tlut_type_ia16 = cmd&BITL(46);
 		
 		BL.p[0] = field(cmd, 30, 3);
 		BL.p[1] = field(cmd, 28, 3);
@@ -347,11 +348,11 @@ void n64_rdp::set_tile(u64 cmd)
 	
 	T.clampT = (cmd&BITL(19));
 	T.mirrorT = (cmd&BITL(18));
-	T.maskT = (cmd>>14)&0xf;
+	T.maskT = (1u<<((cmd>>14)&0xf))-1;
 	T.shiftT = (cmd>>10)&0xf;
 	T.clampS = cmd&BITL(9);
 	T.mirrorS = cmd&BITL(8);
-	T.maskS = (cmd>>4)&0xf;
+	T.maskS = (1u<<((cmd>>4)&0xf))-1;
 	T.shiftS = cmd&0xf;
 	
 	//if( T.clampT || T.mirrorT || T.clampS || T.mirrorS )
@@ -396,7 +397,7 @@ void n64_rdp::texture_rect(u64 cmd0, u64 cmd1)
 			s32 Sl = S;
 			for(u32 X = ulX; X < lrX; ++X, Sl += DsDx)
 			{
-				u16 sample = tex_sample(tile, Sl, T).to16();
+				u16 sample = tex_sample(tile, Sl>>10, T>>10).to16();
 				if( other.alpha_compare_en && !(sample&1) ) continue;
 				if( other.force_blend && !(sample&1) ) continue;
 				
@@ -409,7 +410,7 @@ void n64_rdp::texture_rect(u64 cmd0, u64 cmd1)
 			s32 Sl = S;
 			for(u32 X = ulX; X < lrX; ++X, Sl += DsDx)
 			{
-				u32 sample = tex_sample(tile, Sl, T).to32();
+				u32 sample = tex_sample(tile, Sl>>10, T>>10).to32();
 				if( other.alpha_compare_en && !(sample&0xff) ) continue;
 				if( other.force_blend && !(sample&0xff) ) continue;
 				
@@ -447,7 +448,7 @@ void n64_rdp::texture_rect_flip(u64 cmd0, u64 cmd1)
 			s32 Sl = S;
 			for(u32 X = ulX; X < lrX; ++X, Sl += DsDx)
 			{
-				u16 sample = tex_sample(tile, T, Sl).to16();
+				u16 sample = tex_sample(tile, T>>10, Sl>>10).to16();
 				if( other.alpha_compare_en && !(sample&1) ) continue;
 				if( other.force_blend && !(sample&1) ) continue;
 				
@@ -460,7 +461,7 @@ void n64_rdp::texture_rect_flip(u64 cmd0, u64 cmd1)
 			s32 Sl = S;
 			for(u32 X = ulX; X < lrX; ++X, Sl += DsDx)
 			{
-				u32 sample = tex_sample(tile, T, Sl).to32();
+				u32 sample = tex_sample(tile, T>>10, Sl>>10).to32();
 				if( other.alpha_compare_en && !(sample&0xff) ) continue;
 				if( other.force_blend && !(sample&0xff) ) continue;
 				
@@ -488,19 +489,17 @@ void n64_rdp::set_tile_size(u64 cmd)
 	//fprintf(stderr, "Set Tile%i Size = (%i, %i) - (%i, %i)\n", u8((cmd>>24)&7), ulS, ulT, lrS, lrT);
 }
 
-n64_rdp::dc n64_rdp::tex_sample(u32 tile, s32 s, s32 t)
+n64_rdp::dc n64_rdp::tex_sample(u32 tile, s64 s, s64 t)
 {
 	auto& T = tiles[tile];
-	//s += 0x400;
-	//t += 0x400;
-	s >>= 10;
-	t >>= 10;
 	
-	if( s < 0 ) { s = ~s; }
-	if( t < 0 ) { t = ~t; }	
-	
+	/*
 	s -= T.SL>>2;
 	t -= T.TL>>2;
+
+	if( s < 0 ) { s = ~s; }
+	if( t < 0 ) { t = ~t; }	
+
 
 	if( T.shiftS < 11 ) 
 	{
@@ -517,19 +516,19 @@ n64_rdp::dc n64_rdp::tex_sample(u32 tile, s32 s, s32 t)
 	
 	if( T.mirrorS )
 	{
-		u32 mbit = s & (1u<<(T.maskS+0));
-		s &= (1<<T.maskS)-1;
-		if( mbit ) s ^= (1<<T.maskS)-1;
+		u32 mbit = s & (T.maskS+1);
+		s &= T.maskS;
+		if( mbit ) s ^= T.maskS;
 	} else if( T.maskS ) {
-		s &= (1<<T.maskS)-1;
+		s &= T.maskS;
 	}
 	if( T.mirrorT )
 	{
-		u32 mbit = t & (1u<<(T.maskT+0));
-		t &= (1<<T.maskT)-1;
-		if( mbit ) t ^= (1<<T.maskT)-1;
+		u32 mbit = t & (T.maskT+1);
+		t &= T.maskT;
+		if( mbit ) t ^= T.maskT;
 	} else if( T.maskT ) {
-		t &= (1<<T.maskT)-1;
+		t &= T.maskT;
 	}
 
 	if( s > (T.SH>>2) ) 
@@ -538,7 +537,8 @@ n64_rdp::dc n64_rdp::tex_sample(u32 tile, s32 s, s32 t)
 		{
 			s = T.SH>>2;
 		} else {
-			s %= T.SH>>2;
+			if( T.SH>>2 ) s %= T.SH>>2;
+			else s = 0;
 		}
 	}
 	if( t > (T.TH>>2) ) 
@@ -547,9 +547,23 @@ n64_rdp::dc n64_rdp::tex_sample(u32 tile, s32 s, s32 t)
 		{
 			t = T.TH>>2;
 		} else {
-			t %= T.TH>>2;
+			if( T.TH>>2 ) t %= T.TH>>2;
+			else t = 0;
 		}		
 	}
+	*/
+	s -= T.SL>>2;
+	t -= T.TL>>2;
+	
+	   // Clamp, mirror, or mask the S-coordinate based on tile settings
+	if( T.clampS ) s = std::max<s64>(std::min<s64>(s, ((T.SH>>2) - (T.SL>>2))), 0);
+	if( T.mirrorS && (s & (T.maskS+1)) ) s = ~s;
+	s &= T.maskS;
+
+	// Clamp, mirror, or mask the T-coordinate based on tile settings
+	if( T.clampT ) t = std::max<s64>(std::min<s64>(t, ((T.TH>>2) - (T.TL>>2))), 0);
+	if( T.mirrorT && (t & (T.maskT+1)) ) t = ~t;
+	t &= T.maskT;
 	
 	if( T.bpp == 16 ) 
 	{
@@ -587,32 +601,37 @@ n64_rdp::dc n64_rdp::tex_sample(u32 tile, s32 s, s32 t)
 		 RS.g += RS.DgDe;  \
 		 RS.b += RS.DbDe;  \
 		 RS.a += RS.DaDe;  \
-		 RS.s += (RS.DsDe>>5);  \
-		 RS.t += (RS.DtDe>>5); \
+		 RS.s += (RS.DsDe);  \
+		 RS.t += (RS.DtDe); \
+		 RS.w += (RS.DwDe); \
 		 RS.z += RS.DzDe
 		 
 #define ATTR_XDEC r -= RS.DrDx;  \
 		  g -= RS.DgDx;  \
 		  b -= RS.DbDx;  \
 		  a -= RS.DaDx;  \
-		  s -= (RS.DsDx>>5); \
-		  t -= (RS.DtDx>>5); \
+		  s -= (RS.DsDx); \
+		  t -= (RS.DtDx); \
+		  w -= (RS.DwDx); \
 		  z -= RS.DzDx
 		  
 #define ATTR_XINC r += RS.DrDx;  \
 		  g += RS.DgDx;  \
 		  b += RS.DbDx;  \
 		  a += RS.DaDx;  \
-		  s += (RS.DsDx>>5); \
-		  t += (RS.DtDx>>5); \
+		  s += (RS.DsDx); \
+		  t += (RS.DtDx); \
+		  w += (RS.DwDx); \
 		  z += RS.DzDx
+		  
+#define PERSP  int W = ( other.perspective ) ? (int(w)>>15) : 0x10000; \
+	S /= (W ? W : 0x10000); \
+	T /= (W ? W : 0x10000); \
+
 
 void n64_rdp::triangle()
 {
 	const bool right = (cmdbuf[0] & BITL(55));
-	
-	//RS.s *= 2;
-	//RS.t *= 2;
 	RS.shade_color = white;
 		
 	if( !right )
@@ -626,6 +645,7 @@ void n64_rdp::triangle()
 			s64 s = RS.s;
 			s64 t = RS.t;
 			s64 z = RS.z;
+			s64 w = RS.w;
 			if( y >= 0 )
 			for(s64 x = RS.xh>>16; x >= RS.xm>>16; --x)
 			{
@@ -635,13 +655,16 @@ void n64_rdp::triangle()
 				u16 Z = z>>16;//1/(z/65536.f);
 				if( other.z_compare && Z > *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] ) continue;
 				if( RS.cmd & 4 ) RS.shade_color = dc(r>>16,g>>16,b>>16,a>>16);
-				if( RS.cmd & 2 ) TX.tex_sample = tex_sample(TX.tile, s>>5, t>>5);
+				if( RS.cmd & 2 ) 
+				{
+					s64 S = s; s64 T = t;
+					PERSP
+					TX.tex_sample = tex_sample(TX.tile, S>>5, T>>5);
+				}
 				color_combiner();
 				if( !blender() ) continue;
 				if( cimg.bpp == 16 )
 				{
-					//if( !other.alpha_compare_en || (col.to16()&1) ) 
-					//if( !other.force_blend || (CC.out.to16()&1) ) 
 					if( other.z_write) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = Z;
 					*(u16*)&rdram[cimg.addr + (cimg.width*2*y) + (x*2)]= __builtin_bswap16(BL.out.to16());
 				} else {
@@ -662,6 +685,7 @@ void n64_rdp::triangle()
 			s64 s = RS.s;
 			s64 t = RS.t;
 			s64 z = RS.z;
+			s64 w = RS.w;
 			if( y >= 0 )
 			for(s64 x = RS.xh>>16; x >= RS.xl>>16; --x)
 			{
@@ -671,13 +695,16 @@ void n64_rdp::triangle()
 				u16 Z = z>>16;//1/(z/65536.f);
 				if( other.z_compare && Z > *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] ) continue;
 				if( RS.cmd & 4 ) RS.shade_color = dc(r>>16,g>>16,b>>16,a>>16);
-				if( RS.cmd & 2 ) TX.tex_sample = tex_sample(TX.tile, s>>5, t>>5);
+				if( RS.cmd & 2 ) 
+				{
+					s64 S = s; s64 T = t;
+					PERSP
+					TX.tex_sample = tex_sample(TX.tile, S>>5, T>>5);
+				}
 				color_combiner();
 				if( !blender() ) continue;
 				if( cimg.bpp == 16 )
 				{
-					//if( !other.alpha_compare_en || (col.to16()&1) ) 
-					//if( !other.force_blend || (CC.out.to16()&1) ) 
 					if( other.z_write ) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = Z;
 					*(u16*)&rdram[cimg.addr + (cimg.width*2*y) + (x*2)]= __builtin_bswap16(BL.out.to16());
 				} else {
@@ -699,6 +726,7 @@ void n64_rdp::triangle()
 			s64 s = RS.s;
 			s64 t = RS.t;
 			s64 z = RS.z;
+			s64 w = RS.w;
 			if( y >= 0 )
 			for(s64 x = RS.xh>>16; x <= RS.xm>>16; ++x)
 			{
@@ -708,13 +736,16 @@ void n64_rdp::triangle()
 				u16 Z = z>>16;//1/(z/65536.f);
 				if( other.z_compare && Z > *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] ) continue;
 				if( RS.cmd & 4 ) RS.shade_color = dc(r>>16,g>>16,b>>16,a>>16);
-				if( RS.cmd & 2 ) TX.tex_sample = tex_sample(TX.tile, s>>5, t>>5);
+				if( RS.cmd & 2 ) 
+				{
+					s64 S = s; s64 T = t;
+					PERSP
+					TX.tex_sample = tex_sample(TX.tile, S>>5, T>>5);
+				}
 				color_combiner();
 				if( !blender() ) continue;
 				if( cimg.bpp == 16 )
 				{
-					//if( !other.alpha_compare_en || (col.to16()&1) ) 
-					//if( !other.force_blend || (CC.out.to16()&1) ) 
 					if( other.z_write) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = Z;
 					*(u16*)&rdram[cimg.addr + (cimg.width*2*y) + (x*2)]= __builtin_bswap16(BL.out.to16());
 				} else {
@@ -735,6 +766,7 @@ void n64_rdp::triangle()
 			s64 s = RS.s;
 			s64 t = RS.t;
 			s64 z = RS.z;
+			s64 w = RS.w;
 			if( y >= 0 )
 			for(s64 x = RS.xh>>16; x <= RS.xl>>16; ++x)
 			{
@@ -744,13 +776,16 @@ void n64_rdp::triangle()
 				u16 Z = z>>16;//1/(z/65536.f);
 				if( other.z_compare && Z > *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] ) continue;
 				if( RS.cmd & 4 ) RS.shade_color = dc(r>>16,g>>16,b>>16,a>>16);
-				if( RS.cmd & 2 ) TX.tex_sample = tex_sample(TX.tile, s>>5, t>>5);
+				if( RS.cmd & 2 ) 
+				{
+					s64 S = s; s64 T = t;
+					PERSP
+					TX.tex_sample = tex_sample(TX.tile, S>>5, T>>5);
+				}
 				color_combiner();
 				if( !blender() ) continue;
 				if( cimg.bpp == 16 )
 				{
-					//if( !other.alpha_compare_en || (col.to16()&1) ) 
-					//if( !other.force_blend || (CC.out.to16()&1) ) 
 					if( other.z_write) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = Z;
 					*(u16*)&rdram[cimg.addr + (cimg.width*2*y) + (x*2)]= __builtin_bswap16(BL.out.to16());
 				} else {
@@ -912,22 +947,27 @@ float n64_rdp::cc_alpha(u32 sel)
 
 void n64_rdp::color_combiner()
 {
+	//todo: only supporting 1cycle for now
+	//	normally 1cycle uses the <em>second</em> cycle settings for the combiner
+	//	but <em>first</em> cycle settings for the blender, so the blender is "correct"ish, but
+	//	leaving the 1cycle mode incorrectly using first cycle settings makes games work for now
+	//	Mario uses 2cycle in levels and Wave Race starts using in the intro.
+	//	without this hack, Bob-omb Battlefield is blue and Wave Race land masses are pink.
 	dc res;
 	{
-		dc a = cc_a(1);
-		dc b = cc_b(1);
-		dc c = cc_c(1);
-		dc d = cc_d(1);
-		res = a;
+		res = cc_a(0);
+		dc b = cc_b(0);
+		dc c = cc_c(0);
+		dc d = cc_d(0);
 		res -= b;
 		res *= c;
 		res += d;
 	}
 	
-	float a = cc_alpha(CC.alpha_a[1]);
-	float b = cc_alpha(CC.alpha_b[1]);
-	float c = cc_alpha(CC.alpha_c[1]);
-	float d = cc_alpha(CC.alpha_d[1]);
+	float a = cc_alpha(CC.alpha_a[0]);
+	float b = cc_alpha(CC.alpha_b[0]);
+	float c = cc_alpha(CC.alpha_c[0]);
+	float d = cc_alpha(CC.alpha_d[0]);
 	res.a = ((a - b) * c + d)*255;
 	CC.out = res;
 }
@@ -941,7 +981,7 @@ bool n64_rdp::blender()
 	}
 	
 	dc P, M;
-	switch( BL.p[1] )
+	switch( BL.p[0] )
 	{
 	case 0: P = CC.out; break;
 	case 1: P = (cimg.bpp == 16) ? dc::from16(__builtin_bswap16(*(u16*)&rdram[cimg.addr + (cimg.width*RS.cy*2) + (RS.cx*2)])) :
@@ -950,7 +990,7 @@ bool n64_rdp::blender()
 	case 2: P = blend_color; break;
 	case 3: P = fog_color; break;
 	}
-	switch( BL.m[1] )
+	switch( BL.m[0] )
 	{
 	case 0: M = CC.out; break;
 	case 1: M = (cimg.bpp == 16) ? dc::from16(__builtin_bswap16(*(u16*)&rdram[cimg.addr + (cimg.width*RS.cy*2) + (RS.cx*2)])) :
@@ -960,14 +1000,14 @@ bool n64_rdp::blender()
 	case 3: M = fog_color; break;
 	}
 	float A=1, B=1;
-	switch( BL.a[1] )
+	switch( BL.a[0] )
 	{
 	case 0: A = CC.out.a/255.f; break;
 	case 1: A = fog_color.a/255.f; break;
 	case 2: A = RS.shade_color.a/255.f; break;
 	case 3: A = 0; break;
 	}
-	switch( BL.b[1] )
+	switch( BL.b[0] )
 	{
 	case 0: B = 1.f - A; break;
 	case 1: B = 1; break;  //todo: coverage
