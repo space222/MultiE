@@ -659,7 +659,11 @@ void n64_rdp::triangle()
 				RS.cx = x;
 				RS.cy = y;
 				u16 Z = z>>20; // z ? 1/(z/2097152.f) : 1;
-				if( other.z_compare && Z >= *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] ) continue;
+				if( other.z_compare && Z >= *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] ) 
+				{
+					ATTR_XDEC;
+					continue;
+				}
 				if( RS.cmd & 4 ) RS.shade_color = dc(r>>16,g>>16,b>>16,a>>16);
 				if( RS.cmd & 2 ) 
 				{
@@ -668,7 +672,11 @@ void n64_rdp::triangle()
 					TX.tex_sample = tex_sample(TX.tile, S>>5, T>>5);
 				}
 				color_combiner();
-				if( !blender() ) continue;
+				if( !blender() ) 
+				{
+					ATTR_XDEC;
+					continue;
+				}
 				if( cimg.bpp == 16 )
 				{
 					if( other.z_write) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = Z;
@@ -699,7 +707,11 @@ void n64_rdp::triangle()
 				RS.cx = x;
 				RS.cy = y;
 				u16 Z = z>>20; // z ? 1/(z/2097152.f) : 1;
-				if( other.z_compare && Z >= *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] ) continue;
+				if( other.z_compare && Z >= *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] ) 
+				{
+					ATTR_XDEC;
+					continue;
+				}
 				if( RS.cmd & 4 ) RS.shade_color = dc(r>>16,g>>16,b>>16,a>>16);
 				if( RS.cmd & 2 ) 
 				{
@@ -708,7 +720,11 @@ void n64_rdp::triangle()
 					TX.tex_sample = tex_sample(TX.tile, S>>5, T>>5);
 				}
 				color_combiner();
-				if( !blender() ) continue;
+				if( !blender() ) 
+				{
+					ATTR_XDEC;
+					continue;
+				}
 				if( cimg.bpp == 16 )
 				{
 					if( other.z_write ) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = Z;
@@ -740,7 +756,11 @@ void n64_rdp::triangle()
 				RS.cx = x;
 				RS.cy = y;
 				u16 Z = z>>20; // z ? 1/(z/2097152.f) : 1;
-				if( other.z_compare && Z >= *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] ) continue;
+				if( other.z_compare && Z >= *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] ) 
+				{
+					ATTR_XINC;
+					continue;
+				}
 				if( RS.cmd & 4 ) RS.shade_color = dc(r>>16,g>>16,b>>16,a>>16);
 				if( RS.cmd & 2 ) 
 				{
@@ -749,7 +769,11 @@ void n64_rdp::triangle()
 					TX.tex_sample = tex_sample(TX.tile, S>>5, T>>5);
 				}
 				color_combiner();
-				if( !blender() ) continue;
+				if( !blender() ) 
+				{
+					ATTR_XINC;
+					continue;
+				}
 				if( cimg.bpp == 16 )
 				{
 					if( other.z_write) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = Z;
@@ -780,7 +804,11 @@ void n64_rdp::triangle()
 				RS.cx = x;
 				RS.cy = y;
 				u16 Z = z>>20; // z ? 1/(z/2097152.f) : 1;
-				if( other.z_compare && Z >= *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] ) continue;
+				if( other.z_compare && Z >= *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] ) 
+				{
+					ATTR_XINC;
+					continue;
+				}
 				if( RS.cmd & 4 ) RS.shade_color = dc(r>>16,g>>16,b>>16,a>>16);
 				if( RS.cmd & 2 ) 
 				{
@@ -789,7 +817,11 @@ void n64_rdp::triangle()
 					TX.tex_sample = tex_sample(TX.tile, S>>5, T>>5);
 				}
 				color_combiner();
-				if( !blender() ) continue;
+				if( !blender() ) 
+				{
+					ATTR_XINC;
+					continue;
+				}
 				if( cimg.bpp == 16 )
 				{
 					if( other.z_write) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = Z;
