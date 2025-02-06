@@ -134,6 +134,7 @@ void n64_rdp::recv(u64 cmd)
 		other.z_write = cmd&BITL(5);
 		other.perspective = cmd&BITL(51);
 		other.tlut_type_ia16 = cmd&BITL(46);
+		other.cov_x_alpha = cmd&BITL(12);
 		
 		BL.p[0] = field(cmd, 30, 3);
 		BL.p[1] = field(cmd, 28, 3);
@@ -493,13 +494,13 @@ n64_rdp::dc n64_rdp::tex_sample(u32 tile, s64 s, s64 t)
 {
 	auto& T = tiles[tile];
 	
-	/*
+	// my texcoord handling is better for actually displaying some of them.
+	// but eg. Peach's face gets messed up	
 	s -= T.SL>>2;
 	t -= T.TL>>2;
 
 	if( s < 0 ) { s = ~s; }
 	if( t < 0 ) { t = ~t; }	
-
 
 	if( T.shiftS < 11 ) 
 	{
@@ -551,10 +552,14 @@ n64_rdp::dc n64_rdp::tex_sample(u32 tile, s64 s, s64 t)
 			else t = 0;
 		}		
 	}
-	*/
+	
+	
+	/*
 	s -= T.SL>>2;
 	t -= T.TL>>2;
 	
+	
+	{// from: https://github.com/Hydr8gon/rokuyon/blob/main/src/rdp.cpp L410+
 	   // Clamp, mirror, or mask the S-coordinate based on tile settings
 	if( T.clampS ) s = std::max<s64>(std::min<s64>(s, ((T.SH>>2) - (T.SL>>2))), 0);
 	if( T.mirrorS && (s & (T.maskS+1)) ) s = ~s;
@@ -564,7 +569,8 @@ n64_rdp::dc n64_rdp::tex_sample(u32 tile, s64 s, s64 t)
 	if( T.clampT ) t = std::max<s64>(std::min<s64>(t, ((T.TH>>2) - (T.TL>>2))), 0);
 	if( T.mirrorT && (t & (T.maskT+1)) ) t = ~t;
 	t &= T.maskT;
-	
+	}
+	*/
 	if( T.bpp == 16 ) 
 	{
 		return dc::from16(__builtin_bswap16( *(u16*)&tmem[(T.addr*8 + (t*T.line*8) + s*2)&0xffe] ));
@@ -652,8 +658,8 @@ void n64_rdp::triangle()
 				if( x < 0 || x > scissor.lrX ) break;
 				RS.cx = x;
 				RS.cy = y;
-				u16 Z = z>>16;//1/(z/65536.f);
-				if( other.z_compare && Z > *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] ) continue;
+				u16 Z = z>>20; // z ? 1/(z/2097152.f) : 1;
+				if( other.z_compare && Z >= *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] ) continue;
 				if( RS.cmd & 4 ) RS.shade_color = dc(r>>16,g>>16,b>>16,a>>16);
 				if( RS.cmd & 2 ) 
 				{
@@ -692,8 +698,8 @@ void n64_rdp::triangle()
 				if( x < 0 || x > scissor.lrX ) break;
 				RS.cx = x;
 				RS.cy = y;
-				u16 Z = z>>16;//1/(z/65536.f);
-				if( other.z_compare && Z > *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] ) continue;
+				u16 Z = z>>20; // z ? 1/(z/2097152.f) : 1;
+				if( other.z_compare && Z >= *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] ) continue;
 				if( RS.cmd & 4 ) RS.shade_color = dc(r>>16,g>>16,b>>16,a>>16);
 				if( RS.cmd & 2 ) 
 				{
@@ -733,8 +739,8 @@ void n64_rdp::triangle()
 				if( x < 0 || x > scissor.lrX ) break;
 				RS.cx = x;
 				RS.cy = y;
-				u16 Z = z>>16;//1/(z/65536.f);
-				if( other.z_compare && Z > *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] ) continue;
+				u16 Z = z>>20; // z ? 1/(z/2097152.f) : 1;
+				if( other.z_compare && Z >= *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] ) continue;
 				if( RS.cmd & 4 ) RS.shade_color = dc(r>>16,g>>16,b>>16,a>>16);
 				if( RS.cmd & 2 ) 
 				{
@@ -773,8 +779,8 @@ void n64_rdp::triangle()
 				if( x < 0 || x > scissor.lrX ) break;
 				RS.cx = x;
 				RS.cy = y;
-				u16 Z = z>>16;//1/(z/65536.f);
-				if( other.z_compare && Z > *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] ) continue;
+				u16 Z = z>>20; // z ? 1/(z/2097152.f) : 1;
+				if( other.z_compare && Z >= *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] ) continue;
 				if( RS.cmd & 4 ) RS.shade_color = dc(r>>16,g>>16,b>>16,a>>16);
 				if( RS.cmd & 2 ) 
 				{
@@ -869,9 +875,9 @@ n64_rdp::dc n64_rdp::cc_a(u32 cycle)
 {
 	switch( CC.rgb_a[cycle] )
 	{
-	case 0: return CC.out;
+	case 0: //return CC.out;
 	case 1: return TX.tex_sample;
-	case 2: return white; //todo: tex1
+	case 2: return TX.tex_sample; //todo: tex1
 	case 3: return prim_color;
 	case 4: return RS.shade_color;
 	case 5: return env_color;
@@ -886,9 +892,9 @@ n64_rdp::dc n64_rdp::cc_d(u32 cycle)
 {
 	switch( CC.rgb_d[cycle] )
 	{
-	case 0: return CC.out;
+	case 0: //return CC.out;
 	case 1: return TX.tex_sample;
-	case 2: return white; //todo: tex1
+	case 2: return TX.tex_sample; //todo: tex1
 	case 3: return prim_color;
 	case 4: return RS.shade_color;
 	case 5: return env_color;
@@ -902,9 +908,9 @@ n64_rdp::dc n64_rdp::cc_b(u32 cycle)
 {
 	switch( CC.rgb_b[cycle] )
 	{
-	case 0: return CC.out;
+	case 0: //return CC.out;
 	case 1: return TX.tex_sample;
-	case 2: return white; //todo: tex1
+	case 2: return TX.tex_sample; //todo: tex1
 	case 3: return prim_color;
 	case 4: return RS.shade_color;
 	case 5: return env_color;
@@ -917,9 +923,9 @@ n64_rdp::dc n64_rdp::cc_c(u32 cycle)
 {
 	switch( CC.rgb_c[cycle] )
 	{
-	case 0: return CC.out;
+	case 0: //return CC.out;
 	case 1: return TX.tex_sample;
-	case 2: return white; //todo: tex1
+	case 2: return TX.tex_sample; //todo: tex1
 	case 3: return prim_color;
 	case 4: return RS.shade_color;
 	case 5: return env_color;
@@ -933,9 +939,9 @@ float n64_rdp::cc_alpha(u32 sel)
 {
 	switch( sel )
 	{
-	case 0: return CC.out.a/255.f;
+	case 0: //return CC.out.a/255.f;
 	case 1: return TX.tex_sample.a/255.f;
-	case 2: return 1; //todo: tex1
+	case 2: return TX.tex_sample.a/255.f; //todo: tex1
 	case 3: return prim_color.a/255.f;
 	case 4: return RS.shade_color.a/255.f;
 	case 5: return env_color.a/255.f;
@@ -955,27 +961,34 @@ void n64_rdp::color_combiner()
 	//	without this hack, Bob-omb Battlefield is blue and Wave Race land masses are pink.
 	dc res;
 	{
-		res = cc_a(0);
-		dc b = cc_b(0);
-		dc c = cc_c(0);
-		dc d = cc_d(0);
+		res = cc_a(1);
+		dc b = cc_b(1);
+		dc c = cc_c(1);
+		dc d = cc_d(1);
 		res -= b;
 		res *= c;
 		res += d;
 	}
 	
-	float a = cc_alpha(CC.alpha_a[0]);
-	float b = cc_alpha(CC.alpha_b[0]);
-	float c = cc_alpha(CC.alpha_c[0]);
-	float d = cc_alpha(CC.alpha_d[0]);
-	res.a = ((a - b) * c + d)*255;
+	float a = cc_alpha(CC.alpha_a[1]);
+	float b = cc_alpha(CC.alpha_b[1]);
+	float c = cc_alpha(CC.alpha_c[1]);
+	float d = cc_alpha(CC.alpha_d[1]);
+	res.a = ((a - b) * c + d)*255.f;
 	CC.out = res;
 }
 
 bool n64_rdp::blender()
 {
+	if( other.alpha_compare_en && CC.out.a < blend_color.a )
+	{
+		//std::println("acomp en");
+		return false;
+	}
+
 	if( !other.force_blend ) 
 	{
+		if( CC.out.a == 0 ) return false; // hack to get some decals&billboards to actually cut out
 		BL.out = CC.out;
 		return true;
 	}
@@ -989,6 +1002,7 @@ bool n64_rdp::blender()
 				    break;
 	case 2: P = blend_color; break;
 	case 3: P = fog_color; break;
+	default: std::println("BL.p error"); exit(1);
 	}
 	switch( BL.m[0] )
 	{
@@ -998,6 +1012,7 @@ bool n64_rdp::blender()
 				    break;
 	case 2: M = blend_color; break;
 	case 3: M = fog_color; break;
+	default: std::println("BL.n error"); exit(1);
 	}
 	float A=1, B=1;
 	switch( BL.a[0] )
@@ -1006,6 +1021,7 @@ bool n64_rdp::blender()
 	case 1: A = fog_color.a/255.f; break;
 	case 2: A = RS.shade_color.a/255.f; break;
 	case 3: A = 0; break;
+	default: std::println("BL.a error"); exit(1);
 	}
 	switch( BL.b[0] )
 	{
@@ -1013,12 +1029,16 @@ bool n64_rdp::blender()
 	case 1: B = 1; break;  //todo: coverage
 	case 2: B = 1; break;
 	case 3: B = 0; break;
+	default: std::println("BL.b error"); exit(1);
 	}
 	
 	BL.out = P;
 	BL.out *= A;
 	M *= B;
 	BL.out += M;
+	
+	if( BL.out.a == 0 ) return false; //??
+	
 	return true;
 }
 

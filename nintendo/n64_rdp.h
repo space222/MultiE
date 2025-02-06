@@ -112,6 +112,7 @@ private:
 		bool z_compare, z_write;
 		bool perspective;
 		bool tlut_type_ia16;
+		bool cov_x_alpha;
 	} other;
 	
 	struct {

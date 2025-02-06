@@ -253,13 +253,11 @@ Nintendo 64 Todo List
 ------------------------
 Overall:
 1. Implement/Fix last few vector instructions.
-2. Check combiner/blender mode commands. Figure out what mario64 is using for the level geometry (why all blue!?!)
-3. Debug the rampant crashing in <em>everything but</em> mario64.
-4. Fix FPU rounding and conversions.
-5. Implement FPU underflow and flushing.
-6. Pass PI DMA small and unaligned tests.
-7. Optimize any low hanging fruit (RSP instruction caching? RDP on sep. thread?)
-8. Implement/Fix EEPROM and Pak joybus/pif access.
+2. Fix FPU rounding and conversions.
+3. Implement FPU underflow and flushing.
+4. Pass PI DMA small and unaligned tests.
+5. Optimize any low hanging fruit (RSP instruction caching? RDP on sep. thread?)
+6. Implement/Fix EEPROM and Pak joybus/pif access.
 VR4300:
 1. Continue to improve FPU instructions, figure out underflow. Other than TLB, that's about all that's left for CPU.
 2. TLB?
@@ -280,6 +278,8 @@ AI: Audio works. Not supporting the delayed carry hardware bug. Sounding any goo
 PIF: one controller and only D-pad + a/b/z/start currently implemented and working in namco.
 	If the cmd byte in pifram gets the bit zero cleared, namco stops getting input.
 Notes (latest first):
+	Triangle attributes S and T are actually s10.21, not s15.16. Their deltas (eg DsDx) already take this into account
+		The triangle doc says Z is similar but doing more right shifting doesn't help any.
 	Load Block having num_bytes be num_texels*8 instead of an actual bpp calc makes mario, starfox, and LCARS look way better.
 		This is probably papering over a different bug?
 	After c/p'ing pif hle code from dillonb/n64 to see how far off I was, there was no change until I
