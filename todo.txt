@@ -252,12 +252,13 @@ command gets strobed in, begin alternating the output pin every 30 frames.
 Nintendo 64 Todo List
 ------------------------
 Overall:
-1. Implement/Fix last few vector instructions.
-2. Fix FPU rounding and conversions.
-3. Implement FPU underflow and flushing.
-4. Pass PI DMA small and unaligned tests.
-5. Optimize any low hanging fruit (RSP instruction caching? RDP on sep. thread?)
-6. Implement/Fix EEPROM and Pak joybus/pif access.
+1. Some games don't make it to writing 8 to the PIF. Check which CIC they use and if they did even pass IPL.
+2. Implement/Fix EEPROM and Pak joybus/pif access.
+3. Implement/Fix last few vector instructions.
+4. Fix FPU rounding and conversions.
+5. Implement FPU underflow and flushing.
+6. Pass PI DMA small and unaligned tests.
+7. Optimize any low hanging fruit (RSP instruction caching? RDP on sep. thread?)
 VR4300:
 1. Continue to improve FPU instructions, figure out underflow. Other than TLB, that's about all that's left for CPU.
 2. TLB?

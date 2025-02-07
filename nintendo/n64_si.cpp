@@ -16,7 +16,7 @@
 
 void n64::pif_run()
 {
-	if( pifram[0x3f] & 0x10 ) { pifram[0x3f] = 0; pif_rom_enabled = false; return; }
+	if( pifram[0x3f] & 0x10 ) { pifram[0x3f] = 0x80; pif_rom_enabled = false; return; }
 	if( pifram[0x3f] & 0x40 ) { pifram[0x3f] = 0; return; }
 	if( pifram[0x3f] & 0x20 ) { pifram[0x3f] = 0x80; return; }
 	if( pifram[0x3f] & 8 ) { pifram[0x3f] = 0; return; }
@@ -108,20 +108,20 @@ void n64::pif_run()
                         //unimplemented(cmdlen != 3, "Mempak read with cmdlen != 3");
                         //unimplemented(reslen != 33, "Mempak read with reslen != 33");
                         //pif_mempak_read(cmd, res);
-                        memset(res, 0, reslen);
+                        //memset(res, 0, reslen);
                         break;
                     case PIF_COMMAND_MEMPAK_WRITE:
                         //unimplemented(cmdlen != 35, "Mempak write with cmdlen != 35");
                         //unimplemented(reslen != 1, "Mempak write with reslen != 1");
                        // pif_mempak_write(cmd, res);
                        // memset(res, 0, reslen);
-                        res[0] = cmd[3]; // which byte in cmd?
+                       // res[0] = cmd[3]; // which byte in cmd?
                         break;
                     case PIF_COMMAND_EEPROM_READ:
                         //unimplemented(cmdlen != 2, "EEPROM read with cmdlen != 2");
                         //unimplemented(reslen != 8, "EEPROM read with reslen != 8");
                    //unimplemented(n64sys.mem.save_data == NULL, "EEPROM read when save data is uninitialized! Is this game in the game DB?");		
-                        memset(res, 0, reslen);
+                       //memset(res, 0, reslen);
                         //pif_eeprom_read(cmd, res);
                         break;
                     case PIF_COMMAND_EEPROM_WRITE:
@@ -129,7 +129,7 @@ void n64::pif_run()
                         //unimplemented(reslen != 1,  "EEPROM write with reslen != 1");
                 //unimplemented(n64sys.mem.save_data == NULL, "EEPROM write when save data is uninitialized! Is this game in the game DB?");
                         //pif_eeprom_write(cmd, res);
-                        memset(res, 0, reslen);
+                       // memset(res, 0, reslen);
                         break;
                     default: break;
                        // logfatal("Invalid PIF command: %X", cmd[CMD_COMMAND_INDEX]);

@@ -8,14 +8,14 @@
 #define LINK (cpu.nnpc&0xffc)
 #define DS_REL_ADDR (cpu.npc + (s32(s16(imm16))<<2))
 
-typedef void (*rsp_instr)(n64_rsp&, u32);
+//typedef void (*rsp_instr)(n64_rsp&, u32);
 #define INSTR [](n64_rsp& cpu, u32 opc)
 
-rsp_instr rsp_lwc2(n64_rsp&, u32);
-rsp_instr rsp_swc2(n64_rsp&, u32);
-rsp_instr rsp_cop2(n64_rsp&, u32);
+n64_rsp::rsp_instr rsp_lwc2(n64_rsp&, u32);
+n64_rsp::rsp_instr rsp_swc2(n64_rsp&, u32);
+n64_rsp::rsp_instr rsp_cop2(n64_rsp&, u32);
 
-rsp_instr rsp_special(n64_rsp&, u32 opcode)
+n64_rsp::rsp_instr rsp_special(n64_rsp&, u32 opcode)
 {
 	switch( opcode & 0x3F )
 	{
@@ -48,7 +48,7 @@ rsp_instr rsp_special(n64_rsp&, u32 opcode)
 	}
 }
 
-rsp_instr rsp_regimm(n64_rsp&, u32 opcode)
+n64_rsp::rsp_instr rsp_regimm(n64_rsp&, u32 opcode)
 {
 	switch( (opcode>>16) & 0x1F )
 	{
@@ -61,7 +61,7 @@ rsp_instr rsp_regimm(n64_rsp&, u32 opcode)
 	return nullptr;
 }
 
-rsp_instr rsp_regular(n64_rsp& proc, u32 opcode)
+n64_rsp::rsp_instr rsp_regular(n64_rsp& proc, u32 opcode)
 {
 	switch( opcode>>26 )
 	{
@@ -175,10 +175,34 @@ rsp_instr rsp_regular(n64_rsp& proc, u32 opcode)
 	}
 }
 
+n64_rsp::rsp_instr n64_rsp::decode(u32 opc)
+{
+	if( (opc>>26) == 0 )
+	{
+		return rsp_special(*this, opc);
+	} else if( (opc>>26) == 1 ) {
+		return rsp_regimm(*this, opc);
+	}
+	return rsp_regular(*this, opc);
+}
+
+n64_rsp::rsp_instr imem_cache[1024];
+
+void n64_rsp::invalidate(u32 imem_offset)
+{
+	imem_offset &= 0xffc;
+	imem_offset >>= 2;
+	imem_cache[imem_offset] = [](n64_rsp& rsp, u32 opc) {
+		auto fn = rsp.decode(opc);
+		imem_cache[(rsp.pc&0xfff)>>2] = fn;
+		fn(rsp, opc);
+	};
+}
+
 void n64_rsp::step()
 {
 	r[0] = 0;
-	u32 opc = __builtin_bswap32(*(u32*)&IMEM[pc&0xffc]);
+	/*u32 opc = __builtin_bswap32(*(u32*)&IMEM[pc&0xffc]);
 	if( (opc>>26) == 0 )
 	{
 		rsp_special(*this, opc)(*this, opc);
@@ -186,7 +210,8 @@ void n64_rsp::step()
 		rsp_regimm(*this, opc)(*this, opc);
 	} else {
 		rsp_regular(*this, opc)(*this, opc);
-	}
+	}*/
+	imem_cache[(pc&0xffc)>>2](*this, __builtin_bswap32(*(u32*)&IMEM[pc&0xffc]));
 	//todo: break might not run the pipeline after?	
 	pc = npc & 0xffc;
 	npc = nnpc;

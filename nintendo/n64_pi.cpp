@@ -1,3 +1,4 @@
+#include <cstdio>
 #include <cstring>
 #include "n64.h"
 
@@ -14,18 +15,21 @@ void n64::pi_dma(bool write)
 			//printf("Unaligned DMA\n");
 			//exit(1);
 		}
-		//fprintf(stderr, "PI DMA: cart $%X, ram $%X, len $%X\n", cart, ramaddr, PI_WR_LEN+1);
 		len = (PI_WR_LEN & 0xffFFff)+1;
 		if( cart + len < ROM.size() )
 		{
 			memcpy(mem.data()+ramaddr, ROM.data()+cart, len);
 		} else {
+			fprintf(stderr, "PI DMA: cart $%X, ram $%X, len $%X\n", cart, ramaddr, PI_WR_LEN+1);
+			fprintf(stderr, "PI DMA: dma included data past ROM size of %i bytes\n", int(ROM.size()));
 			memset(mem.data()+ramaddr, 0, len);
-			//fprintf(stderr, "PI DMA: dma included data past ROM size of %i bytes\n", int(ROM.size()));
 			memcpy(mem.data()+ramaddr, ROM.data()+cart, ROM.size()-cart);
 		}
 		PI_CART_ADDR += (len+1)&~1;
 		PI_DRAM_ADDR += (len+7)&~7;
+		FILE* fp = fopen("dump.bin", "wb");
+		fwrite(mem.data()+0x300000, 1, 0x4000, fp);
+		fclose(fp);
 	} else {
 		//todo: writing from RAM to cart's save ram
 		len = (PI_WR_LEN & 0xffFFff)+1;

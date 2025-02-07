@@ -20,6 +20,7 @@ void n64::sp_read_dma()
 		for(u32 i = 0; i < rdlen; ++i, ++sp_offset, ++ram_offset) 
 		{
 			rmem[sp_offset&0xfff] = (ram_offset < 0x800000 ) ? mem[ram_offset] : 0;
+			if( rmem == IMEM ) RSP.invalidate(sp_offset);
 		}
 	}
 	

@@ -14,6 +14,10 @@ struct vreg
 class n64_rsp
 {
 public:
+	typedef void (*rsp_instr)(n64_rsp&, u32);
+	rsp_instr decode(u32);
+	void invalidate(u32);
+	
 	n64_rsp()
 	{
 		for(u32 i = 0; i < 8; ++i) a[i] = 0;

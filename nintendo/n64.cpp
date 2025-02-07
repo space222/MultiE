@@ -1,5 +1,9 @@
+#include <print>
 #include <array>
 #include "n64.h"
+
+u32 flash_status = 0x11118001;
+u8 sram[32*1024];
 
 std::array<u32, 256> crc_table = []() {
 	std::array<u32, 256> crct;
@@ -127,6 +131,8 @@ u64 n64::read(u32 addr, int size)
 		return __builtin_bswap32(*(u32*)&viewbuf[addr-0x13ff0000]);
 	}
 	
+	if( addr >= 0x0800000 && addr <= 0xF000000 ) return __builtin_bswap32(*(u32*)&sram[addr&0x7fff]);
+	
 	printf("N64:$%X: r%i <$%X\n", u32(cpu.pc), size, addr);
 	//exit(1);
 	return 0;
@@ -204,6 +210,13 @@ void n64::write(u32 addr, u64 v, int size)
 		return;
 	}
 	
+	if( addr >= 0x0800000 && addr <= 0xF000000 ) 
+	{
+		*(u32*)&sram[addr&0x7fff] = __builtin_bswap32(u32(v));
+		return;
+	}
+	
+	
 	printf("$%X: W%i $%X = $%lX\n", u32(cpu.pc), size, addr, v);
 }
 
@@ -246,6 +259,8 @@ bool n64::loadROM(const std::string fname)
 		{
 			*(u16*)&ROM[i] = __builtin_bswap16(*(u16*)&ROM[i]);
 		}	
+	} else if( ROM[0] != 0x80 || ROM[1] != 0x37 || ROM[2] != 0x12 || ROM[3] != 0x40 ) {
+		std::println("N64: ROM has unknown byte order. First bytes {:X}{:X}{:X}{:X}", ROM[0], ROM[1], ROM[2], ROM[3]);
 	}
 	
 	//u32 entry = __builtin_bswap32(*(u32*)&ROM[8]);
@@ -400,7 +415,8 @@ void n64::reset()
 	
 	if( do_boot_hle )
 	{
-	
+		printf("boot HLE not yet supported\n");
+		exit(1);
 	} else {
 		u8 seed = 0x3F;
 		u32 iplcrc = crc32(ROM.data()+0x40, 0x1000-0x40);
@@ -418,6 +434,8 @@ void n64::reset()
 			break;
 		}
 	
+		pifram[0x24] = 0;
+		pifram[0x25] = 4;
 		pifram[0x26] = seed;
 		pifram[0x27] = seed;
 	}
