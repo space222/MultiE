@@ -500,7 +500,7 @@ n64_rdp::dc n64_rdp::tex_sample(u32 tile, s64 s, s64 t)
 	t -= T.TL>>2;
 
 	if( s < 0 ) { s = ~s; }
-	if( t < 0 ) { t = ~t; }	
+	if( t < 0 ) { t = ~t; }
 
 	if( T.shiftS < 11 ) 
 	{
@@ -554,7 +554,7 @@ n64_rdp::dc n64_rdp::tex_sample(u32 tile, s64 s, s64 t)
 	}
 	
 	
-	/*
+	/* // works for Peach's face and the tree billboards, but the file select hand is missing completely
 	s -= T.SL>>2;
 	t -= T.TL>>2;
 	
@@ -571,8 +571,16 @@ n64_rdp::dc n64_rdp::tex_sample(u32 tile, s64 s, s64 t)
 	t &= T.maskT;
 	}
 	*/
+	
 	if( T.bpp == 16 ) 
 	{
+		if( T.format == 3 )
+		{
+			u16 c = *(u16*)&tmem[(T.addr*8 + (t*T.line*8) + s*2)&0xffe];
+			u8 I = c;
+			u8 A = c>>8;
+			return dc(I,I,I,A);
+		}
 		return dc::from16(__builtin_bswap16( *(u16*)&tmem[(T.addr*8 + (t*T.line*8) + s*2)&0xffe] ));
 	} else if( T.bpp == 32 ) {
 		//todo: put the rg/ba in the separate banks
@@ -581,6 +589,13 @@ n64_rdp::dc n64_rdp::tex_sample(u32 tile, s64 s, s64 t)
 		if( T.format == 2 )
 		{
 			u8 v = tmem[(T.addr*8 + (t*T.line*8) + s)&0xfff];
+			if( other.tlut_type_ia16 )
+			{
+				u16 c = *(u16*)&tmem[(0x100+v)*8];
+				u8 I = c&0xff;
+				u8 A = c>>8;
+				return dc(I, I, I, A);
+			}
 			return dc::from16(__builtin_bswap16(*(u16*)&tmem[(0x100+v)*8]));
 		} else {
 			u8 v = tmem[(T.addr*8 + (t*T.line*8) + s)&0xfff];
@@ -592,6 +607,13 @@ n64_rdp::dc n64_rdp::tex_sample(u32 tile, s64 s, s64 t)
 			u8 v = tmem[(T.addr*8 + (t*T.line*8) + (s>>1))&0xfff];
 			v >>= ((s^1)&1)*4;
 			v &= 15;
+			if( other.tlut_type_ia16 )
+			{
+				u16 c = *(u16*)&tmem[((0x100+T.palette*16+v)*8)&0xfff];
+				u8 I = c&0xff;
+				u8 A = c>>8;
+				return dc(I, I, I, A);
+			}
 			return dc::from16(__builtin_bswap16(*(u16*)&tmem[((0x100+T.palette*16+v)*8)&0xfff]));
 		}
 	}
@@ -655,10 +677,11 @@ void n64_rdp::triangle()
 			if( y >= 0 )
 			for(s64 x = RS.xh>>16; x >= RS.xm>>16; --x)
 			{
-				if( x < 0 || x > scissor.lrX ) break;
+				if( x < 0 ) { ATTR_XDEC; continue; }
+				if( x > scissor.lrX ) break;
 				RS.cx = x;
 				RS.cy = y;
-				u16 Z = z>>20; // z ? 1/(z/2097152.f) : 1;
+				u16 Z = z>>16; // z ? 1/(z/2097152.f) : 1;
 				if( other.z_compare && Z >= *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] ) 
 				{
 					ATTR_XDEC;
@@ -677,12 +700,12 @@ void n64_rdp::triangle()
 					ATTR_XDEC;
 					continue;
 				}
+				if( other.z_write) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = Z;
 				if( cimg.bpp == 16 )
 				{
-					if( other.z_write) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = Z;
 					*(u16*)&rdram[cimg.addr + (cimg.width*2*y) + (x*2)]= __builtin_bswap16(BL.out.to16());
 				} else {
-				//*(u32*)&rdram[cimg.addr + (cimg.width*4*y) + (x*4)] = __builtin_bswap32(col.to32());
+					*(u32*)&rdram[cimg.addr + (cimg.width*4*y) + (x*4)] = __builtin_bswap32(BL.out.to32());
 				}
 				ATTR_XDEC;
 			}
@@ -703,10 +726,11 @@ void n64_rdp::triangle()
 			if( y >= 0 )
 			for(s64 x = RS.xh>>16; x >= RS.xl>>16; --x)
 			{
-				if( x < 0 || x > scissor.lrX ) break;
+				if( x < 0 ) { ATTR_XDEC; continue; }
+				if( x > scissor.lrX ) break;
 				RS.cx = x;
 				RS.cy = y;
-				u16 Z = z>>20; // z ? 1/(z/2097152.f) : 1;
+				u16 Z = z>>16; // z ? 1/(z/2097152.f) : 1;
 				if( other.z_compare && Z >= *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] ) 
 				{
 					ATTR_XDEC;
@@ -725,12 +749,12 @@ void n64_rdp::triangle()
 					ATTR_XDEC;
 					continue;
 				}
+				if( other.z_write ) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = Z;
 				if( cimg.bpp == 16 )
 				{
-					if( other.z_write ) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = Z;
 					*(u16*)&rdram[cimg.addr + (cimg.width*2*y) + (x*2)]= __builtin_bswap16(BL.out.to16());
 				} else {
-				//*(u32*)&rdram[cimg.addr + (cimg.width*4*y) + (x*4)] = __builtin_bswap32(col.to32());
+					*(u32*)&rdram[cimg.addr + (cimg.width*4*y) + (x*4)] = __builtin_bswap32(BL.out.to32());
 				}
 				ATTR_XDEC;
 			}
@@ -752,10 +776,11 @@ void n64_rdp::triangle()
 			if( y >= 0 )
 			for(s64 x = RS.xh>>16; x <= RS.xm>>16; ++x)
 			{
-				if( x < 0 || x > scissor.lrX ) break;
+				if( x < 0 ) { ATTR_XINC; continue; }
+				if( x > scissor.lrX ) break;
 				RS.cx = x;
 				RS.cy = y;
-				u16 Z = z>>20; // z ? 1/(z/2097152.f) : 1;
+				u16 Z = z>>16; // z ? 1/(z/2097152.f) : 1;
 				if( other.z_compare && Z >= *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] ) 
 				{
 					ATTR_XINC;
@@ -774,12 +799,12 @@ void n64_rdp::triangle()
 					ATTR_XINC;
 					continue;
 				}
+				if( other.z_write) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = Z;
 				if( cimg.bpp == 16 )
 				{
-					if( other.z_write) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = Z;
 					*(u16*)&rdram[cimg.addr + (cimg.width*2*y) + (x*2)]= __builtin_bswap16(BL.out.to16());
 				} else {
-				//*(u32*)&rdram[cimg.addr + (cimg.width*4*y) + (x*4)] = __builtin_bswap32(col.to32());
+					*(u32*)&rdram[cimg.addr + (cimg.width*4*y) + (x*4)] = __builtin_bswap32(BL.out.to32());
 				}
 				ATTR_XINC;
 			}
@@ -800,10 +825,11 @@ void n64_rdp::triangle()
 			if( y >= 0 )
 			for(s64 x = RS.xh>>16; x <= RS.xl>>16; ++x)
 			{
-				if( x < 0 || x > scissor.lrX ) break;
+				if( x < 0 ) { ATTR_XINC; continue; }
+				if( x > scissor.lrX ) break;
 				RS.cx = x;
 				RS.cy = y;
-				u16 Z = z>>20; // z ? 1/(z/2097152.f) : 1;
+				u16 Z = z>>16; // z ? 1/(z/2097152.f) : 1;
 				if( other.z_compare && Z >= *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] ) 
 				{
 					ATTR_XINC;
@@ -822,12 +848,12 @@ void n64_rdp::triangle()
 					ATTR_XINC;
 					continue;
 				}
+				if( other.z_write) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = Z;
 				if( cimg.bpp == 16 )
 				{
-					if( other.z_write) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = Z;
 					*(u16*)&rdram[cimg.addr + (cimg.width*2*y) + (x*2)]= __builtin_bswap16(BL.out.to16());
 				} else {
-				//*(u32*)&rdram[cimg.addr + (cimg.width*4*y) + (x*4)] = __builtin_bswap32(col.to32());
+					*(u32*)&rdram[cimg.addr + (cimg.width*4*y) + (x*4)] = __builtin_bswap32(BL.out.to32());
 				}
 				ATTR_XINC;
 			}
