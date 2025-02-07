@@ -499,9 +499,6 @@ n64_rdp::dc n64_rdp::tex_sample(u32 tile, s64 s, s64 t)
 	s -= T.SL>>2;
 	t -= T.TL>>2;
 
-	if( s < 0 ) { s = ~s; }
-	if( t < 0 ) { t = ~t; }
-
 	if( T.shiftS < 11 ) 
 	{
 		s >>= T.shiftS;
@@ -514,6 +511,9 @@ n64_rdp::dc n64_rdp::tex_sample(u32 tile, s64 s, s64 t)
 	} else {
 		t <<= 16-T.shiftT;
 	}
+	
+	if( T.clampS ) { s = std::clamp(s, s64(0), s64(T.SH>>2)); }
+	if( T.clampT ) { t = std::clamp(t, s64(0), s64(T.TH>>2)); }
 	
 	if( T.mirrorS )
 	{
@@ -677,8 +677,8 @@ void n64_rdp::triangle()
 			if( y >= 0 )
 			for(s64 x = RS.xh>>16; x >= RS.xm>>16; --x)
 			{
-				if( x < 0 ) { ATTR_XDEC; continue; }
-				if( x > scissor.lrX ) break;
+				if( x < 0 ) break;
+				if( x > scissor.lrX ) { ATTR_XDEC; continue; }
 				RS.cx = x;
 				RS.cy = y;
 				u16 Z = z>>16; // z ? 1/(z/2097152.f) : 1;
@@ -726,8 +726,8 @@ void n64_rdp::triangle()
 			if( y >= 0 )
 			for(s64 x = RS.xh>>16; x >= RS.xl>>16; --x)
 			{
-				if( x < 0 ) { ATTR_XDEC; continue; }
-				if( x > scissor.lrX ) break;
+				if( x < 0 ) break;
+				if( x > scissor.lrX ) { ATTR_XDEC; continue; }
 				RS.cx = x;
 				RS.cy = y;
 				u16 Z = z>>16; // z ? 1/(z/2097152.f) : 1;

@@ -186,7 +186,7 @@ n64_rsp::rsp_instr n64_rsp::decode(u32 opc)
 	return rsp_regular(*this, opc);
 }
 
-n64_rsp::rsp_instr imem_cache[1024];
+static n64_rsp::rsp_instr imem_cache[1024] = {0};
 
 void n64_rsp::invalidate(u32 imem_offset)
 {

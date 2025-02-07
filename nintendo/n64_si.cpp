@@ -65,7 +65,8 @@ void n64::pif_run()
                         //unimplemented(reslen != 3, "Reset with reslen != 3");
                         //pif_controller_reset(cmd, res);
                         //pif_controller_id(cmd, res);
-                        res[0] = 5;
+                        if( pif_channel ) res[0] = 0x80;
+                        else res[0] = 5;
                         res[1] = 0;
                         res[2] = 2;
                         break;
@@ -73,7 +74,8 @@ void n64::pif_run()
                        // unimplemented(cmdlen != 1, "Controller id with cmdlen != 1");
                        // unimplemented(reslen != 3, "Controller id with reslen != 3");
                         //pif_controller_id(cmd, res);
-                         res[0] = 5;
+                         if( pif_channel ) res[0] = 0x80;
+                        else res[0] = 5;
                         res[1] = 0;
                         res[2] = 2;
                         break;
@@ -134,7 +136,7 @@ void n64::pif_run()
                     default: break;
                        // logfatal("Invalid PIF command: %X", cmd[CMD_COMMAND_INDEX]);
                 }
-
+		pif_channel++;
                 i += cmdlen + reslen;
 	}
 	}
