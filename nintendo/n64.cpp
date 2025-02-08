@@ -234,6 +234,8 @@ bool n64::loadROM(const std::string fname)
 	
 	fseek(fp, 0, SEEK_END);
 	auto fsz = ftell(fp);
+	fsz += 0xfffff;
+	fsz &= ~0xfffff;
 	fseek(fp, 0, SEEK_SET);
 	ROM.resize(fsz);
 	[[maybe_unused]] int unu = fread(ROM.data(), 1, fsz, fp);
@@ -282,7 +284,7 @@ bool n64::loadROM(const std::string fname)
 
 void n64::run_frame()
 {
-	for(u32 line = 0; line < 262; ++line)
+	for(u32 line = 0; line < 263; ++line)
 	{
 		if( (VI_CTRL & 3) > 1 )
 		{
@@ -355,7 +357,7 @@ void n64::run_frame()
 		}
 	}
 	
-	//if( !(VI_V_TOTAL & 1) && (VI_CTRL&3) ) VI_V_CURRENT ^= 1;
+	if( !(VI_V_TOTAL & 1) && (VI_CTRL&3) ) VI_V_CURRENT ^= 1;
 	
 	vi_draw_frame();
 }

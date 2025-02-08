@@ -398,11 +398,20 @@ void n64_rdp::texture_rect(u64 cmd0, u64 cmd1)
 			s32 Sl = S;
 			for(u32 X = ulX; X < lrX; ++X, Sl += DsDx)
 			{
-				u16 sample = tex_sample(tile, Sl>>10, T>>10).to16();
-				if( other.alpha_compare_en && !(sample&1) ) continue;
-				if( other.force_blend && !(sample&1) ) continue;
+				TX.tex_sample = tex_sample(tile, Sl>>10, T>>10);
+				if( other.cycle_type != CYCLE_TYPE_COPY )
+				{
+					color_combiner();
+					if( !blender() ) continue;
+				} else {
+					BL.out = TX.tex_sample;
+					if( other.alpha_compare_en && !(BL.out.to16()&1) ) continue;
+				}
+				u16 p = BL.out.to16();
+				//if( other.alpha_compare_en && !(p&1) ) continue;
+				//if( other.force_blend && !(p&1) ) continue;
+				*(u16*)&rdram[cimg.addr + (Y*cimg.width*2) + X*2] = __builtin_bswap16(p);
 				
-				*(u16*)&rdram[cimg.addr + (Y*cimg.width*2) + X*2] = __builtin_bswap16(sample);
 			}
 		}	
 	} else if( cimg.bpp == 32 ) {
@@ -415,7 +424,7 @@ void n64_rdp::texture_rect(u64 cmd0, u64 cmd1)
 				if( other.alpha_compare_en && !(sample&0xff) ) continue;
 				if( other.force_blend && !(sample&0xff) ) continue;
 				
-				*(u32*)&rdram[cimg.addr + (Y*cimg.width*4) + X*4] = __builtin_bswap32(sample);
+				*(u32*)&rdram[cimg.addr + (Y*cimg.width*4) + X*4] = dc(0xff,0,0,0xff).to32();//__builtin_bswap32(sample);
 			}
 		}	
 	}
@@ -494,83 +503,84 @@ n64_rdp::dc n64_rdp::tex_sample(u32 tile, s64 s, s64 t)
 {
 	auto& T = tiles[tile];
 	
-	// my texcoord handling is better for actually displaying some of them.
-	// but eg. Peach's face gets messed up	
 	s -= T.SL>>2;
 	t -= T.TL>>2;
 
-	if( T.shiftS < 11 ) 
+	if( other.cycle_type != CYCLE_TYPE_COPY )
 	{
-		s >>= T.shiftS;
-	} else {
-		s <<= 16-T.shiftS;
-	}
-	if( T.shiftT < 11 ) 
-	{
-		t >>= T.shiftT;
-	} else {
-		t <<= 16-T.shiftT;
-	}
-	
-	if( T.clampS ) { s = std::clamp(s, s64(0), s64(T.SH>>2)); }
-	if( T.clampT ) { t = std::clamp(t, s64(0), s64(T.TH>>2)); }
-	
-	if( T.mirrorS )
-	{
-		u32 mbit = s & (T.maskS+1);
-		s &= T.maskS;
-		if( mbit ) s ^= T.maskS;
-	} else if( T.maskS ) {
-		s &= T.maskS;
-	}
-	if( T.mirrorT )
-	{
-		u32 mbit = t & (T.maskT+1);
-		t &= T.maskT;
-		if( mbit ) t ^= T.maskT;
-	} else if( T.maskT ) {
-		t &= T.maskT;
-	}
-
-	if( s > (T.SH>>2) ) 
-	{
-		if( T.clampS ) 
+		if( T.shiftS < 11 ) 
 		{
-			s = T.SH>>2;
+			s >>= T.shiftS;
 		} else {
-			if( T.SH>>2 ) s %= T.SH>>2;
-			else s = 0;
+			s <<= 16-T.shiftS;
 		}
-	}
-	if( t > (T.TH>>2) ) 
-	{
-		if( T.clampT ) 
+		if( T.shiftT < 11 ) 
 		{
-			t = T.TH>>2;
+			t >>= T.shiftT;
 		} else {
-			if( T.TH>>2 ) t %= T.TH>>2;
-			else t = 0;
-		}		
-	}
-	
-	
-	/* // works for Peach's face and the tree billboards, but the file select hand is missing completely
-	s -= T.SL>>2;
-	t -= T.TL>>2;
-	
-	
-	{// from: https://github.com/Hydr8gon/rokuyon/blob/main/src/rdp.cpp L410+
-	   // Clamp, mirror, or mask the S-coordinate based on tile settings
-	if( T.clampS ) s = std::max<s64>(std::min<s64>(s, ((T.SH>>2) - (T.SL>>2))), 0);
-	if( T.mirrorS && (s & (T.maskS+1)) ) s = ~s;
-	s &= T.maskS;
+			t <<= 16-T.shiftT;
+		}
+		
+		if( T.clampS ) { s = std::clamp(s, s64(0 /*T.SL>>2*/), s64(T.SH>>2)); }
+		if( T.clampT ) { t = std::clamp(t, s64(0 /*T.TL>>2*/), s64(T.TH>>2)); }
+		
+		if( T.mirrorS )
+		{
+			u32 mbit = s & (T.maskS+1);
+			s &= T.maskS;
+			if( mbit ) s ^= T.maskS;
+		} else if( T.maskS ) {
+			s &= T.maskS;
+		}
+		if( T.mirrorT )
+		{
+			u32 mbit = t & (T.maskT+1);
+			t &= T.maskT;
+			if( mbit ) t ^= T.maskT;
+		} else if( T.maskT ) {
+			t &= T.maskT;
+		}
 
-	// Clamp, mirror, or mask the T-coordinate based on tile settings
-	if( T.clampT ) t = std::max<s64>(std::min<s64>(t, ((T.TH>>2) - (T.TL>>2))), 0);
-	if( T.mirrorT && (t & (T.maskT+1)) ) t = ~t;
-	t &= T.maskT;
+		if( s > (T.SH>>2) ) 
+		{
+			if( T.clampS ) 
+			{
+				s = T.SH>>2;
+			} else {
+				if( T.SH>>2 ) s %= T.SH>>2;
+				else s = 0;
+			}
+		}
+		if( t > (T.TH>>2) ) 
+		{
+			if( T.clampT ) 
+			{
+				t = T.TH>>2;
+			} else {
+				if( T.TH>>2 ) t %= T.TH>>2;
+				else t = 0;
+			}		
+		}
+		
+		
+		/*
+		s -= T.SL>>2;
+		t -= T.TL>>2;
+		
+		
+		{// from: https://github.com/Hydr8gon/rokuyon/blob/main/src/rdp.cpp L410+
+		   // Clamp, mirror, or mask the S-coordinate based on tile settings
+		if( T.clampS ) s = std::max<s64>(std::min<s64>(s, ((T.SH>>2) - (T.SL>>2))), 0);
+		if( T.mirrorS && (s & (T.maskS+1)) ) s = ~s;
+		s &= T.maskS;
+
+		// Clamp, mirror, or mask the T-coordinate based on tile settings
+		if( T.clampT ) t = std::max<s64>(std::min<s64>(t, ((T.TH>>2) - (T.TL>>2))), 0);
+		if( T.mirrorT && (t & (T.maskT+1)) ) t = ~t;
+		t &= T.maskT;
+		}
+		*/
 	}
-	*/
 	
 	if( T.bpp == 16 ) 
 	{
@@ -681,7 +691,7 @@ void n64_rdp::triangle()
 				if( x > scissor.lrX ) { ATTR_XDEC; continue; }
 				RS.cx = x;
 				RS.cy = y;
-				u16 Z = z>>16; // z ? 1/(z/2097152.f) : 1;
+				u16 Z = z>>16;// z ? 1/(z/65536.f) : 1;
 				if( other.z_compare && Z >= *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] ) 
 				{
 					ATTR_XDEC;
@@ -713,7 +723,7 @@ void n64_rdp::triangle()
 			RS.xm += RS.DxmDy;
 			ATTR_YINC;
 		}
-		for(s64 y = RS.y2>>16; y < RS.y3>>16 && y < scissor.lrY; ++y)
+		for(s64 y = RS.y2>>16; y <= RS.y3>>16 && y < scissor.lrY; ++y)
 		{
 			s64 r = RS.r;
 			s64 g = RS.g;
@@ -730,7 +740,7 @@ void n64_rdp::triangle()
 				if( x > scissor.lrX ) { ATTR_XDEC; continue; }
 				RS.cx = x;
 				RS.cy = y;
-				u16 Z = z>>16; // z ? 1/(z/2097152.f) : 1;
+				u16 Z = z>>16;// z ? 1/(z/65536.f) : 1;
 				if( other.z_compare && Z >= *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] ) 
 				{
 					ATTR_XDEC;
@@ -780,7 +790,7 @@ void n64_rdp::triangle()
 				if( x > scissor.lrX ) break;
 				RS.cx = x;
 				RS.cy = y;
-				u16 Z = z>>16; // z ? 1/(z/2097152.f) : 1;
+				u16 Z = z>>16;// z ? 1/(z/65536.f) : 1;
 				if( other.z_compare && Z >= *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] ) 
 				{
 					ATTR_XINC;
@@ -812,7 +822,7 @@ void n64_rdp::triangle()
 			RS.xm += RS.DxmDy;
 			ATTR_YINC;
 		}
-		for(s64 y = RS.y2>>16; y < RS.y3>>16 && y < scissor.lrY; ++y)
+		for(s64 y = RS.y2>>16; y <= RS.y3>>16 && y < scissor.lrY; ++y)
 		{
 			s64 r = RS.r;
 			s64 g = RS.g;
@@ -829,7 +839,7 @@ void n64_rdp::triangle()
 				if( x > scissor.lrX ) break;
 				RS.cx = x;
 				RS.cy = y;
-				u16 Z = z>>16; // z ? 1/(z/2097152.f) : 1;
+				u16 Z = z>>16;// z ? 1/(z/65536.f) : 1;
 				if( other.z_compare && Z >= *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] ) 
 				{
 					ATTR_XINC;
@@ -933,7 +943,7 @@ n64_rdp::dc n64_rdp::cc_a(u32 cycle)
 {
 	switch( CC.rgb_a[cycle] )
 	{
-	case 0: //return CC.out;
+	case 0: return CC.out;
 	case 1: return TX.tex_sample;
 	case 2: return TX.tex_sample; //todo: tex1
 	case 3: return prim_color;
@@ -950,7 +960,7 @@ n64_rdp::dc n64_rdp::cc_d(u32 cycle)
 {
 	switch( CC.rgb_d[cycle] )
 	{
-	case 0: //return CC.out;
+	case 0: return CC.out;
 	case 1: return TX.tex_sample;
 	case 2: return TX.tex_sample; //todo: tex1
 	case 3: return prim_color;
@@ -966,7 +976,7 @@ n64_rdp::dc n64_rdp::cc_b(u32 cycle)
 {
 	switch( CC.rgb_b[cycle] )
 	{
-	case 0: //return CC.out;
+	case 0: return CC.out;
 	case 1: return TX.tex_sample;
 	case 2: return TX.tex_sample; //todo: tex1
 	case 3: return prim_color;
@@ -981,7 +991,7 @@ n64_rdp::dc n64_rdp::cc_c(u32 cycle)
 {
 	switch( CC.rgb_c[cycle] )
 	{
-	case 0: //return CC.out;
+	case 0: return CC.out;
 	case 1: return TX.tex_sample;
 	case 2: return TX.tex_sample; //todo: tex1
 	case 3: return prim_color;
@@ -997,7 +1007,7 @@ float n64_rdp::cc_alpha(u32 sel)
 {
 	switch( sel )
 	{
-	case 0: //return CC.out.a/255.f;
+	case 0: return CC.out.a/255.f;
 	case 1: return TX.tex_sample.a/255.f;
 	case 2: return TX.tex_sample.a/255.f; //todo: tex1
 	case 3: return prim_color.a/255.f;
@@ -1011,47 +1021,79 @@ float n64_rdp::cc_alpha(u32 sel)
 
 void n64_rdp::color_combiner()
 {
-	//todo: only supporting 1cycle for now
-	//	normally 1cycle uses the <em>second</em> cycle settings for the combiner
-	//	but <em>first</em> cycle settings for the blender, so the blender is "correct"ish, but
-	//	leaving the 1cycle mode incorrectly using first cycle settings makes games work for now
-	//	Mario uses 2cycle in levels and Wave Race starts using in the intro.
-	//	without this hack, Bob-omb Battlefield is blue and Wave Race land masses are pink.
+	if( other.cycle_type == CYCLE_TYPE_1CYCLE )
+	{
+		dc res;
+		{
+			res = cc_a(1);
+			dc b = cc_b(1);
+			dc c = cc_c(1);
+			dc d = cc_d(1);
+			res -= b;
+			res *= c;
+			res += d;
+		}
+		
+		float a = cc_alpha(CC.alpha_a[1]);
+		float b = cc_alpha(CC.alpha_b[1]);
+		float c = cc_alpha(CC.alpha_c[1]);
+		float d = cc_alpha(CC.alpha_d[1]);
+		res.a = std::clamp(((a - b) * c + d)*255.f, 0.f, 255.f);
+		CC.out = res;
+		return;
+	}
+	
 	dc res;
 	{
-		res = cc_a(1);
-		dc b = cc_b(1);
-		dc c = cc_c(1);
-		dc d = cc_d(1);
+		res = cc_a(0);
+		dc b = cc_b(0);
+		dc c = cc_c(0);
+		dc d = cc_d(0);
 		res -= b;
 		res *= c;
 		res += d;
 	}
 	
-	float a = cc_alpha(CC.alpha_a[1]);
-	float b = cc_alpha(CC.alpha_b[1]);
-	float c = cc_alpha(CC.alpha_c[1]);
-	float d = cc_alpha(CC.alpha_d[1]);
-	res.a = ((a - b) * c + d)*255.f;
+	float a = cc_alpha(CC.alpha_a[0]);
+	float b = cc_alpha(CC.alpha_b[0]);
+	float c = cc_alpha(CC.alpha_c[0]);
+	float d = cc_alpha(CC.alpha_d[0]);
+	res.a = std::clamp(((a - b) * c + d)*255.f, 0.f, 255.f);
 	CC.out = res;
+	
+	{
+		res = cc_a(1);
+		dc B = cc_b(1);
+		dc C = cc_c(1);
+		dc D = cc_d(1);
+		res -= B;
+		res *= C;
+		res += D;
+	}
+	
+	a = cc_alpha(CC.alpha_a[1]);
+	b = cc_alpha(CC.alpha_b[1]);
+	c = cc_alpha(CC.alpha_c[1]);
+	d = cc_alpha(CC.alpha_d[1]);
+	res.a = std::clamp(((a - b) * c + d)*255.f, 0.f, 255.f);
+	CC.out = res;
+	return;
 }
 
 bool n64_rdp::blender()
 {
-	if( other.alpha_compare_en && CC.out.a < blend_color.a )
+	if( !other.force_blend )
 	{
-		//std::println("acomp en");
-		return false;
-	}
-
-	if( !other.force_blend ) 
-	{
-		if( CC.out.a == 0 ) return false; // hack to get some decals&billboards to actually cut out
+		if( other.cov_x_alpha && CC.out.a == 0 ) return false; 
+		// ^ hack to get some decals&billboards to actually cut out, but screws the actual levels in sm64
 		BL.out = CC.out;
 		return true;
 	}
 	
+	if( CC.out.a == 0 ) return false; // ???
+	
 	dc P, M;
+	float A=1, B=1;
 	switch( BL.p[0] )
 	{
 	case 0: P = CC.out; break;
@@ -1072,7 +1114,6 @@ bool n64_rdp::blender()
 	case 3: M = fog_color; break;
 	default: std::println("BL.n error"); exit(1);
 	}
-	float A=1, B=1;
 	switch( BL.a[0] )
 	{
 	case 0: A = CC.out.a/255.f; break;
@@ -1094,8 +1135,51 @@ bool n64_rdp::blender()
 	BL.out *= A;
 	M *= B;
 	BL.out += M;
-	
-	if( BL.out.a == 0 ) return false; //??
+
+	if( other.cycle_type == CYCLE_TYPE_2CYCLE )
+	{
+		switch( BL.p[1] )
+		{
+		case 0: P = BL.out; break;
+		case 1: P = (cimg.bpp == 16) ? dc::from16(__builtin_bswap16(*(u16*)&rdram[cimg.addr + (cimg.width*RS.cy*2) + (RS.cx*2)])) :
+					    dc::from32(__builtin_bswap32(*(u32*)&rdram[cimg.addr + (cimg.width*RS.cy*4) + (RS.cx*4)])); 
+					    break;
+		case 2: P = blend_color; break;
+		case 3: P = fog_color; break;
+		default: std::println("BL.p error"); exit(1);
+		}
+		switch( BL.m[1] )
+		{
+		case 0: M = BL.out; break;
+		case 1: M = (cimg.bpp == 16) ? dc::from16(__builtin_bswap16(*(u16*)&rdram[cimg.addr + (cimg.width*RS.cy*2) + (RS.cx*2)])) :
+					    dc::from32(__builtin_bswap32(*(u32*)&rdram[cimg.addr + (cimg.width*RS.cy*4) + (RS.cx*4)])); 
+					    break;
+		case 2: M = blend_color; break;
+		case 3: M = fog_color; break;
+		default: std::println("BL.n error"); exit(1);
+		}
+		switch( BL.a[1] )
+		{
+		case 0: A = CC.out.a/255.f; break;
+		case 1: A = fog_color.a/255.f; break;
+		case 2: A = RS.shade_color.a/255.f; break;
+		case 3: A = 0; break;
+		default: std::println("BL.a error"); exit(1);
+		}
+		switch( BL.b[1] )
+		{
+		case 0: B = 1.f - A; break;
+		case 1: B = 1; break;  //todo: coverage
+		case 2: B = 1; break;
+		case 3: B = 0; break;
+		default: std::println("BL.b error"); exit(1);
+		}
+		
+		BL.out = P;
+		BL.out *= A;
+		M *= B;
+		BL.out += M;
+	}
 	
 	return true;
 }

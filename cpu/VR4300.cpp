@@ -675,7 +675,7 @@ void VR4300::step()
 	
 	if( !(npc & BITL(31)) )
 	{
-		printf("vr4300: pc=$%X, npc=$%X\n", u32(pc), u32(npc));
+		//printf("vr4300: pc=$%X, npc=$%X\n", u32(pc), u32(npc));
 		if( !(npc & BITL(30)) ) exit(1);
 		npc &= ~BITL(30);
 		npc |= BITL(31);

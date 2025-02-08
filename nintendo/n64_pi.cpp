@@ -2,13 +2,52 @@
 #include <cstring>
 #include "n64.h"
 
+static u8 sram[128*1024] = {0};
+
 void n64::pi_dma(bool write)
 {
 	u32 len = 0;
 	if( write )
 	{  // into RAM
-		u32 cart = PI_CART_ADDR - 0x10000000;
-		if( cart >= ROM.size() ) return;
+		if( PI_CART_ADDR < 0x10000000 )
+		{
+			fprintf(stderr, "PI DMA: cart $%X, ram $%X, len $%X\n", PI_CART_ADDR, PI_DRAM_ADDR, PI_WR_LEN+1);
+			u32 cart = PI_CART_ADDR - 0x8000000;
+			//if( cart >= 0x8000 ) return;
+			u32 ramaddr = (PI_DRAM_ADDR & 0x7ffffe);
+			if( ramaddr & 7 )
+			{
+				//printf("Unaligned DMA\n");
+				//exit(1);
+			}
+			len = (PI_WR_LEN & 0xffFFff)+1;
+			memcpy(mem.data()+ramaddr, sram+cart, len);
+		} else {
+			u32 cart = PI_CART_ADDR - 0x10000000;
+			if( cart >= ROM.size() ) return;
+			u32 ramaddr = (PI_DRAM_ADDR & 0x7ffffe);
+			if( ramaddr & 7 )
+			{
+				//printf("Unaligned DMA\n");
+				//exit(1);
+			}
+			len = (PI_WR_LEN & 0xffFFff)+1;
+			if( cart + len < ROM.size() )
+			{
+				memcpy(mem.data()+ramaddr, ROM.data()+cart, len);
+			} else {
+				fprintf(stderr, "PI DMA: cart $%X, ram $%X, len $%X\n", cart, ramaddr, PI_WR_LEN+1);
+				fprintf(stderr, "PI DMA: dma included data past ROM size of %i bytes\n", int(ROM.size()));
+				memset(mem.data()+ramaddr, 0, len);
+				memcpy(mem.data()+ramaddr, ROM.data()+cart, ROM.size()-cart);
+			}
+		}
+		PI_CART_ADDR += (len+1)&~1;
+		PI_DRAM_ADDR += (len+7)&~7;
+	} else {
+		//todo: writing from RAM to cart's save ram
+		printf("PI DMA write to sram? Addr = $%X\n", PI_CART_ADDR);
+		u32 cart = PI_CART_ADDR - 0x8000000;
 		u32 ramaddr = (PI_DRAM_ADDR & 0x7ffffe);
 		if( ramaddr & 7 )
 		{
@@ -16,25 +55,11 @@ void n64::pi_dma(bool write)
 			//exit(1);
 		}
 		len = (PI_WR_LEN & 0xffFFff)+1;
-		if( cart + len < ROM.size() )
-		{
-			memcpy(mem.data()+ramaddr, ROM.data()+cart, len);
-		} else {
-			fprintf(stderr, "PI DMA: cart $%X, ram $%X, len $%X\n", cart, ramaddr, PI_WR_LEN+1);
-			fprintf(stderr, "PI DMA: dma included data past ROM size of %i bytes\n", int(ROM.size()));
-			memset(mem.data()+ramaddr, 0, len);
-			memcpy(mem.data()+ramaddr, ROM.data()+cart, ROM.size()-cart);
-		}
+		
+		memcpy(sram+cart, mem.data()+ramaddr, len);
+		
 		PI_CART_ADDR += (len+1)&~1;
-		PI_DRAM_ADDR += (len+7)&~7;
-		FILE* fp = fopen("dump.bin", "wb");
-		fwrite(mem.data()+0x300000, 1, 0x4000, fp);
-		fclose(fp);
-	} else {
-		//todo: writing from RAM to cart's save ram
-		len = (PI_WR_LEN & 0xffFFff)+1;
-		PI_CART_ADDR += (len+1)&~1;
-		PI_DRAM_ADDR += (len+7)&~7;
+		PI_DRAM_ADDR += (len+7)&~7;	
 	}
 	
 	//pi_cycles_til_irq = len * 4;
