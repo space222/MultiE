@@ -206,7 +206,8 @@ void n64_rdp::recv(u64 cmd)
 	case 0x3D: // texture image
 		teximg.addr = cmd & 0x7ffff8;
 		teximg.width = ((cmd>>32)&0x3ff)+1;
-		teximg.bpp = imgbpp[((cmd>>51)&3)];
+		teximg.size = ((cmd>>51)&3);
+		teximg.bpp = imgbpp[teximg.size];
 		teximg.format = ((cmd>>53)&7);
 		break;
 	case 0x3E: // depth image
@@ -877,17 +878,17 @@ void n64_rdp::triangle()
 void n64_rdp::load_block(u64 cmd)
 {
 	u32 dxt = cmd & 0xfff;
-	u32 lrS = (cmd>>14)&0x3ff;
+	u32 lrS = (cmd>>12)&0xfff;
 	auto& T = tiles[(cmd>>24)&7];
-	u32 ulT = (cmd>>34)&0x3ff;
-	u32 ulS = (cmd>>46)&0x3ff;
+	u32 ulT = (cmd>>32)&0xfff;
+	u32 ulS = (cmd>>44)&0xfff;  // all 3 are u10.2
 	//T.SL = ulS<<2;
 	//T.TL = ulT<<2;
 	u32 num_texels = lrS - ulS + 1;
-	if( num_texels > 2048 ) 
+	if( (num_texels/4) > 2048 ) 
 	{
 		printf("RDP: Num texels was >2048\n");
-		exit(1);
+		//exit(1);
 		return;
 	}
 	if( T.bpp == 32 )
@@ -901,12 +902,14 @@ void n64_rdp::load_block(u64 cmd)
 		exit(1);
 	}
 	//fprintf(stderr, "load_block: $%X, $%X, $%X, %ibpp, num_texels = $%X\n", ulS, ulT, lrS, T.bpp, num_texels);
-	u32 num_bytes = num_texels*8; // TIMES EIGHT?? WTF. yep, times8 makes both mario, starfox, and lcars work
+	u32 num_words = (((num_texels<<teximg.size)>>1)+7)>>3; 
+	// was num_texels*8, hence: TIMES EIGHT?? WTF. yep, times8 makes both mario, starfox, and lcars work
+	// the current expression was yoinked from MAME.
 	u32 swpcnt = dxt;
 	u32 ramoff = teximg.addr;// + ((ulS*T.bpp+7)/8);// + ((ulT*teximg.width*T.bpp+7)/8);
 	u32 t = 0;
 	u32 taddr = (T.addr + T.line*t)*8;
-	for(u32 i = 0; i < ((num_bytes+7)/8); ++i, taddr+=8, ramoff+=8)
+	for(u32 i = 0; i < num_words; ++i, taddr+=8, ramoff+=8)
 	{
 		u64 dw = *(u64*)&rdram[ramoff];
 		//if( swpcnt & BIT(11) ) dw = (dw<<32)|(dw>>32);

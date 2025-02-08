@@ -92,7 +92,7 @@ private:
 	bool blender();
 	
 	struct {
-		u32 addr, width, bpp, format;
+		u32 addr, width, size, bpp, format;
 	} cimg, teximg;
 	
 	struct {
