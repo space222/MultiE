@@ -41,8 +41,9 @@
 #include "WonderSwan.h"
 #include "CreatiVision.h"
 #include "apple2e.h"
-#include "n64.h"
 #include "aes.h"
+#include "n64.h"
+#include "bally_astrocade.h"
 void try_kirq();
 
 namespace fs = std::filesystem;
@@ -478,20 +479,20 @@ void imgui_run()
 			}
 			if( ImGui::BeginMenu("Experimental") ) 
 			{
-				if( ImGui::MenuItem("Neo-Geo AES") )
+				if( ImGui::MenuItem("Bally Astrocade") )
 				{
-					std::string f = getOpenFile("Neo-Geo AES");
+					std::string f = getOpenFile("Bally Astrocade");
 					if( !f.empty() )
 					{
 						delete sys;
-						sys = new AES;
+						sys = new bally_astrocade;
 						if( ! sys->loadROM(f) ) 
 						{
 							printf("unable to load ROM\n");
 							exit(1);
 						}
 						else newinstance = true;
-						crt_scale = 2.f;
+						crt_scale = 3.f;
 					}				
 				}
 				if( ImGui::MenuItem("Nintendo 64") )
@@ -508,6 +509,22 @@ void imgui_run()
 						}
 						else newinstance = true;
 						crt_scale = 1.f;
+					}				
+				}
+				if( ImGui::MenuItem("Neo-Geo AES") )
+				{
+					std::string f = getOpenFile("Neo-Geo AES");
+					if( !f.empty() )
+					{
+						delete sys;
+						sys = new AES;
+						if( ! sys->loadROM(f) ) 
+						{
+							printf("unable to load ROM\n");
+							exit(1);
+						}
+						else newinstance = true;
+						crt_scale = 2.f;
 					}				
 				}
 				if( ImGui::MenuItem("Apple IIe") )
