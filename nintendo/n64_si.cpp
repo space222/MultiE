@@ -65,19 +65,33 @@ void n64::pif_run()
                         //unimplemented(reslen != 3, "Reset with reslen != 3");
                         //pif_controller_reset(cmd, res);
                         //pif_controller_id(cmd, res);
-                        if( pif_channel ) res[0] = 0x80;
-                        else res[0] = 5;
-                        res[1] = 0;
-                        res[2] = 2;
+                        if( pif_channel == 4 )
+                        {
+                        	res[0] = 0;
+                        	res[1] = 0x80;
+                        	res[2] = 0;                        
+                        } else {
+	                        if( pif_channel ) res[0] = 0x80;
+        	                else res[0] = 5;
+        	                res[1] = 0;
+        	                res[2] = 2;
+        	        }
                         break;
                     case PIF_COMMAND_CONTROLLER_ID:
                        // unimplemented(cmdlen != 1, "Controller id with cmdlen != 1");
                        // unimplemented(reslen != 3, "Controller id with reslen != 3");
                         //pif_controller_id(cmd, res);
-                         if( pif_channel ) res[0] = 0x80;
-                        else res[0] = 5;
-                        res[1] = 0;
-                        res[2] = 2;
+                        if( pif_channel == 4 )
+                        {
+                        	res[0] = 0;
+                        	res[1] = 0x80;
+                        	res[2] = 0;                        
+                        } else { 
+		                if( pif_channel ) res[0] = 0x80;
+		                else res[0] = 5;
+		                res[1] = 0;
+		                res[2] = 2;
+		        }
                         break;
                     case PIF_COMMAND_READ_BUTTONS:
                         //unimplemented(cmdlen != 1, "Read buttons with cmdlen != 1");

@@ -131,7 +131,7 @@ u64 n64::read(u32 addr, int size)
 		return __builtin_bswap32(*(u32*)&viewbuf[addr-0x13ff0000]);
 	}
 	
-	if( addr >= 0x0800000 && addr <= 0xF000000 ) return __builtin_bswap32(*(u32*)&sram[addr&0x7fff]);
+	//if( addr >= 0x0800000 && addr <= 0xF000000 ) return __builtin_bswap32(*(u32*)&sram[addr&0x7fff]);
 	
 	printf("N64:$%X: r%i <$%X\n", u32(cpu.pc), size, addr);
 	//exit(1);
@@ -158,6 +158,7 @@ void n64::write(u32 addr, u64 v, int size)
 			if( addr & 0x1000 )
 			{
 				*(u32*)&IMEM[addr&0xffc] = __builtin_bswap32(u32(v));
+				RSP.invalidate(addr);
 			} else {
 				*(u32*)&DMEM[addr&0xffc] = __builtin_bswap32(u32(v));
 			}
@@ -210,11 +211,11 @@ void n64::write(u32 addr, u64 v, int size)
 		return;
 	}
 	
-	if( addr >= 0x0800000 && addr <= 0xF000000 ) 
+	/*if( addr >= 0x0800000 && addr <= 0xF000000 ) 
 	{
 		*(u32*)&sram[addr&0x7fff] = __builtin_bswap32(u32(v));
 		return;
-	}
+	}*/
 	
 	
 	printf("$%X: W%i $%X = $%lX\n", u32(cpu.pc), size, addr, v);
@@ -366,6 +367,8 @@ void n64::reset()
 {
 	mem.clear();
 	mem.resize(8*1024*1024);
+	
+	for(u32 i = 0; i < 1024; ++i) RSP.invalidate(i<<2);
 
 	curwidth = 320;
 	curheight = 240;

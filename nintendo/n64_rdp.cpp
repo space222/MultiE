@@ -1,4 +1,5 @@
 #include <print>
+#include <bit>
 #include <string>
 #include <cstdio>
 #include <cstring>
@@ -33,7 +34,7 @@ void n64_rdp::recv(u64 cmd)
 	case 0x0D:
 	case 0x0E:
 	case 0x0F:
-		{ // basic non-anything flat triangle
+		{ // all the triangles
 		if( cmdbuf.size() < u32(4 + ((cmdbyte&4)?8:0) + ((cmdbyte&2)?8:0) + ((cmdbyte&1)?2:0) ) ) return;
 		RS.cmd = cmdbyte;
 		RS.y3 = s32(((cmdbuf[0]>>32)&0x3FFF) << 19); RS.y3 >>= 5;
@@ -329,7 +330,11 @@ void n64_rdp::load_tile(u64 cmd)
 
 	for(u32 Y = ulT; Y <= lrT; ++Y)
 	{
-		memcpy(tmem+(T.addr*8+((Y-ulT)*linesize)), rdram+roffs+(Y*rdram_stride), rdram_stride);
+		for(u32 i = 0; i < rdram_stride; ++i) 
+		{
+			tmem[(i+T.addr*8+((Y-ulT)*linesize))&0xfff] = rdram[(i+roffs+(Y*rdram_stride))&0x7fffff];
+		}
+		//memcpy(tmem+(T.addr*8+((Y-ulT)*linesize)), rdram+roffs+(Y*rdram_stride), rdram_stride);
 	}
 }
 
@@ -339,6 +344,7 @@ void n64_rdp::set_tile(u64 cmd)
 	T.addr = (cmd>>32)&0x1ff;
 	T.palette = (cmd>>20)&0xf;
 	T.format = (cmd>>53)&7;
+	if( T.format > 4 ) T.format = 4;
 	T.bpp = imgbpp[(cmd>>51)&3];
 	T.line = (cmd>>41)&0x1ff;
 	if( T.bpp == 32 ) 
@@ -425,7 +431,7 @@ void n64_rdp::texture_rect(u64 cmd0, u64 cmd1)
 				if( other.alpha_compare_en && !(sample&0xff) ) continue;
 				if( other.force_blend && !(sample&0xff) ) continue;
 				
-				*(u32*)&rdram[cimg.addr + (Y*cimg.width*4) + X*4] = dc(0xff,0,0,0xff).to32();//__builtin_bswap32(sample);
+				*(u32*)&rdram[cimg.addr + (Y*cimg.width*4) + X*4]=dc(0xff,0xff,0xff,0xff).to32();//__builtin_bswap32(sample);
 			}
 		}	
 	}
@@ -597,9 +603,9 @@ n64_rdp::dc n64_rdp::tex_sample(u32 tile, s64 s, s64 t)
 		//todo: put the rg/ba in the separate banks
 		return dc::from32( __builtin_bswap32( *(u32*)&tmem[(T.addr*8 + (t*T.line*8) + s*4)&0xffc] ));
 	} else if( T.bpp == 8 ) {
+		u8 v = tmem[(T.addr*8 + (t*T.line*8) + s)&0xfff];
 		if( T.format == 2 )
-		{
-			u8 v = tmem[(T.addr*8 + (t*T.line*8) + s)&0xfff];
+		{ // CI8
 			if( other.tlut_type_ia16 )
 			{
 				u16 c = *(u16*)&tmem[(0x100+v)*8];
@@ -608,16 +614,23 @@ n64_rdp::dc n64_rdp::tex_sample(u32 tile, s64 s, s64 t)
 				return dc(I, I, I, A);
 			}
 			return dc::from16(__builtin_bswap16(*(u16*)&tmem[(0x100+v)*8]));
-		} else {
-			u8 v = tmem[(T.addr*8 + (t*T.line*8) + s)&0xfff];
-			return dc::from32((v<<24)|(v<<16)|(v<<8)|v);
+		} 
+		if( T.format == 4 ) 
+		{ // I8
+			return dc(v,v,v,v);
+		}
+		if( T.format == 3 )
+		{ // IA8
+			u8 A = (v&15)|(v<<4);
+			u8 I = (v&0xf0)|(v>>4);
+			return dc(I,I,I,A);
 		}
 	} else if( T.bpp == 4 ) {
+		u8 v = tmem[(T.addr*8 + (t*T.line*8) + (s>>1))&0xfff];
+		v >>= ((s^1)&1)*4;
+		v &= 15;
 		if( T.format == 2 )
-		{
-			u8 v = tmem[(T.addr*8 + (t*T.line*8) + (s>>1))&0xfff];
-			v >>= ((s^1)&1)*4;
-			v &= 15;
+		{  //CI4
 			if( other.tlut_type_ia16 )
 			{
 				u16 c = *(u16*)&tmem[((0x100+T.palette*16+v)*8)&0xfff];
@@ -627,9 +640,20 @@ n64_rdp::dc n64_rdp::tex_sample(u32 tile, s64 s, s64 t)
 			}
 			return dc::from16(__builtin_bswap16(*(u16*)&tmem[((0x100+T.palette*16+v)*8)&0xfff]));
 		}
+		if( T.format == 3 )
+		{  //IA4
+			u8 I = (((v>>1)&7)/7.f)*255.f;
+			u8 A = ((v&1)?0xff:0);
+			return dc(I, I, I, A);		
+		}
+		if( T.format == 4 )
+		{
+			u8 I = v|(v<<4);
+			return dc(I,I,I,I);
+		}
 	}
 	
-	if( !(T.bpp == 4 && T.format == 3) && !(T.bpp == 4 && T.format == 4) )
+	//if( !(T.bpp == 4 && T.format == 4) )
 	{
 		std::println(stderr, "tex_sample, tile bpp{}, format{} unsupported.", T.bpp, T.format);
 	}
@@ -667,12 +691,51 @@ n64_rdp::dc n64_rdp::tex_sample(u32 tile, s64 s, s64 t)
 	S /= (W ? W : 0x10000); \
 	T /= (W ? W : 0x10000); \
 
+static struct {
+    int shift;
+    u32 add;
+} z_format[8] = {
+    6, 0x00000,
+    5, 0x20000,
+    4, 0x30000,
+    3, 0x38000,
+    2, 0x3c000,
+    1, 0x3e000,
+    0, 0x3f000,
+    0, 0x3f800,
+};
+
+u16 decompress_z(u16 z)
+{
+	//return z;
+	
+	z >>= 2;
+	u32 exp = z>>11;
+	u32 mant = z&0x7ff;
+	u32 res = (mant<<z_format[exp].shift) + z_format[exp].add;
+	return res;
+}
+
+u16 compress_z(u16 z)
+{
+	//return z;
+	
+	u32 Z = z>>14;
+	Z &= 0x3ffff;
+	u32 exp = std::countr_one(Z);
+	if( exp > 7 ) exp = 7;
+	return ((exp<<11)|((Z>>z_format[exp].shift)&0x7ff))<<2;
+}
 
 void n64_rdp::triangle()
 {
 	const bool right = (cmdbuf[0] & BITL(55));
 	RS.shade_color = white;
-		
+	
+	//RS.y1 += 0x8000;
+	//RS.y2 += 0x8000;
+	//RS.y3 += 0x8000;
+	
 	if( !right )
 	{
 		for(s64 y = RS.y1>>16; y < RS.y2>>16 && y < scissor.lrY; ++y)
@@ -692,9 +755,9 @@ void n64_rdp::triangle()
 				if( x > scissor.lrX ) { ATTR_XDEC; continue; }
 				RS.cx = x;
 				RS.cy = y;
-				u16 Z = z>>16;// z ? 1/(z/65536.f) : 1;
-				if( other.z_compare && Z >= *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] ) 
-				{
+				u16 Z = (z>>16)&0xffff;
+				if( other.z_compare && Z >= *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] )
+				{					
 					ATTR_XDEC;
 					continue;
 				}
@@ -711,7 +774,7 @@ void n64_rdp::triangle()
 					ATTR_XDEC;
 					continue;
 				}
-				if( other.z_write) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = Z;
+				if( other.z_write ) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = Z;
 				if( cimg.bpp == 16 )
 				{
 					*(u16*)&rdram[cimg.addr + (cimg.width*2*y) + (x*2)]= __builtin_bswap16(BL.out.to16());
@@ -741,8 +804,8 @@ void n64_rdp::triangle()
 				if( x > scissor.lrX ) { ATTR_XDEC; continue; }
 				RS.cx = x;
 				RS.cy = y;
-				u16 Z = z>>16;// z ? 1/(z/65536.f) : 1;
-				if( other.z_compare && Z >= *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] ) 
+				u16 Z = (z>>16)&0xffff;// z ? 1/(z/65536.f) : 1;
+				if( other.z_compare && Z >= *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] )
 				{
 					ATTR_XDEC;
 					continue;
@@ -792,7 +855,7 @@ void n64_rdp::triangle()
 				RS.cx = x;
 				RS.cy = y;
 				u16 Z = z>>16;// z ? 1/(z/65536.f) : 1;
-				if( other.z_compare && Z >= *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] ) 
+				if( other.z_compare && Z >= *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] )
 				{
 					ATTR_XINC;
 					continue;
@@ -810,7 +873,7 @@ void n64_rdp::triangle()
 					ATTR_XINC;
 					continue;
 				}
-				if( other.z_write) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = Z;
+				if( other.z_write ) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = Z;
 				if( cimg.bpp == 16 )
 				{
 					*(u16*)&rdram[cimg.addr + (cimg.width*2*y) + (x*2)]= __builtin_bswap16(BL.out.to16());
@@ -841,7 +904,7 @@ void n64_rdp::triangle()
 				RS.cx = x;
 				RS.cy = y;
 				u16 Z = z>>16;// z ? 1/(z/65536.f) : 1;
-				if( other.z_compare && Z >= *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] ) 
+				if( other.z_compare && Z >= *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] )
 				{
 					ATTR_XINC;
 					continue;
@@ -859,7 +922,7 @@ void n64_rdp::triangle()
 					ATTR_XINC;
 					continue;
 				}
-				if( other.z_write) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = Z;
+				if( other.z_write ) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = Z;
 				if( cimg.bpp == 16 )
 				{
 					*(u16*)&rdram[cimg.addr + (cimg.width*2*y) + (x*2)]= __builtin_bswap16(BL.out.to16());
@@ -1085,15 +1148,18 @@ void n64_rdp::color_combiner()
 
 bool n64_rdp::blender()
 {
+	//if( other.cov_x_alpha && CC.out.a == 0 ) return false; 
+	
 	if( !other.force_blend )
 	{
 		if( other.cov_x_alpha && CC.out.a == 0 ) return false; 
-		// ^ hack to get some decals&billboards to actually cut out, but screws the actual levels in sm64
+		// ^ hack to get some decals&billboards to actually cut out, but I don't understand how coverage is calculated
 		BL.out = CC.out;
 		return true;
 	}
 	
-	if( CC.out.a == 0 ) return false; // ???
+	if( other.alpha_compare_en && CC.out.a <= blend_color.a ) return false; 
+	if( CC.out.a == 0 ) return false; // ??? needed for yet a few more cut outs in sm64
 	
 	dc P, M;
 	float A=1, B=1;
@@ -1128,7 +1194,10 @@ bool n64_rdp::blender()
 	switch( BL.b[0] )
 	{
 	case 0: B = 1.f - A; break;
-	case 1: B = 1; break;  //todo: coverage
+	case 1: B = 1; break; // some manuals say memory alpha. n64brew wiki says coverage
+	//case 1: B = (cimg.bpp == 16) ? dc::from16(__builtin_bswap16(*(u16*)&rdram[cimg.addr + (cimg.width*RS.cy*2) + (RS.cx*2)])).a :
+	//			    dc::from32(__builtin_bswap32(*(u32*)&rdram[cimg.addr + (cimg.width*RS.cy*4) + (RS.cx*4)])).a; 
+	//			    break; //todo: coverage or memory alpha?
 	case 2: B = 1; break;
 	case 3: B = 0; break;
 	default: std::println("BL.b error"); exit(1);

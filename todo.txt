@@ -252,8 +252,8 @@ command gets strobed in, begin alternating the output pin every 30 frames.
 Nintendo 64 Todo List
 ------------------------
 Overall:
-1. Some games don't make it to writing 8 to the PIF. Check which CIC they use and if they did even pass IPL.
-2. Implement/Fix EEPROM and Pak joybus/pif access.
+1. Zelda games differ per-run in getting out of IPL or even crashing.
+2. Implement EEPROM/Pak/Flash joybus/pif/pi/bus access.
 3. Implement/Fix last few vector instructions.
 4. Fix FPU rounding and conversions.
 5. Implement FPU underflow and flushing.
@@ -268,28 +268,30 @@ RCP Subsystems:
 	Proper EEPROM and Controller paks and see if more games boot.
 3. RI: RI_SELECT returns 0x14 to help skip other setup in IPL, but should make all regs r/w.
 4. SP: Rewrite DMA. Rewrite SP_STATUS handling. Continue vector ops.
-5. DP: Improve texture sampling. Texture wordswapping. Blending alpha compare. Coverage. Multitude of other things.
+5. DP: Texture wordswapping. Improve texture sampling. Coverage. Blending alpha compare. Multitude of other things.
 Status:
 SP: a few load/stores left + vsqr/vrcp fail some tests. Like all the rest of the DMAs (except AI), DMA is instant.
-DP: a fair bit done, but so much not working and so many questions.
-MI: done except for MI_MODE's repeat feature
+DP: enough done for everything but text + mario's eye to display. a fair bit done, but so much not working and so many questions.
+MI: done except for MI_MODE's repeat and ebus features
 PI: basic aligned cart->RAM implemented along with interrupt.
 SI: done (PIF now gets its own todo item). Not supporting the single-word xfer regs.
 AI: Audio works. Not supporting the delayed carry hardware bug. Sounding any good dependent on host running fast enough.
-PIF: one controller and only D-pad + a/b/z/start currently implemented and working in namco.
-	If the cmd byte in pifram gets the bit zero cleared, namco stops getting input.
+PIF: one controller and only arrow keys as stick + a/b/z/start currently implemented and working.
 Notes (latest first):
+	I've done something to break Flappy Bird's pipes. Everything about texcoord handling is trial and error now.
 	Triangle attributes S and T are actually s10.21, not s15.16. Their deltas (eg DsDx) already take this into account
 	Load Block having num_bytes be num_texels*8 instead of an actual bpp calc makes mario, starfox, and LCARS look way better.
-		This is probably papering over a different bug?
+		This is probably papering over a different bug? 
+		Found a different based-on-bpp expression in MAME that also fixed Superman and Wave Race.
 	After c/p'ing pif hle code from dillonb/n64 to see how far off I was, there was no change until I
-	zero'd out the response to EEPROM/Pak commands and now a bunch of games boot.
+	zero'd out the response to EEPROM/Pak commands and now a bunch of games boot 
+		(apparently this wasn't what made them boot, so now I don't even know what I did right nevermind wrong)
 	After implementing LWC1/MTC1 and friends half mode odd registers, Namco's title screen and menu button music/sounds function.
 		Looks like odd register access isn't undefined in half mode; it's for getting data into upper parts of a double.
 	If RI_SELECT is nonzero to skip rdram init, IPL3 never writes RAM size to $80000318 which makes libdragon 
-crash trying to set up the stack at end of RAM.
+		crash trying to set up the stack at end of RAM.
 	Flappy Bird's pipes use texcoords masks. It doesn't depend on Tile Size. I'm still unclear on how Tile Size and
-all the shift/clamp/mask and what order those happen.
+		all the shift/clamp/mask and what order those happen.
 
 
 
