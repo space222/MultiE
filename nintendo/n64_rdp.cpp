@@ -332,7 +332,7 @@ void n64_rdp::load_tile(u64 cmd)
 	{
 		for(u32 i = 0; i < rdram_stride; ++i) 
 		{
-			tmem[(i+T.addr*8+((Y-ulT)*linesize))&0xfff] = rdram[(i+roffs+(Y*rdram_stride))&0x7fffff];
+			tmem[((i+T.addr*8+((Y-ulT)*linesize))&0xfff)^((Y&1)?4:0)] = rdram[(i+roffs+(Y*rdram_stride))&0x7fffff];
 		}
 		//memcpy(tmem+(T.addr*8+((Y-ulT)*linesize)), rdram+roffs+(Y*rdram_stride), rdram_stride);
 	}
@@ -427,11 +427,19 @@ void n64_rdp::texture_rect(u64 cmd0, u64 cmd1)
 			s32 Sl = S;
 			for(u32 X = ulX; X < lrX; ++X, Sl += DsDx)
 			{
-				u32 sample = tex_sample(tile, Sl>>10, T>>10).to32();
-				if( other.alpha_compare_en && !(sample&0xff) ) continue;
-				if( other.force_blend && !(sample&0xff) ) continue;
-				
-				*(u32*)&rdram[cimg.addr + (Y*cimg.width*4) + X*4]=dc(0xff,0xff,0xff,0xff).to32();//__builtin_bswap32(sample);
+				TX.tex_sample = tex_sample(tile, Sl>>10, T>>10);
+				if( other.cycle_type != CYCLE_TYPE_COPY )
+				{
+					color_combiner();
+					if( !blender() ) continue;
+				} else {
+					BL.out = TX.tex_sample;
+					if( other.alpha_compare_en && !(BL.out.to16()&1) ) continue;
+				}
+				u32 p = BL.out.to32();
+				//if( other.alpha_compare_en && !(p&1) ) continue;
+				//if( other.force_blend && !(p&1) ) continue;
+				*(u32*)&rdram[cimg.addr + (Y*cimg.width*4) + X*4] = __builtin_bswap32(p);
 			}
 		}	
 	}
@@ -465,11 +473,19 @@ void n64_rdp::texture_rect_flip(u64 cmd0, u64 cmd1)
 			s32 Sl = S;
 			for(u32 X = ulX; X < lrX; ++X, Sl += DsDx)
 			{
-				u16 sample = tex_sample(tile, T>>10, Sl>>10).to16();
-				if( other.alpha_compare_en && !(sample&1) ) continue;
-				if( other.force_blend && !(sample&1) ) continue;
-				
-				*(u16*)&rdram[cimg.addr + (Y*cimg.width*2) + X*2] = __builtin_bswap16(sample);
+				TX.tex_sample = tex_sample(tile, T>>10, Sl>>10);
+				if( other.cycle_type != CYCLE_TYPE_COPY )
+				{
+					color_combiner();
+					if( !blender() ) continue;
+				} else {
+					BL.out = TX.tex_sample;
+					if( other.alpha_compare_en && !(BL.out.to16()&1) ) continue;
+				}
+				u16 p = BL.out.to16();
+				//if( other.alpha_compare_en && !(p&1) ) continue;
+				//if( other.force_blend && !(p&1) ) continue;
+				*(u16*)&rdram[cimg.addr + (Y*cimg.width*2) + X*2] = __builtin_bswap16(p);
 			}
 		}	
 	} else if( cimg.bpp == 32 ) {
@@ -478,11 +494,19 @@ void n64_rdp::texture_rect_flip(u64 cmd0, u64 cmd1)
 			s32 Sl = S;
 			for(u32 X = ulX; X < lrX; ++X, Sl += DsDx)
 			{
-				u32 sample = tex_sample(tile, T>>10, Sl>>10).to32();
-				if( other.alpha_compare_en && !(sample&0xff) ) continue;
-				if( other.force_blend && !(sample&0xff) ) continue;
-				
-				*(u32*)&rdram[(cimg.addr + (Y*cimg.width*4) + X*4)&0x7ffffc] = __builtin_bswap32(sample);
+				TX.tex_sample = tex_sample(tile, T>>10, Sl>>10);
+				if( other.cycle_type != CYCLE_TYPE_COPY )
+				{
+					color_combiner();
+					if( !blender() ) continue;
+				} else {
+					BL.out = TX.tex_sample;
+					if( other.alpha_compare_en && !(BL.out.to16()&1) ) continue;
+				}
+				u32 p = BL.out.to32();
+				//if( other.alpha_compare_en && !(p&1) ) continue;
+				//if( other.force_blend && !(p&1) ) continue;
+				*(u32*)&rdram[cimg.addr + (Y*cimg.width*4) + X*4] = __builtin_bswap32(p);
 			}
 		}	
 	}	
@@ -589,26 +613,28 @@ n64_rdp::dc n64_rdp::tex_sample(u32 tile, s64 s, s64 t)
 		*/
 	}
 	
+	u32 xorval = (t&1)?4:0;
+	
 	if( T.bpp == 16 ) 
 	{
 		if( T.format == 3 )
 		{
-			u16 c = *(u16*)&tmem[(T.addr*8 + (t*T.line*8) + s*2)&0xffe];
+			u16 c = *(u16*)&tmem[((T.addr*8 + (t*T.line*8) + s*2)&0xffe)^xorval];
 			u8 I = c;
 			u8 A = c>>8;
 			return dc(I,I,I,A);
 		}
-		return dc::from16(__builtin_bswap16( *(u16*)&tmem[(T.addr*8 + (t*T.line*8) + s*2)&0xffe] ));
+		return dc::from16(__builtin_bswap16( *(u16*)&tmem[((T.addr*8 + (t*T.line*8) + s*2)&0xffe)^xorval] ));
 	} else if( T.bpp == 32 ) {
 		//todo: put the rg/ba in the separate banks
-		return dc::from32( __builtin_bswap32( *(u32*)&tmem[(T.addr*8 + (t*T.line*8) + s*4)&0xffc] ));
+		return dc::from32( __builtin_bswap32( *(u32*)&tmem[((T.addr*8 + (t*T.line*8) + s*4)&0xffc)^xorval] ));
 	} else if( T.bpp == 8 ) {
-		u8 v = tmem[(T.addr*8 + (t*T.line*8) + s)&0xfff];
+		u8 v = tmem[((T.addr*8 + (t*T.line*8) + s)&0xfff)^xorval];
 		if( T.format == 2 )
 		{ // CI8
 			if( other.tlut_type_ia16 )
 			{
-				u16 c = *(u16*)&tmem[(0x100+v)*8];
+				u16 c = *(u16*)&tmem[((0x100+v)*8)];
 				u8 I = c&0xff;
 				u8 A = c>>8;
 				return dc(I, I, I, A);
@@ -626,7 +652,7 @@ n64_rdp::dc n64_rdp::tex_sample(u32 tile, s64 s, s64 t)
 			return dc(I,I,I,A);
 		}
 	} else if( T.bpp == 4 ) {
-		u8 v = tmem[(T.addr*8 + (t*T.line*8) + (s>>1))&0xfff];
+		u8 v = tmem[((T.addr*8 + (t*T.line*8) + (s>>1))&0xfff)^xorval];
 		v >>= ((s^1)&1)*4;
 		v &= 15;
 		if( T.format == 2 )
@@ -732,7 +758,7 @@ void n64_rdp::triangle()
 	const bool right = (cmdbuf[0] & BITL(55));
 	RS.shade_color = white;
 	
-	//RS.y1 += 0x8000;
+	//RS.y1 -= 0x8000;
 	//RS.y2 += 0x8000;
 	//RS.y3 += 0x8000;
 	
@@ -749,7 +775,7 @@ void n64_rdp::triangle()
 			s64 z = RS.z;
 			s64 w = RS.w;
 			if( y >= 0 )
-			for(s64 x = RS.xh>>16; x >= RS.xm>>16; --x)
+			for(s64 x = (RS.xh+0x8000)>>16; x >= (RS.xm-0x8000)>>16; --x)
 			{
 				if( x < 0 ) break;
 				if( x > scissor.lrX ) { ATTR_XDEC; continue; }
@@ -798,7 +824,7 @@ void n64_rdp::triangle()
 			s64 z = RS.z;
 			s64 w = RS.w;
 			if( y >= 0 )
-			for(s64 x = RS.xh>>16; x >= RS.xl>>16; --x)
+			for(s64 x = (RS.xh+0x8000)>>16; x >= (RS.xl-0x8000)>>16; --x)
 			{
 				if( x < 0 ) break;
 				if( x > scissor.lrX ) { ATTR_XDEC; continue; }
@@ -848,7 +874,7 @@ void n64_rdp::triangle()
 			s64 z = RS.z;
 			s64 w = RS.w;
 			if( y >= 0 )
-			for(s64 x = RS.xh>>16; x <= RS.xm>>16; ++x)
+			for(s64 x = (RS.xh-0x8000)>>16; x <= (RS.xm+0x8000)>>16; ++x)
 			{
 				if( x < 0 ) { ATTR_XINC; continue; }
 				if( x > scissor.lrX ) break;
@@ -897,7 +923,7 @@ void n64_rdp::triangle()
 			s64 z = RS.z;
 			s64 w = RS.w;
 			if( y >= 0 )
-			for(s64 x = RS.xh>>16; x <= RS.xl>>16; ++x)
+			for(s64 x = (RS.xh-0x8000)>>16; x <= (RS.xl+0x8000)>>16; ++x)
 			{
 				if( x < 0 ) { ATTR_XINC; continue; }
 				if( x > scissor.lrX ) break;
@@ -968,17 +994,17 @@ void n64_rdp::load_block(u64 cmd)
 	u32 num_words = (((num_texels<<teximg.size)>>1)+7)>>3; 
 	// was num_texels*8, hence: TIMES EIGHT?? WTF. yep, times8 makes both mario, starfox, and lcars work
 	// the current expression was yoinked from MAME.
-	u32 swpcnt = dxt;
+	u32 swpcnt = 0;//dxt;
 	u32 ramoff = teximg.addr;// + ((ulS*T.bpp+7)/8);// + ((ulT*teximg.width*T.bpp+7)/8);
 	u32 t = 0;
 	u32 taddr = (T.addr + T.line*t)*8;
 	for(u32 i = 0; i < num_words; ++i, taddr+=8, ramoff+=8)
 	{
 		u64 dw = *(u64*)&rdram[ramoff];
-		//if( swpcnt & BIT(11) ) dw = (dw<<32)|(dw>>32);
+		if( swpcnt & BIT(11) ) dw = (dw<<32)|(dw>>32);
 		*(u64*)&tmem[taddr&0xfff] = dw;
 		swpcnt += dxt;
-		//if( swpcnt & BIT(11) ) { ulT+=1; t += 1; }
+		if( swpcnt & BIT(11) ) { ulT+=1; }
 	}
 }
 

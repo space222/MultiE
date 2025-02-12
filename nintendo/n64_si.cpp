@@ -1,4 +1,5 @@
 #include <cstring>
+#include <cstdio>
 #include "n64.h"
 
 
@@ -125,6 +126,7 @@ void n64::pif_run()
                         //unimplemented(reslen != 33, "Mempak read with reslen != 33");
                         //pif_mempak_read(cmd, res);
                         //memset(res, 0, reslen);
+                        printf("Pak Read\n");
                         break;
                     case PIF_COMMAND_MEMPAK_WRITE:
                         //unimplemented(cmdlen != 35, "Mempak write with cmdlen != 35");
@@ -132,6 +134,7 @@ void n64::pif_run()
                        // pif_mempak_write(cmd, res);
                        // memset(res, 0, reslen);
                        // res[0] = cmd[3]; // which byte in cmd?
+                        printf("Pak Write\n");
                         break;
                     case PIF_COMMAND_EEPROM_READ:
                         //unimplemented(cmdlen != 2, "EEPROM read with cmdlen != 2");
@@ -139,6 +142,7 @@ void n64::pif_run()
                    //unimplemented(n64sys.mem.save_data == NULL, "EEPROM read when save data is uninitialized! Is this game in the game DB?");		
                        //memset(res, 0, reslen);
                         //pif_eeprom_read(cmd, res);
+                        printf("EEPROM Read\n");
                         break;
                     case PIF_COMMAND_EEPROM_WRITE:
                        // unimplemented(cmdlen != 10, "EEPROM write with cmdlen != 10");
@@ -146,6 +150,7 @@ void n64::pif_run()
                 //unimplemented(n64sys.mem.save_data == NULL, "EEPROM write when save data is uninitialized! Is this game in the game DB?");
                         //pif_eeprom_write(cmd, res);
                        // memset(res, 0, reslen);
+                       printf("EEPROM Write\n");
                         break;
                     default: break;
                        // logfatal("Invalid PIF command: %X", cmd[CMD_COMMAND_INDEX]);

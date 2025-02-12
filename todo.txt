@@ -268,7 +268,7 @@ RCP Subsystems:
 	Proper EEPROM and Controller paks and see if more games boot.
 3. RI: RI_SELECT returns 0x14 to help skip other setup in IPL, but should make all regs r/w.
 4. SP: Rewrite DMA. Rewrite SP_STATUS handling. Continue vector ops.
-5. DP: Texture wordswapping. Improve texture sampling. Coverage. Blending alpha compare. Multitude of other things.
+5. DP: Texture wordswapping imperfect. Improve texture sampling. Coverage. Blending alpha compare. Multitude of other things.
 Status:
 SP: a few load/stores left + vsqr/vrcp fail some tests. Like all the rest of the DMAs (except AI), DMA is instant.
 DP: enough done for everything but text + mario's eye to display. a fair bit done, but so much not working and so many questions.

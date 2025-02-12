@@ -22,28 +22,40 @@ void n64::pi_dma(bool write)
 			}
 			len = (PI_WR_LEN & 0xffFFff)+1;
 			memcpy(mem.data()+ramaddr, sram+cart, len);
+			PI_CART_ADDR += (len+1)&~1;
+			PI_DRAM_ADDR += (len+7)&~7;
 		} else {
-			u32 cart = PI_CART_ADDR - 0x10000000;
-			if( cart >= ROM.size() ) return;
-			u32 ramaddr = (PI_DRAM_ADDR & 0x7ffffe);
-			if( ramaddr & 7 )
+			u32 length = (PI_WR_LEN & 0x00FFFFFF) + 1;
+			u32 cart_addr = PI_CART_ADDR & 0xFFFFFFFE;
+			u32 dram_addr = PI_DRAM_ADDR & 0x007FFFFE;
+
+			if(dram_addr & 0x7 && length >= 0x7) 
+			{
+				length -= dram_addr & 0x7;
+			}
+			PI_WR_LEN = length;
+			
+			if( 0 ) //ramaddr & 7 )
 			{
 				//printf("Unaligned DMA\n");
 				//exit(1);
 			}
-			len = (PI_WR_LEN & 0xffFFff)+1;
-			if( cart + len < ROM.size() )
-			{
-				memcpy(mem.data()+ramaddr, ROM.data()+cart, len);
-			} else {
-				fprintf(stderr, "PI DMA: cart $%X, ram $%X, len $%X\n", cart, ramaddr, PI_WR_LEN+1);
-				fprintf(stderr, "PI DMA: dma included data past ROM size of %i bytes\n", int(ROM.size()));
-				memset(mem.data()+ramaddr, 0, len);
-				memcpy(mem.data()+ramaddr, ROM.data()+cart, ROM.size()-cart);
-			}
+			//if( cart + len < ROM.size() )
+			//{
+				memcpy(mem.data()+dram_addr, ROM.data()+(cart_addr-0x10000000), length);
+			//} else {
+			//	fprintf(stderr, "PI DMA: cart $%X, ram $%X, len $%X\n", cart, ramaddr, PI_WR_LEN+1);
+			//	fprintf(stderr, "PI DMA: dma included data past ROM size of %i bytes\n", int(ROM.size()));
+			//	memset(mem.data()+ramaddr, 0, len);
+			//	memcpy(mem.data()+ramaddr, ROM.data()+cart, ROM.size()-cart);
+			//}
+			PI_DRAM_ADDR = dram_addr + length;
+			PI_CART_ADDR = cart_addr + length;
 		}
-		PI_CART_ADDR += (len+1)&~1;
-		PI_DRAM_ADDR += (len+7)&~7;
+		//PI_CART_ADDR += (len+1)&~1;
+		//PI_DRAM_ADDR += (len+7)&~7;
+		//PI_DRAM_ADDR = dram_addr + length;
+		//PI_CART_ADDR = cart_addr + length;
 	} else {
 		//todo: writing from RAM to cart's save ram
 		printf("PI DMA write to sram? Addr = $%X\n", PI_CART_ADDR);
@@ -54,7 +66,7 @@ void n64::pi_dma(bool write)
 			//printf("Unaligned DMA\n");
 			//exit(1);
 		}
-		len = (PI_WR_LEN & 0xffFFff)+1;
+		len = (PI_RD_LEN & 0xffFFff)+1;
 		
 		memcpy(sram+cart, mem.data()+ramaddr, len);
 		
@@ -93,12 +105,12 @@ void n64::pi_write(u32 addr, u32 v)
 	}
 	if( reg == 0 )
 	{
-		pi_regs[reg] &= 0xffFFfe;
+		//pi_regs[reg] &= 0xffFFfe;
 		return;
 	}
 	if( reg == 1 )
 	{
-		pi_regs[reg] &= ~1;
+		//pi_regs[reg] &= ~1;
 		return;
 	}
 }

@@ -842,7 +842,7 @@ rsp_instr rsp_cop2(n64_rsp&, u32 opcode)
 				rsp.a[i] &= ~0xffffull;
 				rsp.a[i] |= rsp.v[vt].w(BC(i));
 			}
-			u32 result = rcp(rsp.v[vt].sw(BC(7&vd_elem)));
+			u32 result = rcp(rsp.v[vt].sw(BC(7&e)));
 			rsp.v[vd].w(7&vd_elem) = result;
 			rsp.DIV_OUT = result>>16;
 			rsp.divinloaded = false;			
@@ -855,8 +855,8 @@ rsp_instr rsp_cop2(n64_rsp&, u32 opcode)
 				rsp.a[i] &= ~0xffffull;
 				rsp.a[i] |= rsp.v[vt].w(BC(i));
 			}
-			u32 result = rsp.divinloaded ? rcp((rsp.DIV_IN<<16)|rsp.v[vt].w(BC(7&vd_elem))) :
-						       rcp(rsp.v[vt].sw(BC(7&vd_elem)));
+			u32 result = rsp.divinloaded ? rcp((rsp.DIV_IN<<16)|rsp.v[vt].w(BC(7&e))) :
+						       rcp(rsp.v[vt].sw(BC(7&e)));
 			rsp.v[vd].w(7&vd_elem) = result;
 			rsp.DIV_OUT = result>>16;
 			rsp.divinloaded = false;		
@@ -895,7 +895,7 @@ rsp_instr rsp_cop2(n64_rsp&, u32 opcode)
 				rsp.a[i] &= ~0xffffull;
 				rsp.a[i] |= rsp.v[vt].w(BC(i));
 			}
-			u32 result = rsq(rsp.v[vt].sw(BC(7&vd_elem)));
+			u32 result = rsq(rsp.v[vt].sw(BC(7&e)));
 			rsp.v[vd].w(7&vd_elem) = result;
 			rsp.DIV_OUT = result>>16;
 			rsp.divinloaded = false;
@@ -908,8 +908,8 @@ rsp_instr rsp_cop2(n64_rsp&, u32 opcode)
 				rsp.a[i] &= ~0xffffull;
 				rsp.a[i] |= rsp.v[vt].w(BC(i));
 			}
-			u32 result = rsp.divinloaded ? rsq((rsp.DIV_IN<<16)|rsp.v[vt].w(BC(7&vd_elem))) :
-						       rsq(rsp.v[vt].sw(BC(7&vd_elem)));
+			u32 result = rsp.divinloaded ? rsq((rsp.DIV_IN<<16)|rsp.v[vt].w(BC(7&e))) :
+						       rsq(rsp.v[vt].sw(BC(7&e)));
 			rsp.v[vd].w(7&vd_elem) = result;
 			rsp.DIV_OUT = result>>16;
 			rsp.divinloaded = false;		
@@ -1002,10 +1002,12 @@ rsp_instr rsp_lwc2(n64_rsp&, u32 opcode)
 			}
 		};
 	
+	case 0xB: return INSTR {}; // LTV unimpl
+	
 	case 10: return INSTR {}; // LWV doesn't do anything
 	
-	default: //printf("RSP LWC2: fme unimpl opcode $%X\n", (opcode>>11)&0x1f);
-		 //exit(1);
+	default: printf("RSP LWC2: fme unimpl opcode $%X\n", (opcode>>11)&0x1f);
+		 exit(1);
 		 return INSTR {};
 	}
 }
@@ -1101,10 +1103,11 @@ rsp_instr rsp_swc2(n64_rsp&, u32 opcode)
 				// Rasky's docs say wrap addr, but only not wrapping passes tests
 			}
 		};
-		
 	
-	default: //printf("RSP SWC2: unimpl opcode $%X\n", (opcode>>11)&0x1f);
-		 //exit(1);
+	case 0xB: return INSTR {}; // stv unimpl.
+	
+	default: printf("RSP SWC2: unimpl opcode $%X\n", (opcode>>11)&0x1f);
+		 exit(1);
 		 return INSTR {};
 	}
 }

@@ -56,6 +56,7 @@ u64 n64::read(u32 addr, int size)
 	if( addr < 8*1024*1024 ) return sized_read(mem.data(), addr, size);
 	if( addr >= 0x04000000 && addr < 0x05000000 )
 	{
+		//std::println("${:X}: RCP Read{} <${:X}", u32(cpu.pc), size, addr);
 		if( size == 8 )
 		{
 			u32 val = read(addr&~3, 32);
@@ -85,7 +86,6 @@ u64 n64::read(u32 addr, int size)
 		if( addr == 0x0470000C ) return 0x14;  // RI_SELECT to 0x14 to skip a lot of IPL init
 		if( addr == 0x04080000 ) return 0;
 		
-		printf("N64: Unhandled RCP Read%i <$%X\n", size, addr);
 		return 0;
 	}
 	
@@ -290,7 +290,7 @@ void n64::run_frame()
 		if( (VI_CTRL & 3) > 1 )
 		{
 			VI_V_CURRENT = (VI_V_CURRENT&1) | (line<<1);
-			if( (VI_V_CURRENT>>1) == (VI_V_INTR>>1) ) raise_mi_bit(MI_INTR_VI_BIT);
+			if( (VI_V_CURRENT>>1) == ((VI_V_INTR&0x3ff)>>1) ) raise_mi_bit(MI_INTR_VI_BIT);
 		} else {
 			VI_V_CURRENT = 0;
 		}
@@ -358,7 +358,7 @@ void n64::run_frame()
 		}
 	}
 	
-	if( !(VI_V_TOTAL & 1) && (VI_CTRL&3) ) VI_V_CURRENT ^= 1;
+	if( (VI_CTRL&BIT(6)) && (VI_CTRL&3) ) VI_V_CURRENT ^= 1;
 	
 	vi_draw_frame();
 }
@@ -368,6 +368,7 @@ void n64::reset()
 	mem.clear();
 	mem.resize(8*1024*1024);
 	
+	for(u32 i = 0; i < 0x10; ++i) pi_regs[i] = vi_regs[i] = 0;	
 	for(u32 i = 0; i < 1024; ++i) RSP.invalidate(i<<2);
 
 	curwidth = 320;
@@ -390,10 +391,10 @@ void n64::reset()
 	MI_INTERRUPT = 0;
 	MI_MASK = 0;
 	
-	RDP.rdp_irq = [&](){ raise_mi_bit(MI_INTR_DP_BIT); DP_STATUS &= ~(BIT(3)|BIT(5)|BIT(7)); };
+	RDP.rdp_irq = [&](){ raise_mi_bit(MI_INTR_DP_BIT); DP_STATUS &= ~(BIT(3)|BIT(5)); }; //|BIT(7) //??
 	RDP.rdram = mem.data();
 	for(u32 i = 0; i < 8; ++i) dp_regs[i] = 0;
-	DP_STATUS = 0;//0x80;
+	DP_STATUS = 0x80;
 	dp_xfer.valid = false;
 
 	for(u32 i = 0; i < 8; ++i) sp_regs[i] = 0;

@@ -650,14 +650,6 @@ void VR4300::step()
 		printf("Exception reading opcode from $%X\n", u32(pc));
 		//exit(1);
 	} else {
-		countdiv ^= 1;
-		if( countdiv & 1 ) COUNT = (COUNT+1)&0xffffFFFFull;
-		if( u32(COUNT) == u32(COMPARE) )
-		{
-			CAUSE |= BIT(15);
-			//printf("compare irq!\n");
-		}
-	
 		if( (opc >> 26) == 0 )
 		{
 			decode_special(*this, opc)(*this, opc);
@@ -665,6 +657,13 @@ void VR4300::step()
 			decode_regimm(*this, opc)(*this, opc);	
 		} else {
 			decode_regular(*this, opc)(*this, opc);
+		}
+		countdiv ^= 1;
+		if( countdiv & 1 ) COUNT = (COUNT+1)&0xffffFFFFull;
+		if( u32(COUNT) == u32(COMPARE) )
+		{
+			CAUSE |= BIT(15);
+			//printf("compare irq!\n");
 		}
 	}
 	
@@ -701,7 +700,7 @@ void VR4300::overflow()
 
 void VR4300::address_error(bool write)
 {
-	printf("ae\n");
+	printf("$%X: ae\n", u32(pc));
 	//exit(1);
 	exception(write ? 5 : 4);
 }

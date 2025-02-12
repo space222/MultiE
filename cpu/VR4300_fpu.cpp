@@ -304,7 +304,11 @@ vr4300_instr cop1_d(VR4300& proc, u32 opcode)
 				return;
 			} else {
 				if( a > INT64_MAX || a < INT64_MIN ) { cpu.signal_fpu(cpu.FPU_UNIMPL); return; }
-				c = llround(a);
+				int old = fegetround();
+				fesetround(FE_TONEAREST);
+				c = lrint(a);
+				fesetround(old);
+				//c = llround(a);
 				if( fetestexcept(FE_OVERFLOW) && cpu.signal_fpu(cpu.FPU_INEXACT|cpu.FPU_OVERFLOW) ) return;
 				if( fetestexcept(FE_UNDERFLOW) && cpu.signal_fpu(cpu.FPU_INEXACT|cpu.FPU_UNDERFLOW) ) return;
 				if( a != double(c) && cpu.signal_fpu(cpu.FPU_INEXACT) ) return;
@@ -380,7 +384,10 @@ vr4300_instr cop1_d(VR4300& proc, u32 opcode)
 				return;
 			} else {
 				if( a >= fmaxint || a < INT_MIN ) { cpu.signal_fpu(cpu.FPU_UNIMPL); return; }
-				c = round(a);
+				int old = fegetround();
+				fesetround(FE_TONEAREST);
+				c = lrint(a);
+				fesetround(old);
 				if( fetestexcept(FE_OVERFLOW) && cpu.signal_fpu(cpu.FPU_INEXACT|cpu.FPU_OVERFLOW) ) return;
 				if( fetestexcept(FE_UNDERFLOW) && cpu.signal_fpu(cpu.FPU_INEXACT|cpu.FPU_UNDERFLOW) ) return;
 				if( a != double(c) && cpu.signal_fpu(cpu.FPU_INEXACT) ) return;
@@ -466,13 +473,12 @@ vr4300_instr cop1_d(VR4300& proc, u32 opcode)
 				if( cpu.signal_fpu(cpu.FPU_INVALID) ) return;
 				memcpy(&cpu.f[fd<<3], &fnan, 4);
 				return;
-			//} 
-			//else if( a > FLT_MAX ) {
-			//	if( cpu.signal_fpu(cpu.FPU_OVERFLOW|cpu.FPU_INEXACT) ) return;
-			//	b = std::numeric_limits<float>::infinity();
-			//} else if( a < -FLT_MAX ) {
-			//	if( cpu.signal_fpu(cpu.FPU_UNDERFLOW|cpu.FPU_INEXACT) ) return;
-			//	b = -std::numeric_limits<float>::infinity();
+			} else if( a > FLT_MAX && !std::isinf(a) ) {
+				if( cpu.signal_fpu(cpu.FPU_OVERFLOW|cpu.FPU_INEXACT) ) return;
+				b = std::numeric_limits<float>::infinity();
+			} else if( a < -FLT_MAX && !std::isinf(a) ) {
+				if( cpu.signal_fpu(cpu.FPU_UNDERFLOW|cpu.FPU_INEXACT) ) return;
+				b = -std::numeric_limits<float>::infinity();
 			} else {
 				b = a;
 				if( fetestexcept(FE_INEXACT) && cpu.signal_fpu(cpu.FPU_INEXACT) ) return;
@@ -779,7 +785,10 @@ vr4300_instr cop1_s(VR4300& proc, u32 opcode)
 				return;
 			} else {
 				if( a > double(INT64_MAX) || a < double(INT64_MIN) ) { cpu.signal_fpu(cpu.FPU_UNIMPL); return; }
-				c = llround(a);
+				int old = fegetround();
+				fesetround(FE_TONEAREST);
+				c = lrint(a);
+				fesetround(old);
 				if( fetestexcept(FE_OVERFLOW) && cpu.signal_fpu(cpu.FPU_INEXACT|cpu.FPU_OVERFLOW) ) return;
 				if( fetestexcept(FE_UNDERFLOW) && cpu.signal_fpu(cpu.FPU_INEXACT|cpu.FPU_UNDERFLOW) ) return;
 				if( a != float(c) && cpu.signal_fpu(cpu.FPU_INEXACT) ) return;
@@ -855,7 +864,12 @@ vr4300_instr cop1_s(VR4300& proc, u32 opcode)
 				return;
 			} else {
 				if( a >= fmaxint || a < INT_MIN ) { cpu.signal_fpu(cpu.FPU_UNIMPL); return; }
-				c = round(a);
+				int old = fegetround();
+				fesetround(FE_TONEAREST);
+				c = lrint(a);
+				fesetround(old);
+				
+				//c = nearbyint(a);
 				if( fetestexcept(FE_OVERFLOW) && cpu.signal_fpu(cpu.FPU_INEXACT|cpu.FPU_OVERFLOW) ) return;
 				if( fetestexcept(FE_UNDERFLOW) && cpu.signal_fpu(cpu.FPU_INEXACT|cpu.FPU_UNDERFLOW) ) return;
 				if( a != float(c) && cpu.signal_fpu(cpu.FPU_INEXACT) ) return;

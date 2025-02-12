@@ -75,7 +75,7 @@ void n64::dp_write(u32 addr, u32 v)
 			printf("dp: froze!\n");
 			//exit(1);
 		}
-		if( v & BIT(7) ) DP_STATUS &= ~PIPE_BUSY;
+		//if( v & BIT(7) ) DP_STATUS &= ~PIPE_BUSY;
 		//if( v & 0xfc ) printf("DP_STATUS = $%X\n", v);
 		return;
 	}
