@@ -8,6 +8,7 @@ class n64 : public console
 {
 public:
 	n64() { setVsync(0); }
+	~n64();
 	u32 fb_width() override { return curwidth; }
 	u32 fb_height() override { return curheight; }
 	u32 fb_bpp() override { return curbpp; }
@@ -139,5 +140,7 @@ public:
 	} dp_xfer;
 	
 	u8 eeprom[2048];
+	bool eeprom_written;
+	std::string save_file;
 };
 

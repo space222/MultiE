@@ -269,9 +269,11 @@ bool n64::loadROM(const std::string fname)
 	
 	//u32 entry = __builtin_bswap32(*(u32*)&ROM[8]);
 	//memcpy(mem.data()+(entry&0x7fffff), ROM.data()+0x1000, fsz < 0x101000 ? fsz : 0x100000);
+	eeprom_written = false;
 	std::string sfname = fname;
 	if( auto pos = sfname.rfind('.'); pos != std::string::npos ) sfname.erase(pos);
 	sfname += ".eeprom";
+	save_file = sfname;
 	FILE* eep = fopen(sfname.c_str(), "rb");
 	printf("reading <%s>\n", sfname.c_str());
 	if( eep )
@@ -306,11 +308,11 @@ void n64::run_frame()
 		} else {
 			VI_V_CURRENT = 0;
 		}
-		for(u32 i = 0; i < 6000; ++i)
+		for(u32 i = 0; i < 7000; ++i)
 		{
 			cpu.step();
 			rspdiv += 1;
-			if( rspdiv == 3 ) rspdiv = 0;
+			if( rspdiv >= 3 ) rspdiv = 0;
 			if( !(SP_STATUS & 1) && (rspdiv != 2) )
 			{
 				RSP.step();
@@ -567,7 +569,15 @@ u32 n64::mi_read(u32 addr)
 	return mi_regs[addr];	
 }
 
-
+n64::~n64()
+{
+	if( eeprom_written && save_file.size() )
+	{
+		FILE* fp = fopen(save_file.c_str(), "wb");
+		fwrite(eeprom, 1, 2048, fp);
+		fclose(fp);
+	}
+}
 
 
 

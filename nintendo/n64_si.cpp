@@ -154,8 +154,9 @@ void n64::pif_run()
                        // memset(res, 0, reslen);
 			printf("EEPROM Write\n");
 			u32 page = cmd[CMD_START_INDEX];
-			for(u32 n = 0; n < 8; ++n) eeprom[page*8 + n] = cmd[CMD_START_INDEX+n];
+			for(u32 n = 0; n < 8; ++n) eeprom[page*8 + n] = cmd[CMD_START_INDEX+1+n];
 			res[0] = 0;
+			eeprom_written = true;
 			}break;
                     default: break;
                        // logfatal("Invalid PIF command: %X", cmd[CMD_COMMAND_INDEX]);
