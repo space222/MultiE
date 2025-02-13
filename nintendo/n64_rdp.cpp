@@ -136,6 +136,7 @@ void n64_rdp::recv(u64 cmd)
 		other.perspective = cmd&BITL(51);
 		other.tlut_type_ia16 = cmd&BITL(46);
 		other.cov_x_alpha = cmd&BITL(12);
+		other.z_func = field(cmd, 10, 3);
 		
 		BL.p[0] = field(cmd, 30, 3);
 		BL.p[1] = field(cmd, 28, 3);
@@ -145,7 +146,7 @@ void n64_rdp::recv(u64 cmd)
 		BL.m[1] = field(cmd, 20, 3);
 		BL.b[0] = field(cmd, 18, 3);
 		BL.b[1] = field(cmd, 16, 3);
-		//fprintf(stderr, "set other modes = $%lX, ctype = %i\n", cmd, other.cycle_type);
+		//fprintf(stderr, "set other modes = $%lX, zcomp = %i\n", cmd, other.z_func);
 		break;
 		
 	case 0x30: // Load TLUT
@@ -288,6 +289,7 @@ void n64_rdp::fill_rect(u64 cmd)
 			{
 				u16 fc = (x&1) ? (fill_color&0xffff) : (fill_color>>16);
 				*(u16*)&rdram[cimg.addr + (y*cimg.width*2) + x*2] = __builtin_bswap16(fc);
+				*(u16*)&b9[cimg.addr + (y*cimg.width*2) + x*2] = 0;
 			}
 		}
 	} else {
@@ -296,6 +298,7 @@ void n64_rdp::fill_rect(u64 cmd)
 			for(u32 x = ulx; x < lrx; ++x)
 			{
 				*(u32*)&rdram[cimg.addr + (y*cimg.width*4) + x*4] = __builtin_bswap32(fill_color);
+				*(u32*)&b9[cimg.addr + (y*cimg.width*4) + x*4] = 0;
 			}
 		}
 	}
@@ -731,26 +734,45 @@ static struct {
     0, 0x3f800,
 };
 
-u16 decompress_z(u16 z)
+#define ZSHIFT 16
+
+s64 decompress_z(u16 z)
 {
-	//return z;
-	
+	return z;	
 	z >>= 2;
-	u32 exp = z>>11;
-	u32 mant = z&0x7ff;
-	u32 res = (mant<<z_format[exp].shift) + z_format[exp].add;
+	u64 exp = z>>11;
+	u64 mant = z&0x7ff;
+	u64 res = (mant<<z_format[exp].shift) + z_format[exp].add;
 	return res;
 }
 
-u16 compress_z(u16 z)
+u16 compress_z(s64 z)
 {
-	//return z;
-	
-	u32 Z = z>>14;
+	return z>>ZSHIFT;	
+	u32 Z = z>>ZSHIFT;
 	Z &= 0x3ffff;
-	u32 exp = std::countr_one(Z);
+	u32 exp = std::countr_one(Z<<14);
 	if( exp > 7 ) exp = 7;
 	return ((exp<<11)|((Z>>z_format[exp].shift)&0x7ff))<<2;
+}
+
+bool n64_rdp::z_compare(u32 nz, u32 oz, u32 dz)
+{
+	return nz >= oz;
+	/*switch( other.z_func )
+	{
+	case 0:
+	
+	
+	case 1:
+	
+	
+	case 2:
+	
+	
+	case 3:
+		
+	}*/
 }
 
 void n64_rdp::triangle()
@@ -761,6 +783,9 @@ void n64_rdp::triangle()
 	//RS.y1 -= 0x8000;
 	//RS.y2 += 0x8000;
 	//RS.y3 += 0x8000;
+	
+	u16 deltaZ = ( ((RS.DzDx<0)?-RS.DzDx:RS.DzDx)+((RS.DzDy<0)?-RS.DzDy:RS.DzDy) ) >> 16;
+	deltaZ = 15-std::countl_zero(deltaZ);
 	
 	if( !right )
 	{
@@ -775,14 +800,15 @@ void n64_rdp::triangle()
 			s64 z = RS.z;
 			s64 w = RS.w;
 			if( y >= 0 )
-			for(s64 x = (RS.xh+0x8000)>>16; x >= (RS.xm-0x8000)>>16; --x)
+			for(s64 x = (RS.xh+0x8000)>>16; x >= (RS.xm+0x8000)>>16; --x)
 			{
 				if( x < 0 ) break;
 				if( x > scissor.lrX ) { ATTR_XDEC; continue; }
 				RS.cx = x;
 				RS.cy = y;
-				u16 Z = (z>>16)&0xffff;
-				if( other.z_compare && Z >= *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] )
+				//u16 Z = (z>>16)&0xffff;
+				if(other.z_compare&&
+					z_compare(z>>ZSHIFT, decompress_z(*(u16*)&rdram[depth_image+(cimg.width*2*y)+(x*2)]), deltaZ) )
 				{					
 					ATTR_XDEC;
 					continue;
@@ -800,7 +826,7 @@ void n64_rdp::triangle()
 					ATTR_XDEC;
 					continue;
 				}
-				if( other.z_write ) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = Z;
+				if( other.z_write ) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = compress_z(z);
 				if( cimg.bpp == 16 )
 				{
 					*(u16*)&rdram[cimg.addr + (cimg.width*2*y) + (x*2)]= __builtin_bswap16(BL.out.to16());
@@ -824,14 +850,14 @@ void n64_rdp::triangle()
 			s64 z = RS.z;
 			s64 w = RS.w;
 			if( y >= 0 )
-			for(s64 x = (RS.xh+0x8000)>>16; x >= (RS.xl-0x8000)>>16; --x)
+			for(s64 x = (RS.xh+0x8000)>>16; x >= (RS.xl+0x8000)>>16; --x)
 			{
 				if( x < 0 ) break;
 				if( x > scissor.lrX ) { ATTR_XDEC; continue; }
 				RS.cx = x;
 				RS.cy = y;
-				u16 Z = (z>>16)&0xffff;// z ? 1/(z/65536.f) : 1;
-				if( other.z_compare && Z >= *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] )
+				if(other.z_compare&&
+					z_compare(z>>ZSHIFT, decompress_z(*(u16*)&rdram[depth_image+(cimg.width*2*y)+(x*2)]), deltaZ) )
 				{
 					ATTR_XDEC;
 					continue;
@@ -849,7 +875,7 @@ void n64_rdp::triangle()
 					ATTR_XDEC;
 					continue;
 				}
-				if( other.z_write ) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = Z;
+				if( other.z_write ) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = compress_z(z);
 				if( cimg.bpp == 16 )
 				{
 					*(u16*)&rdram[cimg.addr + (cimg.width*2*y) + (x*2)]= __builtin_bswap16(BL.out.to16());
@@ -880,8 +906,8 @@ void n64_rdp::triangle()
 				if( x > scissor.lrX ) break;
 				RS.cx = x;
 				RS.cy = y;
-				u16 Z = z>>16;// z ? 1/(z/65536.f) : 1;
-				if( other.z_compare && Z >= *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] )
+				if(other.z_compare&&
+					z_compare(z>>ZSHIFT, decompress_z(*(u16*)&rdram[depth_image+(cimg.width*2*y)+(x*2)]), deltaZ) )
 				{
 					ATTR_XINC;
 					continue;
@@ -899,7 +925,7 @@ void n64_rdp::triangle()
 					ATTR_XINC;
 					continue;
 				}
-				if( other.z_write ) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = Z;
+				if( other.z_write ) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = compress_z(z);
 				if( cimg.bpp == 16 )
 				{
 					*(u16*)&rdram[cimg.addr + (cimg.width*2*y) + (x*2)]= __builtin_bswap16(BL.out.to16());
@@ -929,8 +955,8 @@ void n64_rdp::triangle()
 				if( x > scissor.lrX ) break;
 				RS.cx = x;
 				RS.cy = y;
-				u16 Z = z>>16;// z ? 1/(z/65536.f) : 1;
-				if( other.z_compare && Z >= *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] )
+				if(other.z_compare&&
+					z_compare(z>>ZSHIFT, decompress_z(*(u16*)&rdram[depth_image+(cimg.width*2*y)+(x*2)]), deltaZ) )
 				{
 					ATTR_XINC;
 					continue;
@@ -948,7 +974,7 @@ void n64_rdp::triangle()
 					ATTR_XINC;
 					continue;
 				}
-				if( other.z_write ) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = Z;
+				if( other.z_write ) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = compress_z(z);
 				if( cimg.bpp == 16 )
 				{
 					*(u16*)&rdram[cimg.addr + (cimg.width*2*y) + (x*2)]= __builtin_bswap16(BL.out.to16());

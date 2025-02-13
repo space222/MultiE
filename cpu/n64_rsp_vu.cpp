@@ -1007,7 +1007,7 @@ rsp_instr rsp_lwc2(n64_rsp&, u32 opcode)
 	case 10: return INSTR {}; // LWV doesn't do anything
 	
 	default: printf("RSP LWC2: fme unimpl opcode $%X\n", (opcode>>11)&0x1f);
-		 exit(1);
+		 //exit(1);
 		 return INSTR {};
 	}
 }
@@ -1107,7 +1107,7 @@ rsp_instr rsp_swc2(n64_rsp&, u32 opcode)
 	case 0xB: return INSTR {}; // stv unimpl.
 	
 	default: printf("RSP SWC2: unimpl opcode $%X\n", (opcode>>11)&0x1f);
-		 exit(1);
+		 //exit(1);
 		 return INSTR {};
 	}
 }

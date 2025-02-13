@@ -1,5 +1,6 @@
 #include <print>
 #include <array>
+#include <filesystem>
 #include "n64.h"
 
 u32 flash_status = 0x11118001;
@@ -268,6 +269,17 @@ bool n64::loadROM(const std::string fname)
 	
 	//u32 entry = __builtin_bswap32(*(u32*)&ROM[8]);
 	//memcpy(mem.data()+(entry&0x7fffff), ROM.data()+0x1000, fsz < 0x101000 ? fsz : 0x100000);
+	std::string sfname = fname;
+	if( auto pos = sfname.rfind('.'); pos != std::string::npos ) sfname.erase(pos);
+	sfname += ".eeprom";
+	FILE* eep = fopen(sfname.c_str(), "rb");
+	printf("reading <%s>\n", sfname.c_str());
+	if( eep )
+	{
+		printf("reading <%s>\n", sfname.c_str());
+		unu = fread(eeprom, 1, 2048, eep);
+		fclose(eep);
+	}
 	
 	fp = fopen("./bios/pifdata.bin", "rb");
 	if( !fp )

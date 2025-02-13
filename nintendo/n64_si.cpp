@@ -137,21 +137,26 @@ void n64::pif_run()
                         printf("Pak Write\n");
                         break;
                     case PIF_COMMAND_EEPROM_READ:
-                        //unimplemented(cmdlen != 2, "EEPROM read with cmdlen != 2");
+                        {//unimplemented(cmdlen != 2, "EEPROM read with cmdlen != 2");
                         //unimplemented(reslen != 8, "EEPROM read with reslen != 8");
                    //unimplemented(n64sys.mem.save_data == NULL, "EEPROM read when save data is uninitialized! Is this game in the game DB?");		
                        //memset(res, 0, reslen);
                         //pif_eeprom_read(cmd, res);
-                        printf("EEPROM Read\n");
-                        break;
+                        u32 page = cmd[CMD_START_INDEX];
+                        for(u32 n = 0; n < 8; ++n) res[n] = eeprom[page*8 + n];
+                        printf("EEPROM Read, page = $%X\n", page);
+                        }break;
                     case PIF_COMMAND_EEPROM_WRITE:
-                       // unimplemented(cmdlen != 10, "EEPROM write with cmdlen != 10");
+                       {// unimplemented(cmdlen != 10, "EEPROM write with cmdlen != 10");
                         //unimplemented(reslen != 1,  "EEPROM write with reslen != 1");
                 //unimplemented(n64sys.mem.save_data == NULL, "EEPROM write when save data is uninitialized! Is this game in the game DB?");
                         //pif_eeprom_write(cmd, res);
                        // memset(res, 0, reslen);
-                       printf("EEPROM Write\n");
-                        break;
+			printf("EEPROM Write\n");
+			u32 page = cmd[CMD_START_INDEX];
+			for(u32 n = 0; n < 8; ++n) eeprom[page*8 + n] = cmd[CMD_START_INDEX+n];
+			res[0] = 0;
+			}break;
                     default: break;
                        // logfatal("Invalid PIF command: %X", cmd[CMD_COMMAND_INDEX]);
                 }

@@ -137,5 +137,7 @@ public:
 		u32 start, end, current;
 		bool valid;
 	} dp_xfer;
+	
+	u8 eeprom[2048];
 };
 

@@ -81,6 +81,7 @@ private:
 	void triangle();
 	
 	dc tex_sample(u32 tile, s64 s, s64 t);
+	bool z_compare(u32,u32,u32);
 	
 	void color_combiner();
 	dc cc_a(u32 cycle);
@@ -106,7 +107,7 @@ private:
 	} tiles[8];
 	
 	struct {
-		u32 cycle_type;
+		u32 cycle_type, z_func;
 		bool alpha_compare_en;
 		bool force_blend;
 		bool z_compare, z_write;
