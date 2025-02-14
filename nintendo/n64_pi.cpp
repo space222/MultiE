@@ -22,6 +22,7 @@ void n64::pi_dma(bool write)
 			}
 			len = (PI_WR_LEN & 0xffFFff)+1;
 			memcpy(mem.data()+ramaddr, sram+cart, len);
+			for(u32 i = (ramaddr+3)&0x7ffffc; i < ((ramaddr+len+3)&0x7ffffc); i += 4) cpu.invalidate(i);
 			PI_CART_ADDR += (len+1)&~1;
 			PI_DRAM_ADDR += (len+7)&~7;
 		} else {
@@ -43,6 +44,7 @@ void n64::pi_dma(bool write)
 			//if( cart + len < ROM.size() )
 			//{
 				memcpy(mem.data()+dram_addr, ROM.data()+(cart_addr-0x10000000), length);
+				for(u32 i = (dram_addr+3)&0x7ffffc; i < ((dram_addr+len+3)&0x7ffffc); i += 4) cpu.invalidate(i);
 			//} else {
 			//	fprintf(stderr, "PI DMA: cart $%X, ram $%X, len $%X\n", cart, ramaddr, PI_WR_LEN+1);
 			//	fprintf(stderr, "PI DMA: dma included data past ROM size of %i bytes\n", int(ROM.size()));

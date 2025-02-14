@@ -81,11 +81,11 @@ u64 n64::read(u32 addr, int size)
 		if( addr >= 0x04400000 && addr < 0x04500000 ) return vi_read(addr);
 		if( addr >= 0x04500000 && addr < 0x04600000 ) return ai_read(addr);
 		if( addr >= 0x04600000 && addr < 0x04700000 ) return pi_read(addr);
+		if( addr == 0x0470000C ) return 0x14;  // RI_SELECT to 0x14 to skip a lot of IPL init
 		if( addr >= 0x04800000 && addr < 0x04900000 ) return si_read(addr);
 		
-		if( addr == 0x0410000C ) return 0;
-		if( addr == 0x0470000C ) return 0x14;  // RI_SELECT to 0x14 to skip a lot of IPL init
-		if( addr == 0x04080000 ) return 0;
+		//if( addr == 0x0410000C ) return 0;
+		//if( addr == 0x04080000 ) return 0;
 		
 		return 0;
 	}
@@ -141,7 +141,7 @@ u64 n64::read(u32 addr, int size)
 
 void n64::write(u32 addr, u64 v, int size)
 {
-	if( addr < 8*1024*1024 ) { sized_write(mem.data(), addr, v, size); return; }
+	if( addr < 8*1024*1024 ) { sized_write(mem.data(), addr, v, size); cpu.invalidate(addr); return; }
 	if( addr >= 0x04000000 && addr < 0x05000000 )
 	{
 		if( size == 8 )
@@ -308,7 +308,7 @@ void n64::run_frame()
 		} else {
 			VI_V_CURRENT = 0;
 		}
-		for(u32 i = 0; i < 7000; ++i)
+		for(u32 i = 0; i < 5700; ++i)
 		{
 			cpu.step();
 			rspdiv += 1;
@@ -379,6 +379,7 @@ void n64::run_frame()
 
 void n64::reset()
 {
+	cpu.RAM = mem.data();
 	mem.clear();
 	mem.resize(8*1024*1024);
 	
@@ -397,6 +398,11 @@ void n64::reset()
 	memset(&mem[0], 0, 0x800000);
 	memset(DMEM, 0, 0x1000);
 	memset(IMEM, 0, 0x1000);
+	
+	for(u32 i = 0; i < 0x1FFFFFFF+1; i += 0x1000)
+	{
+		cpu.readers[i>>12] = get_reader(i);
+	}
 	
 	PI_STATUS = SI_STATUS = VI_CTRL = 0;
 	memset(si_regs, 0, 30);
@@ -579,5 +585,35 @@ n64::~n64()
 	}
 }
 
+std::function<u64(u32, int)> n64::get_reader(u32 phys)
+{
+	if( phys < 0x800000 ) return [&](u32 a, int s) -> u64 { return sized_read(mem.data(), a, s); };
+	if( phys < 0x0400'0000 ) return [](u32, int) -> u64 { return 0; };
+	if( phys < 0x0404'0000 ) return [&](u32 a, int) -> u64 
+		{ 
+			if( a & BIT(12) ) return __builtin_bswap32(*(u32*)&IMEM[a&0xfff]);
+			return __builtin_bswap32(*(u32*)&DMEM[a&0xfff]);
+		};
+	if( phys < 0x040C'0000 ) return [&](u32 a, int) -> u64
+		{
+			return sp_read(a);
+		};
+	if( phys < 0x0410'0000 ) return [](u32 a, int s)->u64 { std::println("n64: unmapped access{} rd ${:X}", s, a); return 0; };
+	if( phys < 0x0420'0000 ) return [&](u32 a, int) -> u64
+		{
+			return dp_read(a);
+		};
+	if( phys < 0x0430'0000 ) return [](u32 a, int) -> u64 { std::println("n64: dp span reg read ${:X}", a); return 0; };
+	if( phys < 0x0440'0000 ) return [&](u32 a, int) -> u64 { return mi_read(a); };
+	if( phys < 0x0450'0000 ) return [&](u32 a, int) -> u64 { return vi_read(a); };
+	if( phys < 0x0460'0000 ) return [&](u32 a, int) -> u64 { return ai_read(a); };
+	if( phys < 0x0470'0000 ) return [&](u32 a, int) -> u64 { return pi_read(a); };
+	if( phys < 0x0480'0000 ) return [](u32 a, int) -> u64 { if( a == 0x0470000C ) return 0x14; else return 0; };
+	if( phys < 0x0490'0000 ) return [&](u32 a, int) -> u64 { return si_read(a); };
+	if( phys < 0x0500'0000 ) return [](u32 a, int s) -> u64 { std::println("n64: unmapped access{} rd ${:X}", s, a); return 0; };
+
+
+	return [&](u32 a, int s) { return read(a, s); };
+}
 
 

@@ -621,7 +621,7 @@ n64_rdp::dc n64_rdp::tex_sample(u32 tile, s64 s, s64 t)
 	if( T.bpp == 16 ) 
 	{
 		if( T.format == 3 )
-		{
+		{ // IA16
 			u16 c = *(u16*)&tmem[((T.addr*8 + (t*T.line*8) + s*2)&0xffe)^xorval];
 			u8 I = c;
 			u8 A = c>>8;

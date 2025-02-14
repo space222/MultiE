@@ -14,6 +14,7 @@
 #define LIKELY cpu.npc = cpu.nnpc; cpu.nnpc += 4;
 
 typedef void(*vr4300_instr) (VR4300&, u32);
+static vr4300_instr vr4300_icache[0x800000>>2] = {0};
 
 vr4300_instr cop1(VR4300&, u32);
 
@@ -644,19 +645,24 @@ void VR4300::step()
 	{       // exception() will set npc
 		//printf("interrupt: mask=$%X, intr=$%X\n", mimask, miirq);
 		exception(0);
-	} else if( !(opc = read(pc, 32)) ) {
-		// if an exception happened on opcode fetch, exception() will already have been called
-		// nothing else to be done here other than skip to pc pipeline advance
-		printf("Exception reading opcode from $%X\n", u32(pc));
-		//exit(1);
 	} else {
-		if( (opc >> 26) == 0 )
+		if( u32(pc) >= 0x80000000u && u32(pc) < 0x80800000u )
 		{
-			decode_special(*this, opc)(*this, opc);
-		} else if( (opc >> 26) == 1 ) {
-			decode_regimm(*this, opc)(*this, opc);	
+			vr4300_icache[(pc&0x7fffff)>>2](*this, __builtin_bswap32(*(u32*)&RAM[pc&0x7fffff]));		
+		} else if( !(opc = read(pc, 32)) ) {
+			// if an exception happened on opcode fetch, exception() will already have been called
+			// nothing else to be done here other than skip to pc pipeline advance
+			printf("Exception reading opcode from $%X\n", u32(pc));
+			//exit(1);
 		} else {
-			decode_regular(*this, opc)(*this, opc);
+			if( (opc >> 26) == 0 )
+			{
+				decode_special(*this, opc)(*this, opc);
+			} else if( (opc >> 26) == 1 ) {
+				decode_regimm(*this, opc)(*this, opc);	
+			} else {
+				decode_regular(*this, opc)(*this, opc);
+			}
 		}
 		countdiv ^= 1;
 		if( countdiv & 1 ) COUNT = (COUNT+1)&0xffffFFFFull;
@@ -666,7 +672,6 @@ void VR4300::step()
 			//printf("compare irq!\n");
 		}
 	}
-	
 	//if( u32(pc) >= 0x80300000 && u32(pc) < 0x80400000 )
 	//{
 	//	printf("pc = $%X\n", u32(pc));
@@ -674,7 +679,7 @@ void VR4300::step()
 	
 	if( !(npc & BITL(31)) )
 	{
-		//printf("vr4300: pc=$%X, npc=$%X\n", u32(pc), u32(npc));
+		printf("vr4300: pc=$%X, npc=$%X\n", u32(pc), u32(npc));
 		if( !(npc & BITL(30)) ) exit(1);
 		npc &= ~BITL(30);
 		npc |= BITL(31);
@@ -736,6 +741,7 @@ void VR4300::reset()
 	c[15] = 0x00000B22;
 	RANDOM = 31;
 	CONFIG = 0x7006e463;
+	//COMPARE = 0x1fff0000;
 	FCSR = 0;
 	fpu_cond = false;
 	
@@ -743,6 +749,42 @@ void VR4300::reset()
 	npc = pc + 4;
 	nnpc = npc + 4;
 	delay = ndelay = LLbit = false;
+	
+	for(u32 i = 0; i < 0x800000/4; ++i) vr4300_icache[i] = 
+		[](VR4300& cpu, u32 opc) 
+		{ 
+			vr4300_instr INS = nullptr;
+			if( (opc >> 26) == 0 )
+			{
+				INS = decode_special(cpu, opc);
+			} else if( (opc >> 26) == 1 ) {
+				INS = decode_regimm(cpu, opc);
+			} else {
+				INS = decode_regular(cpu, opc);
+			}
+			vr4300_icache[(cpu.pc&0x7fffff)>>4] = INS;
+			INS(cpu, opc);
+		};
+		
+}
+
+void VR4300::invalidate(u32 pa)
+{
+	vr4300_icache[pa>>2] = 
+		[](VR4300& cpu, u32 opc) 
+		{ 
+			vr4300_instr INS = nullptr;
+			if( (opc >> 26) == 0 )
+			{
+				INS = decode_special(cpu, opc);
+			} else if( (opc >> 26) == 1 ) {
+				INS = decode_regimm(cpu, opc);
+			} else {
+				INS = decode_regular(cpu, opc);
+			}
+			vr4300_icache[(cpu.pc&0x7fffff)>>4] = INS;
+			INS(cpu, opc);
+		};
 }
 
 BusResult VR4300::read(u64 addr, int size)
@@ -765,7 +807,8 @@ BusResult VR4300::read(u64 addr, int size)
 		addr -= 0x3C70000; // saves the mario64 head from crashing. really just need a tlb.
 	}
 	u32 phys_addr = addr&0x1FFFffff;
-	return phys_read(phys_addr, size);
+	return readers[phys_addr>>12](phys_addr, size);
+	//return phys_read(phys_addr, size);
 }
 
 BusResult VR4300::write(u64 addr, u64 v, int size)

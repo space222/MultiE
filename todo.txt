@@ -242,7 +242,6 @@ Neo-Geo AES Todo List
 3. Figure out the .neo format (looks like a straight concat of the various files. p1 starts at the 0x1000 mark)
 4. Actually run the z80?
 Status:
-	Only supporting the pile-of-files with particular naming conventions for now, and must be unzipped.
 	Fix layer done, minus support for system ROM graphics or any bankswitching.
 	Gets through the system rom bootup by lame hack of RTC function: Once the first 
 command gets strobed in, begin alternating the output pin every 30 frames.
@@ -252,13 +251,11 @@ command gets strobed in, begin alternating the output pin every 30 frames.
 Nintendo 64 Todo List
 ------------------------
 Overall:
-1. Zelda games differ per-run in getting out of IPL or even crashing.
-2. Implement EEPROM/Pak/Flash joybus/pif/pi/bus access.
-3. Implement/Fix last few vector instructions.
-4. Fix FPU rounding and conversions.
-5. Implement FPU underflow and flushing.
-6. Pass PI DMA small and unaligned tests.
-7. Optimize any low hanging fruit (RSP instruction caching? RDP on sep. thread?)
+1. TLB
+2. Implement FPU underflow and flushing.
+3. Pass PI DMA small and unaligned tests.
+4. Optimize any low hanging fruit (RDP on sep. thread?)
+5. support proper one-field rendering in RDP
 VR4300:
 1. Continue to improve FPU instructions, figure out underflow. Other than TLB, that's about all that's left for CPU.
 2. TLB?
@@ -270,14 +267,16 @@ RCP Subsystems:
 4. SP: Rewrite DMA. Rewrite SP_STATUS handling. Continue vector ops.
 5. DP: Texture wordswapping imperfect. Improve texture sampling. Coverage. Blending alpha compare. Multitude of other things.
 Status:
-SP: a few load/stores left + vsqr/vrcp fail some tests. Like all the rest of the DMAs (except AI), DMA is instant.
-DP: enough done for everything but text + mario's eye to display. a fair bit done, but so much not working and so many questions.
+SP: a few load/stores left. Like all the rest of the DMAs (except AI), DMA is instant.
+DP: triangle gaps. wrong texture coords. z buffer is linear 16bit with no deltaz or 18bit fp.
 MI: done except for MI_MODE's repeat and ebus features
 PI: basic aligned cart->RAM implemented along with interrupt.
 SI: done (PIF now gets its own todo item). Not supporting the single-word xfer regs.
 AI: Audio works. Not supporting the delayed carry hardware bug. Sounding any good dependent on host running fast enough.
 PIF: one controller and only arrow keys as stick + a/b/z/start currently implemented and working.
 Notes (latest first):
+	Everything that doesn't use TLB does *something*, even if that something is a hang at the first output.
+		Almost everything hangs eventually, even sm64 has random freezing just less than most.
 	I've done something to break Flappy Bird's pipes. Everything about texcoord handling is trial and error now.
 	Triangle attributes S and T are actually s10.21, not s15.16. Their deltas (eg DsDx) already take this into account
 	Load Block having num_bytes be num_texels*8 instead of an actual bpp calc makes mario, starfox, and LCARS look way better.

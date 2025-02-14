@@ -26,6 +26,8 @@ public:
 	void address_error(bool);
 	void exception(u32 ec, u32 vector = 0x80000180);
 	
+	void invalidate(u32);
+	
 	u32 c0_read32(u32 reg);
 	u64 c0_read64(u32 reg);
 	void c0_write32(u32 reg, u64 v);
@@ -35,6 +37,8 @@ public:
 	
 	BusResult read(u64, int);
 	BusResult write(u64, u64, int);
+	
+	std::function<u64(u32, int)> readers[((0x1FFFFFFF)+1)>>12];
 	
 	std::function<u64(u32, int)> phys_read;
 	std::function<void(u32,u64,int)> phys_write;
@@ -99,5 +103,7 @@ public:
 	
 	bool isQNaN_f(float);
 	bool isQNaN_d(double);
+	
+	u8* RAM;
 };
 

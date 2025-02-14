@@ -988,6 +988,7 @@ rsp_instr rsp_lwc2(n64_rsp&, u32 opcode)
 				// Rasky's docs say wrap at 8byte boundary, but only 16byte passes tests
 			}
 		};		
+	case 10: return INSTR {}; // LWV doesn't do anything
 	case 7: // LUV
 		return INSTR {
 			VUWC2;
@@ -1003,8 +1004,6 @@ rsp_instr rsp_lwc2(n64_rsp&, u32 opcode)
 		};
 	
 	case 0xB: return INSTR {}; // LTV unimpl
-	
-	case 10: return INSTR {}; // LWV doesn't do anything
 	
 	default: printf("RSP LWC2: fme unimpl opcode $%X\n", (opcode>>11)&0x1f);
 		 //exit(1);

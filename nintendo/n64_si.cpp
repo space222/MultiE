@@ -25,7 +25,7 @@ void n64::pif_run()
 	if( !(pifram[0x3f] & 1) ) return;
 	//pifram[0x3f] = 0;
 	// from here on it's controller time
-	
+	// currently based on dillonb/n64, but the change had no effect on results
 	/*
 	fprintf(stderr, "--------\nBefore:\n");
 	for(u32 i = 0; i < 64; ++i)
@@ -113,6 +113,10 @@ void n64::pif_run()
 				//if( keys[SDL_SCANCODE_DOWN] ) res[0] ^= 4;
 				//if( keys[SDL_SCANCODE_LEFT] ) res[0] ^= 2;
 				//if( keys[SDL_SCANCODE_RIGHT] ) res[0] ^= 1;
+				if( keys[SDL_SCANCODE_KP_8] ) res[1] ^= 8;
+				if( keys[SDL_SCANCODE_KP_4] ) res[1] ^= 4;
+				if( keys[SDL_SCANCODE_KP_2] ) res[1] ^= 2;
+				if( keys[SDL_SCANCODE_KP_6] ) res[1] ^= 1;
 				if( keys[SDL_SCANCODE_UP] ) res[3] = 120;
 				else if( keys[SDL_SCANCODE_DOWN] ) res[3] = -120;
 				if( keys[SDL_SCANCODE_LEFT] ) res[2] = -120;
@@ -247,10 +251,13 @@ void n64::si_write(u32 addr, u32 v)
 	
 	if( addr == 1 )
 	{	// SI_PIF_AD_RD64B: run the pif and read the results back to ram
+		//printf("PIF read $%X\n", si_regs[0]);
+		//for(u32 i = 0; i < 64; ++i) printf("$%02X ", pifram[i]);
+		//printf("\n");
 		pif_run();
 		memcpy(mem.data()+(si_regs[0]&0x7fffff), pifram, 64);
 		raise_mi_bit(MI_INTR_SI_BIT);
-		si_regs[0] += 64;  // "points to last word written to" ?
+		si_regs[0] += 60;  // "points to last word written to" ?
 		//si_cycles_til_irq = 0x2000;
 		//SI_STATUS |= 1;
 		return;
@@ -260,7 +267,7 @@ void n64::si_write(u32 addr, u32 v)
 	{	// SI_PIF_AD_WR64B
 		memcpy(pifram, mem.data()+(si_regs[0]&0x7fffff), 64);
 		raise_mi_bit(MI_INTR_SI_BIT);
-		si_regs[0] += 64; // ??
+		si_regs[0] += 60; // ??
 		//si_cycles_til_irq = 0x2000;
 		//SI_STATUS |= 1;
 		return;

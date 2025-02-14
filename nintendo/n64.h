@@ -24,6 +24,7 @@ public:
 	void write(u32, u64, int);
 	
 	VR4300 cpu;
+	std::function<u64(u32, int)> get_reader(u32 phys);
 	
 	u32 curwidth, curheight, curbpp;
 
