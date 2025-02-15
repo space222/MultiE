@@ -141,7 +141,13 @@ u64 n64::read(u32 addr, int size)
 
 void n64::write(u32 addr, u64 v, int size)
 {
-	if( addr < 8*1024*1024 ) { sized_write(mem.data(), addr, v, size); cpu.invalidate(addr); return; }
+	if( addr < 8*1024*1024 ) 
+	{ 
+		sized_write(mem.data(), addr, v, size); 
+		cpu.invalidate(addr); 
+		if( size == 64 ) cpu.invalidate(addr+4);
+		return;
+	}
 	if( addr >= 0x04000000 && addr < 0x05000000 )
 	{
 		if( size == 8 )

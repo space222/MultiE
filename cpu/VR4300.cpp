@@ -750,27 +750,15 @@ void VR4300::reset()
 	nnpc = npc + 4;
 	delay = ndelay = LLbit = false;
 	
-	for(u32 i = 0; i < 0x800000/4; ++i) vr4300_icache[i] = 
-		[](VR4300& cpu, u32 opc) 
-		{ 
-			vr4300_instr INS = nullptr;
-			if( (opc >> 26) == 0 )
-			{
-				INS = decode_special(cpu, opc);
-			} else if( (opc >> 26) == 1 ) {
-				INS = decode_regimm(cpu, opc);
-			} else {
-				INS = decode_regular(cpu, opc);
-			}
-			vr4300_icache[(cpu.pc&0x7fffff)>>4] = INS;
-			INS(cpu, opc);
-		};
-		
+	for(u32 i = 0; i < 0x800000; i+=4)
+	{
+		invalidate(i);
+	}		
 }
 
 void VR4300::invalidate(u32 pa)
 {
-	vr4300_icache[pa>>2] = 
+	vr4300_icache[(pa&0x7fffff)>>2] = 
 		[](VR4300& cpu, u32 opc) 
 		{ 
 			vr4300_instr INS = nullptr;
@@ -782,7 +770,7 @@ void VR4300::invalidate(u32 pa)
 			} else {
 				INS = decode_regular(cpu, opc);
 			}
-			vr4300_icache[(cpu.pc&0x7fffff)>>4] = INS;
+			vr4300_icache[(cpu.pc&0x7fffff)>>2] = INS;
 			INS(cpu, opc);
 		};
 }
