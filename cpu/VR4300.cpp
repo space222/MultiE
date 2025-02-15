@@ -649,7 +649,8 @@ void VR4300::step()
 		if( u32(pc) >= 0x80000000u && u32(pc) < 0x80800000u )
 		{
 			vr4300_icache[(pc&0x7fffff)>>2](*this, __builtin_bswap32(*(u32*)&RAM[pc&0x7fffff]));		
-		} else if( !(opc = read(pc, 32)) ) {
+		} else 
+		if( !(opc = read(pc, 32)) ) {
 			// if an exception happened on opcode fetch, exception() will already have been called
 			// nothing else to be done here other than skip to pc pipeline advance
 			printf("Exception reading opcode from $%X\n", u32(pc));
@@ -669,21 +670,12 @@ void VR4300::step()
 		if( u32(COUNT) == u32(COMPARE) )
 		{
 			CAUSE |= BIT(15);
-			//printf("compare irq!\n");
 		}
 	}
 	//if( u32(pc) >= 0x80300000 && u32(pc) < 0x80400000 )
 	//{
 	//	printf("pc = $%X\n", u32(pc));
 	//}
-	
-	if( !(npc & BITL(31)) )
-	{
-		printf("vr4300: pc=$%X, npc=$%X\n", u32(pc), u32(npc));
-		if( !(npc & BITL(30)) ) exit(1);
-		npc &= ~BITL(30);
-		npc |= BITL(31);
-	}
 	
 	pc = npc;
 	npc = nnpc;

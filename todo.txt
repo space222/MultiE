@@ -251,11 +251,13 @@ command gets strobed in, begin alternating the output pin every 30 frames.
 Nintendo 64 Todo List
 ------------------------
 Overall:
-1. TLB
-2. Implement FPU underflow and flushing.
-3. Pass PI DMA small and unaligned tests.
-4. Optimize any low hanging fruit (RDP on sep. thread?)
-5. support proper one-field rendering in RDP
+1. Attempt to debug new address errors that have come up after adding instruction caching to the VR4300
+	Systemtest dies after just a few tests, so maybe that'll be easiest to fix.
+2. TLB
+3. Implement FPU underflow and flushing.
+4. Pass PI DMA small and unaligned tests.
+5. Optimize any low hanging fruit (RDP on sep. thread?)
+	After adding an instruction cache, speed is actually acceptable for the moment.
 VR4300:
 1. Continue to improve FPU instructions, figure out underflow. Other than TLB, that's about all that's left for CPU.
 2. TLB?
