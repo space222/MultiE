@@ -1,16 +1,19 @@
+#include <print>
 #include <cstring>
 #include <cstdio>
 #include <cstdlib>
 #include "VR4300.h"
 
 #define JTYPE u64 target = ((opc<<2)&0x0fffFFFFu) + (cpu.npc&~0x0fff'ffffull)
-#define RTYPE u32 d = (opc>>11)&0x1f; u32 s = (opc>>21)&0x1f; u32 t = (opc>>16)&0x1f; u32 sa=(opc>>6)&0x1f
-#define ITYPE u32 t = (opc>>16)&0x1f; u32 s = (opc>>21)&0x1f; u16 imm16 = opc
+#define RTYPE [[maybe_unused]]u32 d = (opc>>11)&0x1f; \
+		[[maybe_unused]]u32 s = (opc>>21)&0x1f; [[maybe_unused]]u32 t = (opc>>16)&0x1f; [[maybe_unused]]u32 sa=(opc>>6)&0x1f
+#define ITYPE [[maybe_unused]]u32 t = (opc>>16)&0x1f; [[maybe_unused]]u32 s = (opc>>21)&0x1f; \
+		[[maybe_unused]]u16 imm16 = opc
 #define INSTR [](VR4300& cpu, u32 opc)
 #define OVERFLOW32(r, a, b) (((r)^(a))&((r)^(b))&BIT(31))
 #define OVERFLOW64(r, a, b) (((r)^(a))&((r)^(b))&BITL(63))
 #define LINK cpu.nnpc
-#define DS_REL_ADDR (cpu.npc + (s32(s16(imm16))<<2))
+#define DS_REL_ADDR (cpu.npc + (s64(s16(imm16))<<2))
 #define LIKELY cpu.npc = cpu.nnpc; cpu.nnpc += 4;
 
 typedef void(*vr4300_instr) (VR4300&, u32);
@@ -33,10 +36,10 @@ vr4300_instr decode_special(VR4300& proc, u32 opcode)
 	case 0x08: return INSTR { RTYPE; cpu.branch(cpu.r[s]); }; // JR
 	case 0x09: return INSTR { RTYPE; u64 temp = cpu.r[s]; cpu.r[d] = LINK; cpu.branch(temp); }; // JALR
 	
-	case 0x0C: return INSTR { cpu.exception(8); }; // SYSCALL
-	case 0x0D: return INSTR { cpu.exception(9); }; // BREAK
+	case 0x0C: return [](VR4300& cpu, u32) { cpu.exception(8); }; // SYSCALL
+	case 0x0D: return [](VR4300& cpu, u32) { cpu.exception(9); }; // BREAK
 	
-	case 0x0F: return INSTR {}; // SYNC
+	case 0x0F: return [](VR4300&, u32) {}; // SYNC
 	case 0x10: return INSTR { RTYPE; cpu.r[d] = cpu.hi; }; // MFHI
 	case 0x11: return INSTR { RTYPE; cpu.hi = cpu.r[s]; }; // MTHI
 	case 0x12: return INSTR { RTYPE; cpu.r[d] = cpu.lo; }; // MFLO
@@ -329,7 +332,7 @@ vr4300_instr decode_regular(VR4300& proc, u32 opcode)
 		default:
 			if( opcode == 0b01000010000000000000000000011000 )
 			{  // ERET
-				return INSTR 
+				return [](VR4300& cpu, u32) 
 				{
 					cpu.LLbit = false;
 					if( cpu.STATUS & cpu.STATUS_ERL )
@@ -344,12 +347,12 @@ vr4300_instr decode_regular(VR4300& proc, u32 opcode)
 				};
 			}
 			printf("VR4300: Unimpl COP0 opcode = $%X\n", opcode);
-			return INSTR {};
+			return [](VR4300&, u32) {};
 			//exit(1);
 		}
 	case 0x11: return cop1(proc, opcode); // COP1 / FPU todo
-	case 0x12: return INSTR { if( cpu.COPUnusable(2) ) return; }; // COP2??		
-	case 0x13: return INSTR { cpu.exception(10); }; // COP3??		
+	case 0x12: return [](VR4300& cpu, u32) { if( cpu.COPUnusable(2) ) return; }; // COP2??		
+	case 0x13: return [](VR4300& cpu, u32) { cpu.exception(10); }; // COP3??		
 	
 	case 0x14:  // BEQL 
 		return INSTR {
@@ -520,7 +523,7 @@ vr4300_instr decode_regular(VR4300& proc, u32 opcode)
 			const u32 shift = (24-((addr&3)*8));
 			cpu.write(addr&~3, (mem&((1ull<<shift)-1)) | (u32(cpu.r[t])<<shift), 32);
 		};
-	case 0x2F: return INSTR { /*printf("VR4300: cache instruction\n");*/ }; // CACHE not implemented
+	case 0x2F: return [](VR4300&, u32) { /*printf("VR4300: cache instruction\n");*/ }; // CACHE not implemented
 	case 0x30: // LL
 		return INSTR
 		{
@@ -646,9 +649,21 @@ void VR4300::step()
 		//printf("interrupt: mask=$%X, intr=$%X\n", mimask, miirq);
 		exception(0);
 	} else {
+		//std::println(stderr, "${:X}", u32(pc));
 		if( u32(pc) >= 0x80000000u && u32(pc) < 0x80800000u )
 		{
-			vr4300_icache[(pc&0x7fffff)>>2](*this, __builtin_bswap32(*(u32*)&RAM[pc&0x7fffff]));		
+			if( pc & 3 )
+			{
+				BADVADDR = pc;
+				CONTEXT &= ~0x7fFFf0;
+				CONTEXT |= (u32(pc)>>9);
+				CONTEXT &= ~15;
+				XCONTEXT = (pc>>9);
+				XCONTEXT &= 0x1fffffff0ull;
+				address_error(false);
+			} else {
+				vr4300_icache[(pc&0x7ffffc)>>2](*this, __builtin_bswap32(*(u32*)&RAM[pc&0x7ffffc]));		
+			}
 		} else 
 		if( !(opc = read(pc, 32)) ) {
 			// if an exception happened on opcode fetch, exception() will already have been called
@@ -769,7 +784,7 @@ void VR4300::invalidate(u32 pa)
 
 BusResult VR4300::read(u64 addr, int size)
 {
-	if( (size == 64 && (addr&7)) || (size == 32 && (addr&3)) || (size == 16 && (addr&1)) ) 
+	if( (size == 32 && (addr&3)) || (size == 16 && (addr&1)) || (size == 64 && (addr&7)) ) 
 	{
 		BADVADDR = addr;
 		CONTEXT &= ~0x7fFFf0;
@@ -793,7 +808,7 @@ BusResult VR4300::read(u64 addr, int size)
 
 BusResult VR4300::write(u64 addr, u64 v, int size)
 {
-	if( (size == 64 && (addr&7)) || (size == 32 && (addr&3)) || (size == 16 && (addr&1)) ) 
+	if( (size == 32 && (addr&3)) || (size == 16 && (addr&1)) || (size == 64 && (addr&7)) ) 
 	{
 		BADVADDR = addr;
 		CONTEXT &= ~0x7fFFf0;

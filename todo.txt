@@ -252,7 +252,6 @@ Nintendo 64 Todo List
 ------------------------
 Overall:
 1. Attempt to debug new address errors that have come up after adding instruction caching to the VR4300
-	Systemtest dies after just a few tests, so maybe that'll be easiest to fix.
 2. TLB
 3. Implement FPU underflow and flushing.
 4. Pass PI DMA small and unaligned tests.
