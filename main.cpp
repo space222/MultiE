@@ -360,6 +360,22 @@ void imgui_run()
 						else newinstance = true;
 					}
 				}
+				if( ImGui::MenuItem("Nintendo 64") )
+				{
+					std::string f = getOpenFile("Nintendo 64");
+					if( !f.empty() )
+					{
+						delete sys;
+						sys = new n64;
+						if( ! sys->loadROM(f) ) 
+						{
+							printf("unable to load ROM\n");
+							exit(1);
+						}
+						else newinstance = true;
+						crt_scale = 1.f;
+					}				
+				}
 				ImGui::EndMenu();
 			}
 			if( ImGui::BeginMenu("Mattel") )
@@ -493,22 +509,6 @@ void imgui_run()
 						}
 						else newinstance = true;
 						crt_scale = 3.f;
-					}				
-				}
-				if( ImGui::MenuItem("Nintendo 64") )
-				{
-					std::string f = getOpenFile("Nintendo 64");
-					if( !f.empty() )
-					{
-						delete sys;
-						sys = new n64;
-						if( ! sys->loadROM(f) ) 
-						{
-							printf("unable to load ROM\n");
-							exit(1);
-						}
-						else newinstance = true;
-						crt_scale = 1.f;
 					}				
 				}
 				if( ImGui::MenuItem("Neo-Geo AES") )
