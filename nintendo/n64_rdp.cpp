@@ -280,6 +280,10 @@ void n64_rdp::fill_rect(u64 cmd)
 	ulx >>= 2;
 	lry >>= 2;
 	lrx >>= 2;
+	uly = std::max(uly, scissor.ulY);
+	ulx = std::max(ulx, scissor.ulX);
+	lry = std::min(lry, scissor.lrY);
+	lrx = std::min(lrx, scissor.lrX);
 	//printf("fill rect (%i, %i) to (%i, %i)\n", ulx, uly, lrx, lry);
 	if( cimg.bpp == 16 )
 	{
@@ -400,14 +404,19 @@ void n64_rdp::texture_rect(u64 cmd0, u64 cmd1)
 	
 	//fprintf(stderr, "texrect t%i (%i, %i) to (%i, %i)\n\tst(%X, %X), d(%X,%X)\n\n", 
 	//	other.cycle_type, ulX, ulY, lrX, lrY, S>>10, T>>10, DsDx, DtDy);
-		
+	
+	lrX = std::min(lrX, scissor.lrX);
+	lrY = std::min(lrY, scissor.lrY);
+
 	if( cimg.bpp == 16 )
 	{
 		for(u32 Y = ulY; Y < lrY; ++Y, T += DtDy)
 		{
 			s32 Sl = S;
+			if( Y < scissor.ulY ) continue;
 			for(u32 X = ulX; X < lrX; ++X, Sl += DsDx)
 			{
+				if( X < scissor.ulX ) continue;
 				TX.tex_sample = tex_sample(tile, Sl>>10, T>>10);
 				if( other.cycle_type != CYCLE_TYPE_COPY )
 				{
@@ -420,14 +429,14 @@ void n64_rdp::texture_rect(u64 cmd0, u64 cmd1)
 				u16 p = BL.out.to16();
 				//if( other.alpha_compare_en && !(p&1) ) continue;
 				//if( other.force_blend && !(p&1) ) continue;
-				*(u16*)&rdram[cimg.addr + (Y*cimg.width*2) + X*2] = __builtin_bswap16(p);
-				
+				*(u16*)&rdram[cimg.addr + (Y*cimg.width*2) + X*2] = __builtin_bswap16(p);	
 			}
 		}	
 	} else if( cimg.bpp == 32 ) {
 		for(u32 Y = ulY; Y < lrY; ++Y, T += DtDy)
 		{
 			s32 Sl = S;
+			if( Y < scissor.ulY ) continue;
 			for(u32 X = ulX; X < lrX; ++X, Sl += DsDx)
 			{
 				TX.tex_sample = tex_sample(tile, Sl>>10, T>>10);
@@ -468,14 +477,19 @@ void n64_rdp::texture_rect_flip(u64 cmd0, u64 cmd1)
 		//lrY += 1;
 		//lrX += 1;
 	}
+
+	lrX = std::min(lrX, scissor.lrX);
+	lrY = std::min(lrY, scissor.lrY);
 	
 	if( cimg.bpp == 16 )
 	{
 		for(u32 Y = ulY; Y < lrY; ++Y, T += DtDy)
 		{
 			s32 Sl = S;
+			if( Y < scissor.ulY ) continue;
 			for(u32 X = ulX; X < lrX; ++X, Sl += DsDx)
 			{
+				if( X < scissor.ulX ) continue;
 				TX.tex_sample = tex_sample(tile, T>>10, Sl>>10);
 				if( other.cycle_type != CYCLE_TYPE_COPY )
 				{
@@ -495,8 +509,10 @@ void n64_rdp::texture_rect_flip(u64 cmd0, u64 cmd1)
 		for(u32 Y = ulY; Y < lrY; ++Y, T += DtDy)
 		{
 			s32 Sl = S;
+			if( Y < scissor.ulY ) continue;
 			for(u32 X = ulX; X < lrX; ++X, Sl += DsDx)
 			{
+				if( X < scissor.ulX ) continue;
 				TX.tex_sample = tex_sample(tile, T>>10, Sl>>10);
 				if( other.cycle_type != CYCLE_TYPE_COPY )
 				{
@@ -799,10 +815,10 @@ void n64_rdp::triangle()
 			s64 t = RS.t;
 			s64 z = RS.z;
 			s64 w = RS.w;
-			if( y >= 0 )
+			if( y >= scissor.ulY )
 			for(s64 x = (RS.xh+0x8000)>>16; x >= (RS.xm+0x8000)>>16; --x)
 			{
-				if( x < 0 ) break;
+				if( x < scissor.ulX ) break;
 				if( x > scissor.lrX ) { ATTR_XDEC; continue; }
 				RS.cx = x;
 				RS.cy = y;
@@ -849,10 +865,10 @@ void n64_rdp::triangle()
 			s64 t = RS.t;
 			s64 z = RS.z;
 			s64 w = RS.w;
-			if( y >= 0 )
+			if( y >= scissor.ulY )
 			for(s64 x = (RS.xh+0x8000)>>16; x >= (RS.xl+0x8000)>>16; --x)
 			{
-				if( x < 0 ) break;
+				if( x < scissor.ulX ) break;
 				if( x > scissor.lrX ) { ATTR_XDEC; continue; }
 				RS.cx = x;
 				RS.cy = y;
@@ -899,10 +915,10 @@ void n64_rdp::triangle()
 			s64 t = RS.t;
 			s64 z = RS.z;
 			s64 w = RS.w;
-			if( y >= 0 )
+			if( y >= scissor.ulY )
 			for(s64 x = (RS.xh-0x8000)>>16; x <= (RS.xm+0x8000)>>16; ++x)
 			{
-				if( x < 0 ) { ATTR_XINC; continue; }
+				if( x < scissor.ulX ) { ATTR_XINC; continue; }
 				if( x > scissor.lrX ) break;
 				RS.cx = x;
 				RS.cy = y;
@@ -948,10 +964,10 @@ void n64_rdp::triangle()
 			s64 t = RS.t;
 			s64 z = RS.z;
 			s64 w = RS.w;
-			if( y >= 0 )
+			if( y >= scissor.ulY )
 			for(s64 x = (RS.xh-0x8000)>>16; x <= (RS.xl+0x8000)>>16; ++x)
 			{
-				if( x < 0 ) { ATTR_XINC; continue; }
+				if( x < scissor.ulX ) { ATTR_XINC; continue; }
 				if( x > scissor.lrX ) break;
 				RS.cx = x;
 				RS.cy = y;
