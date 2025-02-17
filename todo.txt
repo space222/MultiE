@@ -270,6 +270,7 @@ SI: done (PIF now gets its own todo item). Not supporting the single-word xfer r
 AI: Audio works. Not supporting the delayed carry hardware bug. Sounding any good dependent on host running fast enough.
 PIF: one controller and only arrow keys as stick + a/b/z/start currently implemented and working.
 Notes (latest first):
+	Implementing RDP scissor fixed the logo and FIGHT text in MKT, as well as the address error in that and Smash.
 	Everything that doesn't use TLB does *something*, even if that something is a hang at the first output.
 		Almost everything hangs eventually, even sm64 has random freezing just less than most.
 	I've done something to break Flappy Bird's pipes. Everything about texcoord handling is trial and error now.

@@ -417,7 +417,7 @@ void n64::reset()
 	MI_INTERRUPT = 0;
 	MI_MASK = 0;
 	
-	RDP.rdp_irq = [&](){ raise_mi_bit(MI_INTR_DP_BIT); DP_STATUS &= ~(BIT(3)|BIT(5)); }; //|BIT(7) //??
+	RDP.rdp_irq = [&](){ raise_mi_bit(MI_INTR_DP_BIT); DP_STATUS &= ~(BIT(3)|BIT(5)|BIT(7)); }; //|BIT(7) //??
 	RDP.rdram = mem.data();
 	for(u32 i = 0; i < 8; ++i) dp_regs[i] = 0;
 	DP_STATUS = 0x80;

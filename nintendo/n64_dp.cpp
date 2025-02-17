@@ -85,8 +85,8 @@ void n64::dp_send()
 {
 	DP_STATUS |= PIPE_BUSY;
 	
-	DP_CURRENT &= 0x7ffff8;
-	DP_END &= 0x7ffff8;
+	//DP_CURRENT &= 0x7ffff8;
+	//DP_END &= 0x7ffff8;
 	
 	while( DP_CURRENT < DP_END )
 	{
@@ -99,7 +99,7 @@ void n64::dp_send()
 		DP_CURRENT += 8;
 	}
 	
-	DP_START = DP_CURRENT = DP_END;
+	//DP_START = DP_CURRENT = DP_END;
 	
 	DP_STATUS |= CBUF_READY;
 }
