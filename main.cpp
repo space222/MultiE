@@ -67,6 +67,7 @@ console* sys = nullptr;
 
 const int sbuflen = 735*3;
 float sample_buf[sbuflen];
+float last_sample = 0;
 std::atomic<int> sample_rd(1), sample_wr(2);
 
 void audio_add(float L, float R)
@@ -78,10 +79,10 @@ void audio_add(float L, float R)
 
 float audio_get()
 {
-	if( (sample_rd + 1) % sbuflen == sample_wr ) return 0;
-	float r = sample_buf[sample_rd++];
+	if( (sample_rd + 1) % sbuflen == sample_wr ) return last_sample;
+	last_sample = sample_buf[sample_rd++];
 	sample_rd = sample_rd % sbuflen;
-	return r;
+	return last_sample;
 }
 
 void audio_callback(void*, Uint8 *stream, int len)
@@ -130,7 +131,7 @@ int main(int argc, char** args)
 	ProgramOptions cli(argc, args, {"help", "a26", "a52", "c64", "dmg", "nes", "itv"});
 	
 	SDL_Init(SDL_INIT_GAMECONTROLLER|SDL_INIT_VIDEO|SDL_INIT_AUDIO);
-	MainWindow = SDL_CreateWindow("Multie", 0, 80, 1200, 720, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+	MainWindow = SDL_CreateWindow("Multie", 0, 80, 1000, 720, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
 	MainRender = SDL_CreateRenderer(MainWindow, -1, SDL_RENDERER_ACCELERATED|SDL_RENDERER_PRESENTVSYNC);
 	SDL_SetRenderDrawBlendMode(MainRender, SDL_BLENDMODE_NONE);
 	

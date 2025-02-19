@@ -7,8 +7,9 @@
 #include <cfenv>
 #include "VR4300.h"
 #define JTYPE u64 target = ((opc<<2)&0x0fffFFFFu) + (cpu.npc&~0x0fff'ffffull)
-#define RTYPE u32 d = (opc>>11)&0x1f; u32 s = (opc>>21)&0x1f; u32 t = (opc>>16)&0x1f; u32 sa=(opc>>6)&0x1f
-#define ITYPE u32 t = (opc>>16)&0x1f; u32 s = (opc>>21)&0x1f; u16 imm16 = opc
+#define RTYPE [[maybe_unused]]u32 d = (opc>>11)&0x1f; [[maybe_unused]]u32 s = (opc>>21)&0x1f; \
+		[[maybe_unused]]u32 t = (opc>>16)&0x1f; [[maybe_unused]]u32 sa=(opc>>6)&0x1f
+#define ITYPE [[maybe_unused]]u32 t = (opc>>16)&0x1f; [[maybe_unused]]u32 s = (opc>>21)&0x1f; [[maybe_unused]]u16 imm16 = opc
 #define INSTR [](VR4300& cpu, u32 opc)
 #define OVERFLOW32(r, a, b) (((r)^(a))&((r)^(b))&BIT(31))
 #define OVERFLOW64(r, a, b) (((r)^(a))&((r)^(b))&BITL(63))
@@ -18,9 +19,9 @@
 #define FLTYPE u32 fs = (opc>>11)&0x1f; u32 rt = (opc>>16)&0x1f
 #define FITYPE  if( cpu.COPUnusable(1) ) return; \
 		feclearexcept(FE_ALL_EXCEPT); \
-		u32 fs = (opc>>11)&0x1f; \
-		u32 fd = (opc>>6)&0x1f;  \
-		u32 ft = (opc>>16)&0x1f; \
+		[[maybe_unused]]u32 fs = (opc>>11)&0x1f; \
+		[[maybe_unused]]u32 fd = (opc>>6)&0x1f;  \
+		[[maybe_unused]] u32 ft = (opc>>16)&0x1f; \
 		if( !(cpu.STATUS & BIT(26)) ) fs &= ~1; \
 		cpu.FCSR &= ~0x3f000
 
@@ -50,7 +51,7 @@ bool VR4300::isQNaN_d(double a)
 	return /*(fpclassify(a)==FP_NAN) &&*/ ((v & mask)==mask); //BITL(51));
 }
 
-vr4300_instr cop1_d(VR4300& proc, u32 opcode)
+vr4300_instr cop1_d(VR4300&, u32 opcode)
 {
 	if( (opcode & 0x3F) >= 0x30 )
 	{	// All the compares
@@ -520,11 +521,11 @@ vr4300_instr cop1_d(VR4300& proc, u32 opcode)
 			if( fetestexcept(FE_INEXACT) && cpu.signal_fpu(cpu.FPU_INEXACT) ) return;
 			memcpy(&cpu.f[fd<<3], &b, 8);		
 		};
-	default: return INSTR { if( cpu.COPUnusable(1) ) return; cpu.FCSR &= ~0x3f000; cpu.signal_fpu(cpu.FPU_UNIMPL); };
+	default: return [](VR4300& cpu, u32) { if( cpu.COPUnusable(1) ) return; cpu.FCSR &= ~0x3f000; cpu.signal_fpu(cpu.FPU_UNIMPL); };
 	}
 }
 
-vr4300_instr cop1_s(VR4300& proc, u32 opcode)
+vr4300_instr cop1_s(VR4300&, u32 opcode)
 {
 	if( (opcode & 0x3F) >= 0x30 )
 	{	// All the compares
@@ -990,7 +991,7 @@ vr4300_instr cop1_s(VR4300& proc, u32 opcode)
 			if( fetestexcept(FE_INVALID) && cpu.signal_fpu(cpu.FPU_INVALID) ) return;
 			memcpy(&cpu.f[fd<<3], &b, 8);		
 		};
-	default: return INSTR { if( cpu.COPUnusable(1) ) return; cpu.FCSR &= ~0x3f000; cpu.signal_fpu(cpu.FPU_UNIMPL); };
+	default: return [](VR4300& cpu, u32) { if( cpu.COPUnusable(1) ) return; cpu.FCSR &= ~0x3f000; cpu.signal_fpu(cpu.FPU_UNIMPL); };
 	}
 }
 
@@ -1122,7 +1123,7 @@ vr4300_instr cop1(VR4300& proc, u32 opcode)
 	case 0x15: return cop1_long(proc, opcode);
 	default:
 		//printf("VR4300: Unimpl or undef cop1 opcode = $%X\n", opcode);
-		return INSTR { if( cpu.COPUnusable(1) ) return; cpu.FCSR &= ~0x3f000; cpu.signal_fpu(cpu.FPU_UNIMPL); };
+		return [](VR4300& cpu, u32) { if( cpu.COPUnusable(1) ) return; cpu.FCSR &= ~0x3f000; cpu.signal_fpu(cpu.FPU_UNIMPL); };
 	}
 	return nullptr;
 }
@@ -1158,7 +1159,7 @@ vr4300_instr cop1_word(VR4300&, u32 opcode)
 		};
 	default: 
 		fprintf(stderr, "cop1_word unimpl opcode = $%X\n", opcode & 0x3F);
-		return INSTR { if( cpu.COPUnusable(1) ) return; cpu.FCSR &= ~0x3f000; cpu.signal_fpu(cpu.FPU_UNIMPL); };
+		return [](VR4300& cpu, u32) { if( cpu.COPUnusable(1) ) return; cpu.FCSR &= ~0x3f000; cpu.signal_fpu(cpu.FPU_UNIMPL); };
 	}
 }
 
@@ -1195,7 +1196,7 @@ vr4300_instr cop1_long(VR4300&, u32 opcode)
 		};	
 	default: 
 		fprintf(stderr, "cop1_long unimpl opcode = $%X\n", opcode & 0x3F);
-		return INSTR { if( cpu.COPUnusable(1) ) return; cpu.FCSR &= ~0x3f000; cpu.signal_fpu(cpu.FPU_UNIMPL); };
+		return [](VR4300& cpu, u32) { if( cpu.COPUnusable(1) ) return; cpu.FCSR &= ~0x3f000; cpu.signal_fpu(cpu.FPU_UNIMPL); };
 	}
 }
 

@@ -346,9 +346,37 @@ vr4300_instr decode_regular(VR4300& proc, u32 opcode)
 					cpu.STATUS &= ~(cpu.STATUS_ERL|cpu.STATUS_EXL);
 				};
 			}
+			if( opcode == 0b0100'0010'0000'0000'0000'0000'0000'1000 )
+			{  // TLBP
+				return [](VR4300& cpu, u32)
+				{
+					std::println("TLBP");				
+				};			
+			}
+			if( opcode == 0b0100'0010'0000'0000'0000'0000'0000'0001 )
+			{  // TLBR
+				return [](VR4300& cpu, u32)
+				{
+					std::println("TLBR");				
+				};			
+			}
+			if( opcode == 0b0100'0010'0000'0000'0000'0000'0000'0010 )
+			{  // TLBWI
+				return [](VR4300& cpu, u32)
+				{
+					std::println("TLBWI");				
+				};			
+			}
+			if( opcode == 0b0100'0010'0000'0000'0000'0000'0000'0110 )
+			{  // TLBWR
+				return [](VR4300& cpu, u32)
+				{
+					std::println("TLBWR");
+				};			
+			}
 			printf("VR4300: Unimpl COP0 opcode = $%X\n", opcode);
-			return [](VR4300&, u32) {};
-			//exit(1);
+			//return [](VR4300&, u32) {};
+			exit(1);
 		}
 	case 0x11: return cop1(proc, opcode); // COP1 / FPU todo
 	case 0x12: return [](VR4300& cpu, u32) { if( cpu.COPUnusable(2) ) return; }; // COP2??		
@@ -760,7 +788,9 @@ void VR4300::reset()
 	for(u32 i = 0; i < 0x800000; i+=4)
 	{
 		invalidate(i);
-	}		
+	}
+	
+	in_infinite_loop = false;
 }
 
 void VR4300::invalidate(u32 pa)
@@ -858,6 +888,13 @@ void VR4300::c0_write64(u32 reg, u64 v)
 	//fprintf(stderr, "cop0 write32 c%i = $%X\n", reg, u32(v));
 	switch( reg )
 	{
+	/*case 2:
+	case 3:
+	case 5:
+	case 10:
+		std::println("c{} = ${:X}", reg, v);
+		break;
+	*/
 	case 0: INDEX = v&0x8000003Fu; return;
 	case 4: CONTEXT &= ((1ull<<23)-1); CONTEXT |= v&~((1ull<<23)-1); CONTEXT &= ~15; return;
 	

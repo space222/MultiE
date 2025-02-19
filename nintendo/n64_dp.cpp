@@ -88,7 +88,7 @@ void n64::dp_send()
 	//DP_CURRENT &= 0x7ffff8;
 	//DP_END &= 0x7ffff8;
 	
-	while( DP_CURRENT < DP_END )
+	while( DP_CURRENT != DP_END )
 	{
 		if( DP_STATUS & XBUS )
 		{

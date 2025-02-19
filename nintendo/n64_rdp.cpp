@@ -439,6 +439,7 @@ void n64_rdp::texture_rect(u64 cmd0, u64 cmd1)
 			if( Y < scissor.ulY ) continue;
 			for(u32 X = ulX; X < lrX; ++X, Sl += DsDx)
 			{
+				if( X < scissor.ulX ) continue;
 				TX.tex_sample = tex_sample(tile, Sl>>10, T>>10);
 				if( other.cycle_type != CYCLE_TYPE_COPY )
 				{

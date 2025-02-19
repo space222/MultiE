@@ -48,10 +48,14 @@ public:
 	
 	u64& INDEX = c[0];
 	u64& RANDOM = c[1];
+	u64& ENTRY_LO0 = c[2];
+	u64& ENTRY_LO1 = c[3];
 	u64& CONTEXT = c[4];
+	u64& PAGE_MASK = c[5];
 	u64& WIRED = c[6];
 	u64& BADVADDR = c[8];
 	u64& COUNT = c[9];
+	u64& ENTRY_HI = c[10];
 	u64& COMPARE = c[11];
 	u64& STATUS = c[12];
 	u64& CAUSE  = c[13];
@@ -103,6 +107,13 @@ public:
 	
 	bool isQNaN_f(float);
 	bool isQNaN_d(double);
+	
+	struct {
+		u64 mask, page0, page1, vpn;
+		u8 asid, G, C, V;
+	} tlb[32];
+	
+	bool in_infinite_loop;
 	
 	u8* RAM;
 };
