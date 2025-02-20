@@ -302,6 +302,7 @@ bool n64::loadROM(const std::string fname)
 	return true;
 }
 
+extern int countdiv;
 
 void n64::run_frame()
 {
@@ -317,70 +318,93 @@ void n64::run_frame()
 		for(u32 i = 0; i < 5700; ++i)
 		{
 			cpu.step();
-			rspdiv += 1;
-			if( rspdiv >= 3 ) rspdiv = 0;
-			if( !(SP_STATUS & 1) && (rspdiv != 2) )
+			if( 0 ) //cpu.in_infinite_loop ) 
 			{
-				RSP.step();
-			}
-			//dp_send();
-			/*if( pi_cycles_til_irq )
-			{
-				pi_cycles_til_irq -= 1;
-				if( pi_cycles_til_irq == 0 )
+				u64 cc = (93750000/44100) - ai_output_cycles;
+				if( ai_dma_enabled && ai_buf[0].valid && cc > ai_cycles_per_sample - ai_cycles ) 
 				{
-					PI_STATUS &= ~3;
-					raise_mi_bit(MI_INTR_PI_BIT);
+					cc = ai_cycles_per_sample - ai_cycles;
 				}
-			}
-			if( si_cycles_til_irq )
-			{
-				si_cycles_til_irq -= 1;
-				if( si_cycles_til_irq == 0 )
+				if( 5700 - i < cc ) 
+				{	
+					cc = 5700 - i;
+				}
+				//std::println("${:X}", cc);
+				for(u32 x = 0; x < cc; ++x)
 				{
-					SI_STATUS &= ~1;
-					raise_mi_bit(MI_INTR_SI_BIT);
-				}			
-			}
-			*/
-			if( ai_dma_enabled && ai_buf[0].valid )
-			{
-				ai_cycles += 1;
-				if( ai_cycles >= ai_cycles_per_sample )
-				{
-					ai_cycles = 0;
-					s16 L = __builtin_bswap16(*(u16*)&mem[ai_buf[0].ramaddr&0x7fffff]);
-					ai_buf[0].ramaddr += 2;
-					s16 R = __builtin_bswap16(*(u16*)&mem[ai_buf[0].ramaddr&0x7fffff]);
-					ai_buf[0].ramaddr += 2;
-					ai_buf[0].length -= 4;
-					if( ai_buf[0].length == 0 )
+					run_sp();
+					run_ai();
+					ai_output_sample();
+					countdiv ^= 1;
+					if( countdiv & 1 ) cpu.COUNT = (cpu.COUNT+1)&0xffffFFFFull;
+					if( u32(cpu.COUNT) == u32(cpu.COMPARE) )
 					{
-						ai_buf[0] = ai_buf[1];
-						ai_buf[1].valid = false;
-						if( ai_buf[0].valid )
-						{
-							raise_mi_bit(MI_INTR_AI_BIT);
-							//printf("N64: AI interrupt 2\n");
-						}
+						cpu.CAUSE |= BIT(15);
+						break;
 					}
-					
-					ai_L = (L / 32768.f);
-					ai_R = (R / 32768.f);				
+					i += 1;
 				}
-			}
-			ai_output_cycles += 1;
-			if( ai_output_cycles >= (93750000/44100) )
-			{
-				ai_output_cycles = 0; // -= (93750000/44100);
-				audio_add(ai_L, ai_R);
-			}
+			} else {			
+				run_sp();			
+				run_ai();
+				ai_output_sample();
+			}			
 		}
 	}
 	
 	if( (VI_CTRL&BIT(6)) && (VI_CTRL&3) ) VI_V_CURRENT ^= 1;
 	
 	vi_draw_frame();
+}
+
+void n64::run_sp()
+{
+	rspdiv += 1;
+	if( rspdiv >= 3 ) rspdiv = 0;
+	if( !(SP_STATUS & 1) && (rspdiv != 2) )
+	{
+		RSP.step();
+	}
+}
+
+void n64::run_ai()
+{
+	if( ai_dma_enabled && ai_buf[0].valid )
+	{
+		ai_cycles += 1;
+		if( ai_cycles >= ai_cycles_per_sample )
+		{
+			ai_cycles = 0;
+			s16 L = __builtin_bswap16(*(u16*)&mem[ai_buf[0].ramaddr&0x7fffff]);
+			ai_buf[0].ramaddr += 2;
+			s16 R = __builtin_bswap16(*(u16*)&mem[ai_buf[0].ramaddr&0x7fffff]);
+			ai_buf[0].ramaddr += 2;
+			ai_buf[0].length -= 4;
+			if( ai_buf[0].length == 0 )
+			{
+				ai_buf[0] = ai_buf[1];
+				ai_buf[1].valid = false;
+				if( ai_buf[0].valid )
+				{
+					raise_mi_bit(MI_INTR_AI_BIT);
+					//printf("N64: AI interrupt 2\n");
+				}
+			}
+			
+			ai_L = (L / 32768.f);
+			ai_R = (R / 32768.f);				
+		}
+	}
+}
+
+void n64::ai_output_sample()
+{
+	ai_output_cycles += 1;
+	if( ai_output_cycles >= (93750000/44100) )
+	{
+		ai_output_cycles = 0; // -= (93750000/44100);
+		audio_add(ai_L, ai_R);
+	}
 }
 
 void n64::reset()

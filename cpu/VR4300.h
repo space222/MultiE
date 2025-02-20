@@ -78,6 +78,7 @@ public:
 	
 	bool signal_fpu(int sig)
 	{
+		return false;
 		if( sig == FPU_UNIMPL )
 		{
 			FCSR |= BIT(17);

@@ -296,9 +296,25 @@ vr4300_instr decode_regular(VR4300& proc, u32 opcode)
 {
 	switch( opcode>>26 )
 	{
-	case 0x02: return INSTR { JTYPE; cpu.branch(target); }; // J
+	case 0x02:  // J
+		return INSTR 
+		{ 
+			JTYPE;
+			//if( u32(target) == u32(cpu.pc) )
+			//{
+			//	cpu.in_infinite_loop = (cpu.read(cpu.pc+4, 32) == 0);
+			//}
+			cpu.branch(target); 
+		};
 	case 0x03: return INSTR { JTYPE; cpu.r[31] = LINK; cpu.branch(target); }; // JAL
-	case 0x04: return INSTR { ITYPE; cpu.ndelay = true; if( cpu.r[s] == cpu.r[t] ) cpu.branch(DS_REL_ADDR); }; // BEQ
+	case 0x04: // BEQ
+		return INSTR 
+		{
+			ITYPE; 
+			cpu.ndelay = true;
+			if( s == 0 && t == 0 && cpu.read(cpu.pc+4, 32) == 0 ) cpu.in_infinite_loop = true;
+			if( cpu.r[s] == cpu.r[t] ) cpu.branch(DS_REL_ADDR); 
+		};
 	case 0x05: return INSTR { ITYPE; cpu.ndelay = true; if( cpu.r[s] != cpu.r[t] ) cpu.branch(DS_REL_ADDR); }; // BNE
 	case 0x06: return INSTR { ITYPE; cpu.ndelay = true; if( s64(cpu.r[s]) <= 0 ) cpu.branch(DS_REL_ADDR); }; // BLEZ
 	case 0x07: return INSTR { ITYPE; cpu.ndelay = true; if( s64(cpu.r[s]) > 0 ) cpu.branch(DS_REL_ADDR); }; // BGTZ
@@ -350,28 +366,28 @@ vr4300_instr decode_regular(VR4300& proc, u32 opcode)
 			{  // TLBP
 				return [](VR4300& cpu, u32)
 				{
-					std::println("TLBP");				
+					//std::println("TLBP");				
 				};			
 			}
 			if( opcode == 0b0100'0010'0000'0000'0000'0000'0000'0001 )
 			{  // TLBR
 				return [](VR4300& cpu, u32)
 				{
-					std::println("TLBR");				
+					//std::println("TLBR");				
 				};			
 			}
 			if( opcode == 0b0100'0010'0000'0000'0000'0000'0000'0010 )
 			{  // TLBWI
 				return [](VR4300& cpu, u32)
 				{
-					std::println("TLBWI");				
+					//std::println("TLBWI");				
 				};			
 			}
 			if( opcode == 0b0100'0010'0000'0000'0000'0000'0000'0110 )
 			{  // TLBWR
 				return [](VR4300& cpu, u32)
 				{
-					std::println("TLBWR");
+					//std::println("TLBWR");
 				};			
 			}
 			printf("VR4300: Unimpl COP0 opcode = $%X\n", opcode);
@@ -670,6 +686,7 @@ void VR4300::step()
 	r[0] = 0;
 	delay = ndelay;
 	ndelay = false;
+	in_infinite_loop = false;
 	BusResult opc;
 	
 	if( ((STATUS&7)==1) && (STATUS & CAUSE & 0xff00) )
@@ -713,7 +730,7 @@ void VR4300::step()
 		if( u32(COUNT) == u32(COMPARE) )
 		{
 			CAUSE |= BIT(15);
-		}
+		}	
 	}
 	//if( u32(pc) >= 0x80300000 && u32(pc) < 0x80400000 )
 	//{

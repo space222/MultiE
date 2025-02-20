@@ -20,6 +20,10 @@ public:
 	void run_frame() override;
 	void reset() override;
 	
+	void run_sp();
+	void run_ai();
+	void ai_output_sample();
+	
 	u64 read(u32, int);
 	void write(u32, u64, int);
 	
