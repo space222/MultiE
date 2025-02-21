@@ -318,7 +318,7 @@ void n64::run_frame()
 		for(u32 i = 0; i < 5700; ++i)
 		{
 			cpu.step();
-			if( 0 ) //cpu.in_infinite_loop ) 
+			if( cpu.in_infinite_loop ) 
 			{
 				u64 cc = (93750000/44100) - ai_output_cycles;
 				if( ai_dma_enabled && ai_buf[0].valid && cc > ai_cycles_per_sample - ai_cycles ) 
@@ -336,11 +336,14 @@ void n64::run_frame()
 					run_ai();
 					ai_output_sample();
 					countdiv ^= 1;
-					if( countdiv & 1 ) cpu.COUNT = (cpu.COUNT+1)&0xffffFFFFull;
-					if( u32(cpu.COUNT) == u32(cpu.COMPARE) )
+					if( countdiv & 1 ) 
 					{
-						cpu.CAUSE |= BIT(15);
-						break;
+						cpu.COUNT = (cpu.COUNT+1)&0xffffFFFFull;
+						if( u32(cpu.COUNT) == u32(cpu.COMPARE) )
+						{
+							cpu.CAUSE |= BIT(15);
+							break;
+						}
 					}
 					i += 1;
 				}

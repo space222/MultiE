@@ -300,10 +300,10 @@ vr4300_instr decode_regular(VR4300& proc, u32 opcode)
 		return INSTR 
 		{ 
 			JTYPE;
-			//if( u32(target) == u32(cpu.pc) )
-			//{
-			//	cpu.in_infinite_loop = (cpu.read(cpu.pc+4, 32) == 0);
-			//}
+			if( u32(target) == u32(cpu.pc) )
+			{
+				cpu.in_infinite_loop = (cpu.read(cpu.pc+4, 32) == 0);
+			}
 			cpu.branch(target); 
 		};
 	case 0x03: return INSTR { JTYPE; cpu.r[31] = LINK; cpu.branch(target); }; // JAL
@@ -726,7 +726,10 @@ void VR4300::step()
 			}
 		}
 		countdiv ^= 1;
-		if( countdiv & 1 ) COUNT = (COUNT+1)&0xffffFFFFull;
+		if( countdiv & 1 ) 
+		{
+			COUNT = (COUNT+1)&0xffffFFFFull;
+		}
 		if( u32(COUNT) == u32(COMPARE) )
 		{
 			CAUSE |= BIT(15);

@@ -1,10 +1,12 @@
 Framework Todo List
 ----------------------
-1. Continue improving main ui.
-2. Windows support
-3. ability to remap controls across systems
-4. Stereo sound
-5. Support letter/pillar boxing rather than scaling the boxed size to 640x480.
+1. ability to remap controls across systems
+2. regroup load menu, remove "experimental", go to "alpha", "beta" plus normal by-brand.
+3. Generally continue improving main ui.
+4. Windows support
+5. Stereo sound
+6. Support letter/pillar boxing rather than scaling the boxed size to 640x480.
+
 
 
 
@@ -250,6 +252,8 @@ command gets strobed in, begin alternating the output pin every 30 frames.
 
 Nintendo 64 Todo List
 ------------------------
+Overall:
+1. Scheduler? Implement input mapping?
 Subsystems:
 1. VR4300: TLB. eventually jit?
 2. VI: currently just all registers being r/w so I can display output. Actually do things per-line and v-int.
@@ -261,12 +265,16 @@ Subsystems:
 Status:
 SP: a few load/stores left. Like all the rest of the DMAs (except AI), DMA is instant.
 DP: triangle gaps. wrong texture coords. z buffer is linear 16bit with no deltaz or 18bit fp.
+	YUV textures. RG/BA bank split.
 MI: done except for MI_MODE's repeat and ebus features
 PI: basic aligned cart->RAM implemented along with interrupt.
 SI: done, but DMAs instant. Not supporting the single-word xfer regs.
 AI: Audio works. Not supporting the delayed carry hardware bug. Sounding any good dependent on host running fast enough.
 PIF: Paks still. one controller and only arrow keys as stick + a/b/z/start currently implemented and working.
 Notes (latest first):
+	Hacked in some idle loop skip to rather large speed up.
+	Turned out almost everything freezing was spurious fpu exceptions. Commenting out fpu exceptions "fixes" everything.
+		At least I know where to look for the real bug.
 	Implementing RDP scissor fixed the logo and FIGHT text in MKT, as well as the address error in that and Smash.
 	Everything that doesn't use TLB does *something*, even if that something is a hang at the first output.
 		Almost everything hangs eventually, even sm64 has random freezing just less than most.
