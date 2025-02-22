@@ -24,5 +24,20 @@ public:
 	u8 bios[512];
 	u8 RAM[0x10000];
 	u32 fbuf[160*102];
+	
+	void mikey_write(u16, u8);
+	u8 mikey_read(u16);
+	void suzy_write(u16, u8);
+	u8 suzy_read(u16);
+	
+	u8 cart_block, cart_strobe, cart_data;
+	u32 cart_offset;
+	u32 cart_mask, cart_shift;
+	
+	u8 mmctrl;
+	bool mmctrl_vectors() { return !(mmctrl & 8); }
+	bool mmctrl_rom() { return !(mmctrl & 4); }
+	bool mmctrl_mikey() { return !(mmctrl & 2); }
+	bool mmctrl_suzy() { return !(mmctrl & 1); }
 };
 

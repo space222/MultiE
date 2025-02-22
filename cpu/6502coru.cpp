@@ -1,7 +1,7 @@
 // 6502 (and eventually at least 65C02 and maybe HuC6280) implementation as a C++20 coroutine
 // Intention is to be at least bus-activity-level accurate (read/write called on the right cycle with correct address). 
 // Internal operations otherwise may not match hardware.
-
+#include <print>
 #include <iostream>
 #include <coroutine>
 #include <functional>
@@ -32,6 +32,7 @@ Yieldable coru6502::run()
 		
 	if( !waiting ) {
 		opc = read(pc);
+		//std::println("${:X}: opc = ${:X}", pc, opc);
 		pc += 1;
 		CYCLE;
 		u8 oldC = F.b.C;		
@@ -1702,7 +1703,7 @@ Yieldable coru6502::run()
 				exit(1);
 				break;
 			}
-			printf("65C02coru:$%X: Unimpl opc $%X\n", pc, opc);
+			//printf("65C02coru:$%X: Unimpl opc $%X\n", pc, opc);
 
 			// this point it's time for the 'C02
 			// C++ coroutines can't co_yield from a function, so time to include more code
