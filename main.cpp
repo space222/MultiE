@@ -276,41 +276,6 @@ void imgui_run()
 						else newinstance = true;
 					}
 				}
-				if( ImGui::MenuItem("5200") )
-				{
-					std::string f = getOpenFile("Atari 5200");
-					if( !f.empty() )
-					{
-						delete sys;
-						sys = new a52;
-						if( ! sys->loadROM(f) ) 
-						{
-							printf("unable to load ROM\n");
-							exit(1);
-						}
-						else newinstance = true;
-					}
-				}
-				ImGui::EndMenu();
-			}
-			if( ImGui::BeginMenu("Commodore") )
-			{
-				if( ImGui::MenuItem("C64 Tape") )
-				{
-					std::string f = getOpenFile("C64");
-					if( !f.empty() )
-					{
-						delete sys;
-						sys = new c64;
-						cli_options["c64-tape"] = f;
-						if( ! sys->loadROM(f) ) 
-						{
-							printf("unable to load ROM\n");
-							exit(1);
-						}
-						else newinstance = true;
-					}
-				}
 				ImGui::EndMenu();
 			}
 			if( ImGui::BeginMenu("Nintendo") )
@@ -379,46 +344,7 @@ void imgui_run()
 					}				
 				}
 				ImGui::EndMenu();
-			}
-			if( ImGui::BeginMenu("Mattel") )
-			{
-				if( ImGui::MenuItem("IntelliVision") )
-				{
-					std::string f = getOpenFile("IntelliVision");
-					if( !f.empty() )
-					{
-						delete sys;
-						sys = new intellivision;
-						if( ! sys->loadROM(f) ) 
-						{
-							printf("unable to load ROM\n");
-							exit(1);
-						}
-						else newinstance = true;
-					}
-				}
-				ImGui::EndMenu();
-			}
-			if( ImGui::BeginMenu("IBM") )
-			{
-				if( ImGui::MenuItem("PC XT") )
-				{
-					std::string f = getOpenFile("IBM PC BIOS");
-					if( !f.empty() )
-					{
-						delete sys;
-						sys = new ibmpc;
-						if( ! sys->loadROM(f) ) 
-						{
-							printf("unable to load ROM\n");
-							exit(1);
-						}
-						else newinstance = true;
-						crt_scale = 1;
-					}				
-				}
-				ImGui::EndMenu();
-			}
+			}			
 			if( ImGui::BeginMenu("Sega") )
 			{
 				if( ImGui::MenuItem("SMS") )
@@ -495,7 +421,93 @@ void imgui_run()
 				}
 				ImGui::EndMenu();
 			}
-			if( ImGui::BeginMenu("Experimental") ) 
+			
+			ImGui::Separator();
+			
+			if( ImGui::BeginMenu("Beta") ) 
+			{
+				
+				if( ImGui::MenuItem("Apple IIe") )
+				{
+					std::string f = getOpenFile("Apple IIe");
+					if( !f.empty() )
+					{
+						delete sys;
+						sys = new apple2e;
+						if( ! sys->loadROM(f) ) 
+						{
+							printf("unable to load floppy image\n");
+							exit(1);
+						}
+						else newinstance = true;
+						crt_scale = 3;
+					}				
+				}
+				if( ImGui::MenuItem("Casio PV-1000") )
+				{
+					std::string f = getOpenFile("Casio PV-1000");
+					if( !f.empty() )
+					{
+						delete sys;
+						sys = new pv1k;
+						if( ! sys->loadROM(f) ) 
+						{
+							printf("unable to load ROM\n");
+							exit(1);
+						}
+						else newinstance = true;
+						crt_scale = 2;
+					}				
+				}
+				if( ImGui::MenuItem("Microsoft MSX") )
+				{
+					std::string f = getOpenFile("Microsoft MSX");
+					if( !f.empty() )
+					{
+						delete sys;
+						sys = new msx;
+						if( ! sys->loadROM(f) ) 
+						{
+							printf("unable to load ROM\n");
+							exit(1);
+						}
+						else newinstance = true;
+						crt_scale = 2;
+					}				
+				}
+				if( ImGui::MenuItem("Atari 5200") )
+				{
+					std::string f = getOpenFile("Atari 5200");
+					if( !f.empty() )
+					{
+						delete sys;
+						sys = new a52;
+						if( ! sys->loadROM(f) ) 
+						{
+							printf("unable to load ROM\n");
+							exit(1);
+						}
+						else newinstance = true;
+					}
+				}
+				if( ImGui::MenuItem("Mattel IntelliVision") )
+				{
+					std::string f = getOpenFile("IntelliVision");
+					if( !f.empty() )
+					{
+						delete sys;
+						sys = new intellivision;
+						if( ! sys->loadROM(f) ) 
+						{
+							printf("unable to load ROM\n");
+							exit(1);
+						}
+						else newinstance = true;
+					}
+				}		
+				ImGui::EndMenu();
+			}
+			if( ImGui::BeginMenu("Alpha") )
 			{
 				if( ImGui::MenuItem("Atari Lynx") )
 				{
@@ -510,7 +522,7 @@ void imgui_run()
 							exit(1);
 						}
 						else newinstance = true;
-						crt_scale = 3.f;
+						crt_scale = 4.f;
 					}				
 				}
 				if( ImGui::MenuItem("Bally Astrocade") )
@@ -543,22 +555,6 @@ void imgui_run()
 						}
 						else newinstance = true;
 						crt_scale = 2.f;
-					}				
-				}
-				if( ImGui::MenuItem("Apple IIe") )
-				{
-					std::string f = getOpenFile("Apple IIe");
-					if( !f.empty() )
-					{
-						delete sys;
-						sys = new apple2e;
-						if( ! sys->loadROM(f) ) 
-						{
-							printf("unable to load floppy image\n");
-							exit(1);
-						}
-						else newinstance = true;
-						crt_scale = 3;
 					}				
 				}
 				if( ImGui::MenuItem("V.Tech CreatiVision") )
@@ -625,38 +621,6 @@ void imgui_run()
 						crt_scale = 2;
 					}				
 				}
-				if( ImGui::MenuItem("Casio PV-1000") )
-				{
-					std::string f = getOpenFile("Casio PV-1000");
-					if( !f.empty() )
-					{
-						delete sys;
-						sys = new pv1k;
-						if( ! sys->loadROM(f) ) 
-						{
-							printf("unable to load ROM\n");
-							exit(1);
-						}
-						else newinstance = true;
-						crt_scale = 2;
-					}				
-				}
-				if( ImGui::MenuItem("Microsoft MSX") )
-				{
-					std::string f = getOpenFile("Microsoft MSX");
-					if( !f.empty() )
-					{
-						delete sys;
-						sys = new msx;
-						if( ! sys->loadROM(f) ) 
-						{
-							printf("unable to load ROM\n");
-							exit(1);
-						}
-						else newinstance = true;
-						crt_scale = 2;
-					}				
-				}
 				if( ImGui::MenuItem("Fairchild Channel F") )
 				{
 					std::string f = getOpenFile("Channel F");
@@ -673,8 +637,41 @@ void imgui_run()
 						crt_scale = 5;
 					}				
 				}
+				if( ImGui::MenuItem("IBM PC XT") )
+				{
+					std::string f = getOpenFile("IBM PC BIOS");
+					if( !f.empty() )
+					{
+						delete sys;
+						sys = new ibmpc;
+						if( ! sys->loadROM(f) ) 
+						{
+							printf("unable to load ROM\n");
+							exit(1);
+						}
+						else newinstance = true;
+						crt_scale = 1;
+					}				
+				}
+				if( ImGui::MenuItem("Commodore C64 Tape") )
+				{
+					std::string f = getOpenFile("C64");
+					if( !f.empty() )
+					{
+						delete sys;
+						sys = new c64;
+						cli_options["c64-tape"] = f;
+						if( ! sys->loadROM(f) ) 
+						{
+							printf("unable to load ROM\n");
+							exit(1);
+						}
+						else newinstance = true;
+					}
+				}
 				ImGui::EndMenu();
 			}
+			
 			//ImGui::BeginDisabled();
 			//ImGui::EndDisabled();
 			
@@ -683,6 +680,8 @@ void imgui_run()
 				sys->reset();
 				resize_screen();
 			}			
+			
+			ImGui::Separator();
 			
 			if( ImGui::MenuItem("Exit") ) exit(0);
 			ImGui::EndMenu();

@@ -34,6 +34,9 @@ public:
 	u32 cart_offset;
 	u32 cart_mask, cart_shift;
 	
+	u8 palette[0x20];
+	u16 fb_addr;
+	
 	u8 mmctrl;
 	bool mmctrl_vectors() { return !(mmctrl & 8); }
 	bool mmctrl_rom() { return !(mmctrl & 4); }

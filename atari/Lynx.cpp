@@ -7,9 +7,17 @@
 #define IODAT    0xFD8B
 #define SYSCTL1  0xFD87
 #define RCART    0xFCB2
+#define PALSTART 0xFDA0
+#define PALEND   0xFDBF
+#define DISPADRH 0xFD95
+#define DISPADRL 0xFD94
 
 u8 Lynx::mikey_read(u16 addr)
 {
+	if( addr >= PALSTART && addr <= PALEND )
+	{
+		return palette[addr&0x1F];
+	}
 	std::println("Mikey <${:X}", addr);
 	return 0;
 }
@@ -40,7 +48,7 @@ void Lynx::mikey_write(u16 addr, u8 v)
 	}
 	if( addr == SYSCTL1 )
 	{
-		if( !(cart_strobe&1) && (v&1) )
+		if( (cart_strobe&1) && !(v&1) )
 		{
 			cart_block <<= 1;
 			cart_block |= (cart_data>>1)&1;	
@@ -51,6 +59,21 @@ void Lynx::mikey_write(u16 addr, u8 v)
 		}
 		cart_strobe = v;
 		return;	
+	}
+	if( addr >= PALSTART && addr <= PALEND )
+	{
+		palette[addr&0x1F] = v;
+		return;
+	}
+	if( addr == DISPADRH )
+	{
+		fb_addr = (fb_addr&0xff)|(v<<8);
+		return;
+	}
+	if( addr == DISPADRL )
+	{
+		fb_addr = (fb_addr&0xff00)|v;
+		return;
 	}
 	std::println("Mikey ${:X} = ${:X}", addr, v);
 }
@@ -131,10 +154,27 @@ void Lynx::write(u16 addr, u8 v)
 
 void Lynx::run_frame()
 {
-	for(u32 i = 0; i < 3000; ++i)
+	for(u32 i = 0; i < 8000; ++i)
 	{
 		//std::println("${:X}", cpu.pc);
 		cycle();
+	}
+	
+	for(u32 y = 0; y < 102; ++y)
+	{
+		for(u32 x = 0; x < 160; ++x)
+		{
+			u8 b = RAM[(fb_addr + (y*80) + (x>>1)) & 0xffff];
+			b >>= ((x&1) ? 4 : 0);
+			b &= 15;
+			u8 R = palette[0x10 + b]&15;
+			u8 B = palette[0x10 + b]>>4;
+			u8 G = palette[b]&15;
+			R = (R<<4)|R;
+			G = (G<<4)|G;
+			B = (B<<4)|B;
+			fbuf[y*160+x] = (R<<24)|(G<<16)|(B<<8);	
+		}
 	}
 }
 
