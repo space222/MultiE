@@ -297,11 +297,9 @@ Notes (latest first):
 
 Atari Lynx Todo List
 -----------------------
-1. Cart block shifter and cart reads
-2. Palette and framebuffer
-3. Sprite blitter engine
-4. Input?
-5. Timers, sound, etc?
+1. Sprite blitter engine
+2. Timers
+3. Input? Sound? etc?
 
 
 
