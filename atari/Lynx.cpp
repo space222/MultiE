@@ -11,6 +11,11 @@
 #define PALEND   0xFDBF
 #define DISPADRH 0xFD95
 #define DISPADRL 0xFD94
+#define SPRBEGIN 0xFC00
+#define SPREND   0xFC7F
+#define SPRG0    0xFC91
+#define DISPCTL  0xFD92
+#define KEYPAD   0xFCB0
 
 u8 Lynx::mikey_read(u16 addr)
 {
@@ -31,10 +36,19 @@ u8 Lynx::suzy_read(u16 addr)
 	if( addr == RCART )
 	{
 		u8 r = rom[(cart_block<<cart_shift)|(cart_offset&cart_mask)];
-		std::println("cart read [${:X}:${:X}] got ${:X}", cart_block, cart_offset, r);
+		//std::println("cart read [${:X}:${:X}] got ${:X}", cart_block, cart_offset, r);
 		cart_offset += 1;
 		return r;
 	}
+	if( addr >= SPRBEGIN && addr <= SPREND )
+	{
+		return spr[addr&0x7f];
+	}
+	if( addr == KEYPAD )
+	{
+		return 0; //todo
+	}
+	
 	std::println("Suzy <${:X}", addr);
 	return 0;
 }
@@ -75,11 +89,30 @@ void Lynx::mikey_write(u16 addr, u8 v)
 		fb_addr = (fb_addr&0xff00)|v;
 		return;
 	}
+	if( addr == DISPCTL )
+	{
+		dispctl = v;
+		return;
+	}
 	std::println("Mikey ${:X} = ${:X}", addr, v);
 }
 
 void Lynx::suzy_write(u16 addr, u8 v)
 {
+	if( addr >= SPRBEGIN && addr <= SPREND )
+	{
+		spr[addr&0x7f] = v;
+		if( !(addr & 1) ) spr[(addr&0x7f)|1] = 0;
+		return;
+	}
+	if( addr == SPRG0 )
+	{
+		if( v & 1 )
+		{
+			suzy_draw();
+		}
+		return;
+	}
 	std::println("Suzy ${:X} = ${:X}", addr, v);
 }
 
@@ -152,29 +185,136 @@ void Lynx::write(u16 addr, u8 v)
 	RAM[addr] = v;
 }
 
+void Lynx::fb_write(int x, int y, u8 v)
+{
+	if( dispctl & BIT(2) )
+	{ // 4bpp
+		RAM[fb_addr + y*80 + (x>>1)] &= 0xf<<((x&1)*4);
+		RAM[fb_addr + y*80 + (x>>1)] |= (v&15)<<(((x&1)^1)*4);	
+	} else {
+		// 2bpp
+		RAM[fb_addr + y*40 + (x>>2)] &= ~( 3<<((x&3)*2) );
+		RAM[fb_addr + y*40 + (x>>2)] |= (v&3)<<((x&3)*2);	
+	}
+}
+
+void Lynx::suzy_draw()
+{
+	u16 offs = *(u16*)&spr[0x10];
+	//u16 hsz_offs = *(u16*)&spr[0x28];
+	//u16 vsz_offs = *(u16*)&spr[0x2A];
+	
+	while( offs )
+	{
+		
+		std::println("drawing sprite at ${:X}", offs);
+
+		u8 sprctl0 = RAM[offs];
+		u8 sprctl1 = RAM[offs+1];
+		u8 sprcoll = RAM[offs+2];
+		u16 ptr = *(u16*)&RAM[offs+3];
+		u16 data = *(u16*)&RAM[offs+5];
+		u16 hpos = *(u16*)&RAM[offs+7];
+		u16 vpos = *(u16*)&RAM[offs+9];
+		u16 hsz =  *(u16*)&RAM[offs+11];
+		u16 vsz =  *(u16*)&RAM[offs+13];
+		u16 stretch=*(u16*)&RAM[offs+15];
+		u16 tilt = *(u16*)&RAM[offs+17];
+		
+		std::println("ctl0\t${:X}", sprctl0);
+		std::println("ctl1\t${:X}", sprctl1);
+		std::println("coll\t${:X}", sprcoll);
+		std::println("ptr\t${:X}", ptr);
+		std::println("data\t${:X}", data);
+		std::println("hpos\t{}", short(hpos));
+		std::println("vpos\t{}", short(vpos));
+		std::println("hsz\t${:X}", hsz);
+		std::println("vsz\t${:X}", vsz);
+		offs = ptr;
+		
+		for(u32 i = 0; i < 0x10; ++i) std::print("${:X} ", RAM[data+i]);
+		std::println("\n----");
+		
+		if( sprctl1 & 0x80 )
+		{ //totally literal
+			u8 ls = RAM[data];
+			int y = vpos;
+			while( ls )
+			{
+				for(u32 i = 0; i < ls; ++i)
+				{
+					u8 b = RAM[data+1+i];
+					switch( sprctl0>>6 )
+					{
+					case 0:
+						for(u32 bit = 0; bit < 8; ++bit) fb_write(hpos+i*8+bit, y, (b>>(7-bit))&1);
+						break;
+					case 1:
+						for(u32 bit = 0; bit < 4; ++bit) fb_write(hpos+i*4+bit, y, (b>>((3-bit)*2))&3); 
+						break;
+					case 3:
+						fb_write(hpos+i*2, y, b>>4);
+						fb_write(hpos+i*2+1, y, b&15);
+						break;
+					}				
+				}
+				data += ls;
+				ls = RAM[data];
+				y += 1;
+				if( y >= 102 ) break;
+			}
+			continue;
+		}
+		
+		//bitstream of packed and unpacked(kinda literal?) data
+		//todo
+	}
+
+}
+
 void Lynx::run_frame()
 {
-	for(u32 i = 0; i < 8000; ++i)
+	for(u32 i = 0; i < 35000; ++i)
 	{
 		//std::println("${:X}", cpu.pc);
 		cycle();
 	}
 	
-	for(u32 y = 0; y < 102; ++y)
+	if( dispctl & BIT(2) )
 	{
-		for(u32 x = 0; x < 160; ++x)
+		for(u32 y = 0; y < 102; ++y)
 		{
-			u8 b = RAM[(fb_addr + (y*80) + (x>>1)) & 0xffff];
-			b >>= ((x&1) ? 4 : 0);
-			b &= 15;
-			u8 R = palette[0x10 + b]&15;
-			u8 B = palette[0x10 + b]>>4;
-			u8 G = palette[b]&15;
-			R = (R<<4)|R;
-			G = (G<<4)|G;
-			B = (B<<4)|B;
-			fbuf[y*160+x] = (R<<24)|(G<<16)|(B<<8);	
+			for(u32 x = 0; x < 160; ++x)
+			{
+				u8 b = RAM[(fb_addr + (y*80) + (x>>1)) & 0xffff];
+				b >>= ((x&1) ? 4 : 0);
+				b &= 15;
+				u8 R = palette[0x10 + b]&15;
+				u8 B = palette[0x10 + b]>>4;
+				u8 G = palette[b]&15;
+				R = (R<<4)|R;
+				G = (G<<4)|G;
+				B = (B<<4)|B;
+				fbuf[y*160+x] = (R<<24)|(G<<16)|(B<<8);	
+			}
 		}
+	} else {
+		for(u32 y = 0; y < 102; ++y)
+		{
+			for(u32 x = 0; x < 160; ++x)
+			{
+				u8 b = RAM[(fb_addr + (y*40) + (x>>2)) & 0xffff];
+				b >>= (((x&3)^3)*2);
+				b &= 3;
+				u8 R = palette[0x10 + b]&15;
+				u8 B = palette[0x10 + b]>>4;
+				u8 G = palette[b]&15;
+				R = (R<<4)|R;
+				G = (G<<4)|G;
+				B = (B<<4)|B;
+				fbuf[y*160+x] = (R<<24)|(G<<16)|(B<<8);	
+			}
+		}	
 	}
 }
 

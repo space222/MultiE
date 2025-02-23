@@ -30,10 +30,15 @@ public:
 	void suzy_write(u16, u8);
 	u8 suzy_read(u16);
 	
+	void suzy_draw();
+	void fb_write(int x, int y, u8 v);
+	
 	u8 cart_block, cart_strobe, cart_data;
 	u32 cart_offset;
 	u32 cart_mask, cart_shift;
 	
+	u8 spr[0x80];
+	u8 dispctl;
 	u8 palette[0x20];
 	u16 fb_addr;
 	
