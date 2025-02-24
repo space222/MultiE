@@ -366,7 +366,14 @@ vr4300_instr decode_regular(VR4300& proc, u32 opcode)
 			{  // TLBP
 				return [](VR4300& cpu, u32)
 				{
-					//std::println("TLBP");				
+					//std::println("TLBP");	
+					u32 p = 0;
+					if(int ent = cpu.tlb_search(cpu.ENTRY_HI&~0xff, p); ent >= 0)
+					{
+						cpu.INDEX = ent;
+					} else {
+						cpu.INDEX |= BIT(31);
+					}
 				};			
 			}
 			if( opcode == 0b0100'0010'0000'0000'0000'0000'0000'0001 )
@@ -398,15 +405,14 @@ vr4300_instr decode_regular(VR4300& proc, u32 opcode)
 					en.D1 = cpu.ENTRY_LO1 & 4; 
 					en.V0 = cpu.ENTRY_LO0 & 2;
 					en.V1 = cpu.ENTRY_LO1 & 2;
-					if( en.V0 )
+					/*if( en.V0 )
 					{
 						std::println("${:X} even translates to ${:X}", en.vpn, en.page0<<6);
 					}
 					if( en.V1 )
 					{
 						std::println("${:X} odd translates to ${:X}", en.vpn, en.page1<<6);
-					}
-					//std::println("TLBWI tlb#{}", cpu.INDEX);	
+					}*/
 				};			
 			}
 			if( opcode == 0b0100'0010'0000'0000'0000'0000'0000'0110 )
@@ -752,7 +758,7 @@ void VR4300::step()
 		if( !(opc = read(pc, 32)) ) {
 			// if an exception happened on opcode fetch, exception() will already have been called
 			// nothing else to be done here other than skip to pc pipeline advance
-			printf("Exception reading opcode from $%X\n", u32(pc));
+			//printf("Exception reading opcode from $%X\n", u32(pc));
 			//exit(1);
 		} else {
 			if( (opc >> 26) == 0 )
@@ -887,11 +893,19 @@ BusResult VR4300::read(u64 addr, int size)
 	if( u32(addr) < 0x8000'0000u || u32(addr) >= 0xc000'0000u )
 	{
 		u32 p = 0;
-		if( tlb_search(addr, p) >= 0 )
+		if( int ent = tlb_search(addr, p); ent >= 0 )
 		{
 			addr = p;
 		} else {
-			//todo: TLB miss
+			BADVADDR = addr;
+			CONTEXT &= ~0x7fFFf0;
+			CONTEXT |= (u32(addr)>>9);
+			CONTEXT &= ~15;
+			XCONTEXT = (addr>>9);
+			XCONTEXT &= 0x1fffffff0ull;
+			ENTRY_HI = (ENTRY_HI&0xff) | (addr&~0xfff);
+			exception(2, (ent==-1) ? 0x80000000u : 0x80000180u);
+			return BusResult::exception(1); 
 		}
 		//addr -= 0x3C70000; // saves the mario64 head from crashing. really just need a tlb.
 	}
@@ -916,11 +930,19 @@ BusResult VR4300::write(u64 addr, u64 v, int size)
 	if( u32(addr) < 0x8000'0000u || u32(addr) >= 0xc000'0000u )
 	{
 		u32 p = 0;
-		if( tlb_search(addr, p) >= 0 )
+		if( int ent = tlb_search(addr, p); ent >= 0 )
 		{
 			addr = p;
 		} else {
-			//todo: TLB miss
+			BADVADDR = addr;
+			CONTEXT &= ~0x7fFFf0;
+			CONTEXT |= (u32(addr)>>9);
+			CONTEXT &= ~15;
+			XCONTEXT = (addr>>9);
+			XCONTEXT &= 0x1fffffff0ull;
+			ENTRY_HI = (ENTRY_HI&0xff) | (addr&~0xfff);
+			exception(3, (ent==-1) ? 0x80000000u : 0x80000180u);
+			return BusResult::exception(1); 
 		}
 		//addr -= 0x3C70000; // saves the mario64 head from crashing. really just need a tlb.
 	}
@@ -957,13 +979,14 @@ void VR4300::c0_write64(u32 reg, u64 v)
 	//fprintf(stderr, "cop0 write32 c%i = $%X\n", reg, u32(v));
 	switch( reg )
 	{
-	/*case 2:
-	case 3:
-	case 5:
-	case 10:
-		std::println("c{} = ${:X}", reg, v);
-		break;
-	*/
+	case 2: ENTRY_LO0 = v & 0x3fffffff; return;
+	case 3: ENTRY_LO1 = v & 0x3fffffff; return;
+	case 5: PAGE_MASK = v & (0xfff<<13); return;
+	case 10: ENTRY_HI = v & ~0x1f00; ENTRY_HI &= 0xFFffffFFFFull; return;
+	
+	//failed: a == b expected, but a=0x345678ffffe0ff b=0x78ffffe0ff. EntryHi was written as 0x12345678ffffffff
+
+
 	case 0: INDEX = v&0x8000003Fu; return;
 	case 4: CONTEXT &= ((1ull<<23)-1); CONTEXT |= v&~((1ull<<23)-1); CONTEXT &= ~15; return;
 	
@@ -1009,25 +1032,25 @@ bool VR4300::COPUnusable(u32 cop)
 
 int VR4300::tlb_search(u64 virt, u32& phys)
 {
-	for(u32 i = 0; i < 32; ++i)
+	for(int i = 0; i < 32; ++i)
 	{
 		auto& E = tlb[i];
-		if( !E.V0 && !E.V1 ) continue;
 		const u32 M = ~(E.mask|0x1fff);
 		if( (virt & M) != E.vpn ) continue;
+		if( !E.G && ((ENTRY_HI&0xff) != E.asid) ) continue;
 		const u32 odd = virt & (1<<(std::countr_zero(M)-1));
 		if( odd )
 		{
-			if( !E.V1 ) continue;
+			if( !E.V1 ) return -2;
 			phys = E.page1;
 		} else {
-			if( !E.V0 ) continue;
+			if( !E.V0 ) return -2;
 			phys = E.page0;
 		}
 		phys <<= 6;
 		phys &= M>>1;
 		phys |= (virt & ~(M>>1));
-		std::println("translated v${:X} to p${:X}", virt, phys);
+		//std::println("translated v${:X} to p${:X}", virt, phys);
 		return i;
 	}
 	return -1;

@@ -650,7 +650,7 @@ n64_rdp::dc n64_rdp::tex_sample(u32 tile, s64 s, s64 t)
 		return dc::from32( __builtin_bswap32( *(u32*)&tmem[((T.addr*8 + (t*T.line*8) + s*4)&0xffc)^xorval] ));
 	} else if( T.bpp == 8 ) {
 		u8 v = tmem[((T.addr*8 + (t*T.line*8) + s)&0xfff)^xorval];
-		if( T.format == 2 )
+		if( T.format == 2 || T.format == 0 )
 		{ // CI8
 			if( other.tlut_type_ia16 )
 			{
@@ -1061,14 +1061,14 @@ void n64_rdp::load_tlut(u64 cmd)
 	
 	if( ulT != lrT || ulT != 0 || lrT != 0 )
 	{
-		printf("RDP: LoadTLUT with ulT != lrT != both 0\n");
+		//std::println("ulT = ${:X}, lrT = ${:X}", ulT, lrT);
 		//exit(1);
 	}
 	
 	u32 num = (lrS - ulS + 1);
 	for(u32 i = 0; i < num; ++i)
 	{
-		u64 p = (*(u16*)&rdram[teximg.addr + i*2]);
+		u64 p = (*(u16*)&rdram[teximg.addr + (ulT*teximg.width*2) + i*2]);
 		p = (p<<48)|(p<<32)|(p<<16)|p;
 		*(u64*)&tmem[(T.addr*8 + i*8)&0xfff] = p;
 	}
