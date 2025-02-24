@@ -373,14 +373,40 @@ vr4300_instr decode_regular(VR4300& proc, u32 opcode)
 			{  // TLBR
 				return [](VR4300& cpu, u32)
 				{
-					//std::println("TLBR");				
-				};			
+					//std::println("TLBR");	
+					auto& en = cpu.tlb[cpu.INDEX&0x1F];
+					cpu.PAGE_MASK = en.mask;
+					cpu.ENTRY_HI = en.vpn | en.asid;
+					cpu.ENTRY_LO0 = en.page0 | en.G | en.C0 | en.D0 | en.V0;
+					cpu.ENTRY_LO1 = en.page1 | en.G | en.C1 | en.D1 | en.V1;			
+				};
 			}
 			if( opcode == 0b0100'0010'0000'0000'0000'0000'0000'0010 )
 			{  // TLBWI
 				return [](VR4300& cpu, u32)
 				{
-					//std::println("TLBWI");				
+					auto& en = cpu.tlb[cpu.INDEX&0x1F];  // masked to 32?
+					en.mask = cpu.PAGE_MASK & 0xFFE000;
+					en.asid = cpu.ENTRY_HI & 0xff;
+					en.vpn  = cpu.ENTRY_HI & ~0x1fff;
+					en.page0 = cpu.ENTRY_LO0 & 0x1fffffc0;
+					en.page1 = cpu.ENTRY_LO1 & 0x1fffffc0;
+					en.G = cpu.ENTRY_LO0 & cpu.ENTRY_LO1 & 1;
+					en.C0 = cpu.ENTRY_LO0 & 0x38;
+					en.C1 = cpu.ENTRY_LO1 & 0x38;
+					en.D0 = cpu.ENTRY_LO0 & 4;
+					en.D1 = cpu.ENTRY_LO1 & 4; 
+					en.V0 = cpu.ENTRY_LO0 & 2;
+					en.V1 = cpu.ENTRY_LO1 & 2;
+					if( en.V0 )
+					{
+						std::println("${:X} even translates to ${:X}", en.vpn, en.page0<<6);
+					}
+					if( en.V1 )
+					{
+						std::println("${:X} odd translates to ${:X}", en.vpn, en.page1<<6);
+					}
+					//std::println("TLBWI tlb#{}", cpu.INDEX);	
 				};			
 			}
 			if( opcode == 0b0100'0010'0000'0000'0000'0000'0000'0110 )
@@ -388,6 +414,19 @@ vr4300_instr decode_regular(VR4300& proc, u32 opcode)
 				return [](VR4300& cpu, u32)
 				{
 					//std::println("TLBWR");
+					auto& en = cpu.tlb[cpu.RANDOM&0x1F];  // masked to 32?
+					en.mask = cpu.PAGE_MASK & 0xFFE000;
+					en.asid = cpu.ENTRY_HI & 0xff;
+					en.vpn  = cpu.ENTRY_HI & ~0x1fff;
+					en.page0 = cpu.ENTRY_LO0 & 0x1fffffc0;
+					en.page1 = cpu.ENTRY_LO1 & 0x1fffffc0;
+					en.G = cpu.ENTRY_LO0 & cpu.ENTRY_LO1 & 1;
+					en.C0 = cpu.ENTRY_LO0 & 0x38;
+					en.C1 = cpu.ENTRY_LO1 & 0x38;
+					en.D0 = cpu.ENTRY_LO0 & 4;
+					en.D1 = cpu.ENTRY_LO1 & 4; 
+					en.V0 = cpu.ENTRY_LO0 & 2;
+					en.V1 = cpu.ENTRY_LO1 & 2; 
 				};			
 			}
 			printf("VR4300: Unimpl COP0 opcode = $%X\n", opcode);
@@ -847,9 +886,14 @@ BusResult VR4300::read(u64 addr, int size)
 	}
 	if( u32(addr) < 0x8000'0000u || u32(addr) >= 0xc000'0000u )
 	{
-		//printf("VR4300:$%X: tlb not yet supported, read%i <$%lX\n", u32(pc), size, addr);
-		//exit(1);
-		addr -= 0x3C70000; // saves the mario64 head from crashing. really just need a tlb.
+		u32 p = 0;
+		if( tlb_search(addr, p) >= 0 )
+		{
+			addr = p;
+		} else {
+			//todo: TLB miss
+		}
+		//addr -= 0x3C70000; // saves the mario64 head from crashing. really just need a tlb.
 	}
 	u32 phys_addr = addr&0x1FFFffff;
 	return readers[phys_addr>>12](phys_addr, size);
@@ -871,9 +915,14 @@ BusResult VR4300::write(u64 addr, u64 v, int size)
 	}
 	if( u32(addr) < 0x8000'0000u || u32(addr) >= 0xc000'0000u )
 	{
-		//printf("VR4300:$%X: tlb not yet supported, write%i $%lX = $%lX\n", u32(pc), size, addr, v);
-		//exit(1);
-		addr -= 0x3C70000; // saves the mario64 head from crashing. really just need a tlb.
+		u32 p = 0;
+		if( tlb_search(addr, p) >= 0 )
+		{
+			addr = p;
+		} else {
+			//todo: TLB miss
+		}
+		//addr -= 0x3C70000; // saves the mario64 head from crashing. really just need a tlb.
 	}
 	u32 phys_addr = addr&0x1FFFffff;
 	phys_write(phys_addr, v, size);
@@ -956,5 +1005,31 @@ bool VR4300::COPUnusable(u32 cop)
 	CAUSE &= ~(BIT(28)|BIT(29));
 	CAUSE |= cop<<28;
 	return true;
+}
+
+int VR4300::tlb_search(u64 virt, u32& phys)
+{
+	for(u32 i = 0; i < 32; ++i)
+	{
+		auto& E = tlb[i];
+		if( !E.V0 && !E.V1 ) continue;
+		const u32 M = ~(E.mask|0x1fff);
+		if( (virt & M) != E.vpn ) continue;
+		const u32 odd = virt & (1<<(std::countr_zero(M)-1));
+		if( odd )
+		{
+			if( !E.V1 ) continue;
+			phys = E.page1;
+		} else {
+			if( !E.V0 ) continue;
+			phys = E.page0;
+		}
+		phys <<= 6;
+		phys &= M>>1;
+		phys |= (virt & ~(M>>1));
+		std::println("translated v${:X} to p${:X}", virt, phys);
+		return i;
+	}
+	return -1;
 }
 

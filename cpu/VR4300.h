@@ -109,10 +109,11 @@ public:
 	bool isQNaN_f(float);
 	bool isQNaN_d(double);
 	
-	struct {
+	struct tlb_entry {
 		u64 mask, page0, page1, vpn;
-		u8 asid, G, C, V;
+		u8 asid, G, C0, C1, V0, V1, D0, D1;
 	} tlb[32];
+	int tlb_search(u64 virt, u32& phys); // returns tlb entry # or -1
 	
 	bool in_infinite_loop;
 	
