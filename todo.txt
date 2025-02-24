@@ -253,9 +253,10 @@ command gets strobed in, begin alternating the output pin every 30 frames.
 Nintendo 64 Todo List
 ------------------------
 Overall:
-1. Scheduler? Implement input mapping?
+1. Find the cause of Paper Mario segfaulting the emulator
+2. Implement input mapping?
 Subsystems:
-1. VR4300: TLB. eventually jit?
+1. VR4300: better TLB. find the spurious fpu exception and reenable them.
 2. VI: currently just all registers being r/w so I can display output. Actually do things per-line and v-int.
 3. PIF: The rest of the buttons, and support controllers. Still need the framework support for input customization.
 	Proper EEPROM and Controller paks.
