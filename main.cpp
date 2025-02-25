@@ -783,6 +783,50 @@ void console::setVsync(bool e)
 */
 
 
+struct InputDef
+{
+	u8 type; // 0=invalid, 1=keyboard, 2=controller button, 3=stick axis
+	u32 code; // scancode or button or stick axis index
+};
+
+void create_input_map(std::vector<InputDef>& vals, std::vector<std::string>& names)
+{
+	for(std::string n : names)
+	{
+		if( n.starts_with("key") )
+		{
+			std::string sdlname = n.substr(4);
+			auto sc = SDL_GetScancodeFromName(sdlname.c_str());
+			if( sc == SDL_SCANCODE_UNKNOWN )
+			{
+				vals.push_back({0,1});
+			} else {
+				vals.push_back({1, sc});
+			}			
+		} else if( n.starts_with("btn") ) {
+			std::string sdlname = n.substr(4);
+			auto bc = SDL_GameControllerGetButtonFromString(sdlname.c_str());
+			if( bc == SDL_CONTROLLER_BUTTON_INVALID ) 
+			{
+				vals.push_back({0,2});
+			} else {
+				vals.push_back({2, u32(bc)});
+			}
+		} else if( n.starts_with("axis") ) {
+			std::string sdlname = n.substr(5);
+			auto bc = SDL_GameControllerGetAxisFromString(sdlname.c_str());
+			if( bc == SDL_CONTROLLER_AXIS_INVALID ) 
+			{
+				vals.push_back({0,3});
+			} else {
+				vals.push_back({3, u32(bc)});
+			}
+		} else {
+			vals.push_back({0,1});
+		}
+	}
+}
+
 bool getKeyState(u32 key)
 {
 	if( !(key & BIT(31)) )

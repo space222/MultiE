@@ -734,6 +734,12 @@ void VR4300::step()
 	in_infinite_loop = false;
 	BusResult opc;
 	
+	{
+		u32 rd = (RANDOM&0x1f)-1;
+		rd &= 0x1f;
+		if( rd == WIRED ) rd = 31;
+		RANDOM = (RANDOM&0x20)|rd;
+	}
 	if( ((STATUS&7)==1) && (STATUS & CAUSE & 0xff00) )
 	{       // exception() will set npc
 		//printf("interrupt: mask=$%X, intr=$%X\n", mimask, miirq);
