@@ -1,11 +1,10 @@
 Framework Todo List
 ----------------------
 1. ability to remap controls across systems
-2. regroup load menu, remove "experimental", go to "alpha", "beta" plus normal by-brand.
-3. Generally continue improving main ui.
-4. Windows support
-5. Stereo sound
-6. Support letter/pillar boxing rather than scaling the boxed size to 640x480.
+2. Generally continue improving main ui.
+3. Windows support
+4. Stereo sound
+5. Support letter/pillar boxing rather than scaling the boxed size to 640x480.
 
 
 
@@ -253,8 +252,7 @@ command gets strobed in, begin alternating the output pin every 30 frames.
 Nintendo 64 Todo List
 ------------------------
 Overall:
-1. Find the cause of Paper Mario segfaulting the emulator
-2. Implement input mapping?
+1. Implement input mapping?
 Subsystems:
 1. VR4300: better TLB. find the spurious fpu exception and reenable them.
 2. VI: currently just all registers being r/w so I can display output. Actually do things per-line and v-int.

@@ -44,7 +44,17 @@ void n64::pi_dma(bool write)
 			}
 			//if( cart + len < ROM.size() )
 			//{
-				memcpy(mem.data()+dram_addr, ROM.data()+(cart_addr-0x10000000), length);
+				if( dram_addr + length > 0x7fffff )
+				{
+					std::println("dram ${:X}, len ${:X}, end addr = ${:X}", dram_addr, length, dram_addr+length);
+					length = 0x800000 - dram_addr;
+				}
+				if( (cart_addr&0x0FFFffff) >= ROM.size() )
+				{
+					memset(mem.data()+dram_addr, 0, length);
+				} else {
+					memcpy(mem.data()+dram_addr, ROM.data()+(cart_addr-0x10000000), length);
+				}
 				//std::println("PI dma invalidating ${:X} to ${:X}", dram_addr, dram_addr+length);
 				for(u32 i = dram_addr&0x7fffff; i < ((dram_addr+length)&0x7fffff); i += 4) cpu.invalidate(i);
 			//} else {

@@ -37,12 +37,13 @@ void n64_rdp::recv(u64 cmd)
 		{ // all the triangles
 		if( cmdbuf.size() < u32(4 + ((cmdbyte&4)?8:0) + ((cmdbyte&2)?8:0) + ((cmdbyte&1)?2:0) ) ) return;
 		RS.cmd = cmdbyte;
+		// give everything 16 fractional bits
 		RS.y3 = s32(((cmdbuf[0]>>32)&0x3FFF) << 19); RS.y3 >>= 5;
 		RS.y2 = s32(((cmdbuf[0]>>16)&0x3FFF) << 19); RS.y2 >>= 5;
 		RS.y1 = s32((cmdbuf[0]&0x3FFF) << 19); RS.y1 >>= 5;
 		RS.xl = s32((cmdbuf[1]>>32)<<4); RS.xl >>= 4;
-		RS.xm = s32((cmdbuf[3]>>32)<<4); RS.xm >>= 4;
 		RS.xh = s32((cmdbuf[2]>>32)<<4); RS.xh >>= 4;
+		RS.xm = s32((cmdbuf[3]>>32)<<4); RS.xm >>= 4;
 		RS.DxlDy = s32((cmdbuf[1]<<2)); RS.DxlDy >>= 2;
 		RS.DxhDy = s32((cmdbuf[2]<<2)); RS.DxhDy >>= 2;
 		RS.DxmDy = s32((cmdbuf[3]<<2)); RS.DxmDy >>= 2;
@@ -798,10 +799,9 @@ void n64_rdp::triangle()
 	RS.shade_color = white;
 	
 	//RS.y1 -= 0x8000;
-	//RS.y2 += 0x8000;
 	//RS.y3 += 0x8000;
 	
-	u16 deltaZ = ( ((RS.DzDx<0)?-RS.DzDx:RS.DzDx)+((RS.DzDy<0)?-RS.DzDy:RS.DzDy) ) >> 16;
+	u16 deltaZ = ((RS.DzDx>>16)&0x7fff) + ((RS.DzDy>>16)&0x7fff);
 	deltaZ = 15-std::countl_zero(deltaZ);
 	
 	if( !right )
@@ -817,7 +817,7 @@ void n64_rdp::triangle()
 			s64 z = RS.z;
 			s64 w = RS.w;
 			if( y >= scissor.ulY )
-			for(s64 x = (RS.xh+0x8000)>>16; x >= (RS.xm+0x8000)>>16; --x)
+			for(s64 x = (RS.xh+0x8000)>>16; x >= (RS.xm-0x8000)>>16; --x)
 			{
 				if( x < scissor.ulX ) break;
 				if( x > scissor.lrX ) { ATTR_XDEC; continue; }
@@ -867,7 +867,7 @@ void n64_rdp::triangle()
 			s64 z = RS.z;
 			s64 w = RS.w;
 			if( y >= scissor.ulY )
-			for(s64 x = (RS.xh+0x8000)>>16; x >= (RS.xl+0x8000)>>16; --x)
+			for(s64 x = (RS.xh+0x8000)>>16; x >= (RS.xl-0x8000)>>16; --x)
 			{
 				if( x < scissor.ulX ) break;
 				if( x > scissor.lrX ) { ATTR_XDEC; continue; }
