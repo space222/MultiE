@@ -54,6 +54,8 @@ SDL_AudioDeviceID audio_dev;
 SDL_Window* MainWindow = nullptr;
 SDL_Renderer* MainRender = nullptr;
 SDL_Texture* Screen = nullptr;
+std::vector<SDL_GameController*> conts;
+
 bool Running = true;
 bool Paused = false;
 std::string modal_msg;
@@ -120,7 +122,6 @@ void copy_fb()
 	SDL_UnlockTexture(Screen);
 }
 
-std::vector<SDL_GameController*> conts;
 
 void imgui_run();
 
@@ -789,6 +790,8 @@ struct InputDef
 	u32 code; // scancode or button or stick axis index
 };
 
+std::vector<InputDef> input_maps[4];
+
 void create_input_map(std::vector<InputDef>& vals, std::vector<std::string>& names)
 {
 	for(std::string n : names)
@@ -827,25 +830,32 @@ void create_input_map(std::vector<InputDef>& vals, std::vector<std::string>& nam
 	}
 }
 
-bool getKeyState(u32 key)
+int getInputState(u32 player, u32 map_index)
 {
-	if( !(key & BIT(31)) )
+	if( map_index >= input_maps[player].size() ) return 0;
+
+	auto& I = input_maps[player][map_index];
+	if( I.type == 0 ) return 0;
+	if( I.type == 1 )
 	{
 		auto keys = SDL_GetKeyboardState(nullptr);
-		return keys[key];
+		return keys[I.code];
 	}
-
-	//todo: unpack a bitfield that references joystick
-	// will need up to 4 sticks + however many buttons on xbox ctrlr
-	return false;
+	if( I.type == 2 )
+	{
+		return SDL_GameControllerGetButton(conts[player], SDL_GameControllerButton(I.code));
+	}
+	if( I.type == 3 )
+	{
+		return SDL_GameControllerGetAxis(conts[player], SDL_GameControllerAxis(I.code))>>8;
+	}
+	return 0;
 }
 
-
-
-
-
-
-
+void setPlayerInputMap(u32 player, std::vector<std::string>& m)
+{
+	create_input_map(input_maps[player], m);
+}
 
 
 std::string lastDir;

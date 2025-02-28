@@ -16,3 +16,8 @@ bios = "./bios/PSX.BIOS"
 cd = "./roms/psx/Crash1.bin"
 #exp1 = "./roms/psx/unirom/stuff/unirom_withcaetla.rom"
 #exp1 = "./roms/psx/Caetla/EXPROM.BIN"
+
+
+[n64]
+player1 = ["key:z","key:x", "key:a","key:s", "key:q","key:w", "key:i","key:k","key:j","key:l", "key:up","key:down","key:left","key:right" ]
+

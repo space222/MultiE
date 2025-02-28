@@ -35,6 +35,7 @@ void n64::pi_dma(bool write)
 			{
 				length -= dram_addr & 0x7;
 			}
+			
 			PI_WR_LEN = length;
 			
 			if( 0 ) //ramaddr & 7 )

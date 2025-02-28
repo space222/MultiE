@@ -806,7 +806,7 @@ void n64_rdp::triangle()
 	
 	if( !right )
 	{
-		for(s64 y = RS.y1>>16; y < RS.y2>>16 && y < scissor.lrY; ++y)
+		for(s64 y = RS.y1>>16; y <= RS.y2>>16 && y < scissor.lrY; ++y)
 		{
 			s64 r = RS.r;
 			s64 g = RS.g;
@@ -856,7 +856,7 @@ void n64_rdp::triangle()
 			RS.xm += RS.DxmDy;
 			ATTR_YINC;
 		}
-		for(s64 y = RS.y2>>16; y <= RS.y3>>16 && y < scissor.lrY; ++y)
+		for(s64 y = (RS.y2>>16)+1; y <= RS.y3>>16 && y < scissor.lrY; ++y)
 		{
 			s64 r = RS.r;
 			s64 g = RS.g;
@@ -906,7 +906,7 @@ void n64_rdp::triangle()
 			ATTR_YINC;
 		}	
 	} else {
-		for(s64 y = RS.y1>>16; y < RS.y2>>16 && y < scissor.lrY; ++y)
+		for(s64 y = RS.y1>>16; y <= RS.y2>>16 && y < scissor.lrY; ++y)
 		{
 			s64 r = RS.r;
 			s64 g = RS.g;
@@ -955,7 +955,7 @@ void n64_rdp::triangle()
 			RS.xm += RS.DxmDy;
 			ATTR_YINC;
 		}
-		for(s64 y = RS.y2>>16; y <= RS.y3>>16 && y < scissor.lrY; ++y)
+		for(s64 y = (RS.y2>>16)+1; y <= RS.y3>>16 && y < scissor.lrY; ++y)
 		{
 			s64 r = RS.r;
 			s64 g = RS.g;
@@ -1219,17 +1219,20 @@ bool n64_rdp::blender()
 {
 	//if( other.cov_x_alpha && CC.out.a == 0 ) return false; 
 	
-	if( !other.force_blend )
+	if( other.cycle_type == CYCLE_TYPE_1CYCLE )
 	{
-		if( other.cov_x_alpha && CC.out.a == 0 ) return false; 
-		// ^ hack to get some decals&billboards to actually cut out, but I don't understand how coverage is calculated
-		BL.out = CC.out;
-		return true;
+		if( !other.force_blend )
+		{
+			if( other.cov_x_alpha && CC.out.a == 0 ) return false; 
+			// ^ hack to get some decals&billboards to actually cut out, but I don't understand how coverage is calculated
+			BL.out = CC.out;
+			return true;
+		}
+		
+		if( other.alpha_compare_en && CC.out.a <= blend_color.a ) return false; 
+		if( CC.out.a == 0 ) return false; // ??? needed for yet a few more cut outs in sm64
 	}
-	
-	if( other.alpha_compare_en && CC.out.a <= blend_color.a ) return false; 
-	if( CC.out.a == 0 ) return false; // ??? needed for yet a few more cut outs in sm64
-	
+		
 	dc P, M;
 	float A=1, B=1;
 	switch( BL.p[0] )
@@ -1279,6 +1282,17 @@ bool n64_rdp::blender()
 
 	if( other.cycle_type == CYCLE_TYPE_2CYCLE )
 	{
+		if( !other.force_blend )
+		{
+			//if( other.cov_x_alpha && CC.out.a == 0 ) return false; 
+			// ^ hack to get some decals&billboards to actually cut out, but I don't understand how coverage is calculated
+			//BL.out = CC.out;
+			return true;
+		}
+	
+		//if( other.alpha_compare_en && CC.out.a <= blend_color.a ) return false; 
+		//if( CC.out.a == 0 ) return false; // ??? needed for yet a few more cut outs in sm64
+	
 		switch( BL.p[1] )
 		{
 		case 0: P = BL.out; break;

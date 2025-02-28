@@ -29,7 +29,7 @@ public:
 			b = ((b/255.f) * (p.b/255.f))*255;
 			g = ((g/255.f) * (p.g/255.f))*255;
 			r = ((r/255.f) * (p.r/255.f))*255;
-			a = ((a/255.f) * (p.a/255.f))*255;
+			//a = ((a/255.f) * (p.a/255.f))*255;
 			return *this;
 		}
 		
@@ -38,7 +38,7 @@ public:
 			r += p.r;
 			g += p.g;
 			b += p.b;
-			a += p.a;
+			//a += p.a;
 			return *this;
 		}
 		
@@ -47,7 +47,7 @@ public:
 			r -= p.r;
 			g -= p.g;
 			b -= p.b;
-			a -= p.a;
+			//a -= p.a;
 			return *this;
 		}
 		

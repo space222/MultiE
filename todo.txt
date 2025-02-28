@@ -253,6 +253,7 @@ Nintendo 64 Todo List
 ------------------------
 Overall:
 1. Implement input mapping?
+2. Rewrite joybus handshakes
 Subsystems:
 1. VR4300: better TLB. find the spurious fpu exception and reenable them.
 2. VI: currently just all registers being r/w so I can display output. Actually do things per-line and v-int.

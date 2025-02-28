@@ -306,52 +306,25 @@ extern int countdiv;
 
 void n64::run_frame()
 {
+	cpu.in_infinite_loop = false;
 	for(u32 line = 0; line < 263; ++line)
 	{
 		if( (VI_CTRL & 3) > 1 )
 		{
 			VI_V_CURRENT = (VI_V_CURRENT&1) | (line<<1);
-			if( (VI_V_CURRENT>>1) == ((VI_V_INTR&0x3ff)>>1) ) raise_mi_bit(MI_INTR_VI_BIT);
+			if( (VI_V_CURRENT>>1) == ((VI_V_INTR&0x3ff)>>1) )
+			{
+				raise_mi_bit(MI_INTR_VI_BIT);
+			}
 		} else {
 			VI_V_CURRENT = 0;
 		}
-		for(u32 i = 0; i < 5700; ++i)
+		for(u32 i = 0; i < 5000; ++i)
 		{
 			cpu.step();
-			if( cpu.in_infinite_loop ) 
-			{
-				u64 cc = (93750000/44100) - ai_output_cycles;
-				if( ai_dma_enabled && ai_buf[0].valid && cc > ai_cycles_per_sample - ai_cycles ) 
-				{
-					cc = ai_cycles_per_sample - ai_cycles;
-				}
-				if( 5700 - i < cc ) 
-				{	
-					cc = 5700 - i;
-				}
-				//std::println("${:X}", cc);
-				for(u32 x = 0; x < cc; ++x)
-				{
-					run_sp();
-					run_ai();
-					ai_output_sample();
-					countdiv ^= 1;
-					if( countdiv & 1 ) 
-					{
-						cpu.COUNT = (cpu.COUNT+1)&0xffffFFFFull;
-						if( u32(cpu.COUNT) == u32(cpu.COMPARE) )
-						{
-							cpu.CAUSE |= BIT(15);
-							break;
-						}
-					}
-					i += 1;
-				}
-			} else {			
-				run_sp();			
-				run_ai();
-				ai_output_sample();
-			}			
+			run_sp();
+			run_ai();
+			ai_output_sample();			
 		}
 	}
 	
