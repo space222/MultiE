@@ -21,8 +21,8 @@ public:
 	void reset() override;
 	
 	void run_sp();
-	void run_ai();
-	void ai_output_sample();
+	void run_ai(u64);
+	void ai_output_sample(u64);
 	
 	u64 read(u32, int);
 	void write(u32, u64, int);

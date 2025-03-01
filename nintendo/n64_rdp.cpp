@@ -798,8 +798,8 @@ void n64_rdp::triangle()
 	const bool right = (cmdbuf[0] & BITL(55));
 	RS.shade_color = white;
 	
-	//RS.y1 -= 0x8000;
-	//RS.y3 += 0x8000;
+	//RS.y1 -= 0x0000;
+	//RS.y3 += 0x0000;
 	
 	u16 deltaZ = ((RS.DzDx>>16)&0x7fff) + ((RS.DzDy>>16)&0x7fff);
 	deltaZ = 15-std::countl_zero(deltaZ);
@@ -817,7 +817,7 @@ void n64_rdp::triangle()
 			s64 z = RS.z;
 			s64 w = RS.w;
 			if( y >= scissor.ulY )
-			for(s64 x = (RS.xh+0x8000)>>16; x >= (RS.xm-0x8000)>>16; --x)
+			for(s64 x = (RS.xh+0x0000)>>16; x >= (RS.xm-0x0000)>>16; --x)
 			{
 				if( x < scissor.ulX ) break;
 				if( x > scissor.lrX ) { ATTR_XDEC; continue; }
@@ -867,7 +867,7 @@ void n64_rdp::triangle()
 			s64 z = RS.z;
 			s64 w = RS.w;
 			if( y >= scissor.ulY )
-			for(s64 x = (RS.xh+0x8000)>>16; x >= (RS.xl-0x8000)>>16; --x)
+			for(s64 x = (RS.xh+0x0000)>>16; x >= (RS.xl-0x0000)>>16; --x)
 			{
 				if( x < scissor.ulX ) break;
 				if( x > scissor.lrX ) { ATTR_XDEC; continue; }
@@ -917,7 +917,7 @@ void n64_rdp::triangle()
 			s64 z = RS.z;
 			s64 w = RS.w;
 			if( y >= scissor.ulY )
-			for(s64 x = (RS.xh-0x8000)>>16; x <= (RS.xm+0x8000)>>16; ++x)
+			for(s64 x = (RS.xh-0x0000)>>16; x <= (RS.xm+0x0000)>>16; ++x)
 			{
 				if( x < scissor.ulX ) { ATTR_XINC; continue; }
 				if( x > scissor.lrX ) break;
@@ -966,7 +966,7 @@ void n64_rdp::triangle()
 			s64 z = RS.z;
 			s64 w = RS.w;
 			if( y >= scissor.ulY )
-			for(s64 x = (RS.xh-0x8000)>>16; x <= (RS.xl+0x8000)>>16; ++x)
+			for(s64 x = (RS.xh-0x0000)>>16; x <= (RS.xl+0x0000)>>16; ++x)
 			{
 				if( x < scissor.ulX ) { ATTR_XINC; continue; }
 				if( x > scissor.lrX ) break;

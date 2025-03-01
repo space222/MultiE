@@ -319,12 +319,15 @@ void n64::run_frame()
 		} else {
 			VI_V_CURRENT = 0;
 		}
-		for(u32 i = 0; i < 5000; ++i)
+		for(u32 i = 0; i < 5000;)
 		{
-			cpu.step();
-			run_sp();
-			run_ai();
-			ai_output_sample();			
+			for(u32 x = 0; x < 500; ++x, ++i)
+			{
+				cpu.step();			
+				run_sp();
+			}
+			run_ai(500);
+			ai_output_sample(500);
 		}
 	}
 	
@@ -343,14 +346,14 @@ void n64::run_sp()
 	}
 }
 
-void n64::run_ai()
+void n64::run_ai(u64 cc)
 {
 	if( ai_dma_enabled && ai_buf[0].valid )
 	{
-		ai_cycles += 1;
+		ai_cycles += cc;
 		if( ai_cycles >= ai_cycles_per_sample )
 		{
-			ai_cycles = 0;
+			ai_cycles -= ai_cycles_per_sample;
 			s16 L = __builtin_bswap16(*(u16*)&mem[ai_buf[0].ramaddr&0x7fffff]);
 			ai_buf[0].ramaddr += 2;
 			s16 R = __builtin_bswap16(*(u16*)&mem[ai_buf[0].ramaddr&0x7fffff]);
@@ -373,12 +376,12 @@ void n64::run_ai()
 	}
 }
 
-void n64::ai_output_sample()
+void n64::ai_output_sample(u64 cc)
 {
-	ai_output_cycles += 1;
+	ai_output_cycles += cc;
 	if( ai_output_cycles >= (93750000/44100) )
 	{
-		ai_output_cycles = 0; // -= (93750000/44100);
+		ai_output_cycles -= (93750000/44100);
 		audio_add(ai_L, ai_R);
 	}
 }
