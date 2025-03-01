@@ -252,7 +252,7 @@ command gets strobed in, begin alternating the output pin every 30 frames.
 Nintendo 64 Todo List
 ------------------------
 Overall:
-1. Implement input mapping?
+1. attempt to use new input mapping system
 2. Rewrite joybus handshakes
 Subsystems:
 1. VR4300: better TLB. find the spurious fpu exception and reenable them.
@@ -272,7 +272,8 @@ SI: done, but DMAs instant. Not supporting the single-word xfer regs.
 AI: Audio works. Not supporting the delayed carry hardware bug. Sounding any good dependent on host running fast enough.
 PIF: Paks still. one controller and only arrow keys as stick + a/b/z/start currently implemented and working.
 Notes (latest first):
-	Hacked in some idle loop skip to rather large speed up.
+	New idle loop detection didn't work out, but reworked run_frame better
+	in triangle rasterization y2 being part of the xm loop instead of xl fixes most of the gaps and popping lines
 	Turned out almost everything freezing was spurious fpu exceptions. Commenting out fpu exceptions "fixes" everything.
 		At least I know where to look for the real bug.
 	Implementing RDP scissor fixed the logo and FIGHT text in MKT, as well as the address error in that and Smash.

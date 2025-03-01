@@ -796,7 +796,7 @@ bool n64_rdp::z_compare(u32 nz, u32 oz, u32 dz)
 void n64_rdp::triangle()
 {
 	const bool right = (cmdbuf[0] & BITL(55));
-	RS.shade_color = white;
+	RS.shade_color = blend_color;
 	
 	//RS.y1 -= 0x0000;
 	//RS.y3 += 0x0000;
