@@ -1,6 +1,7 @@
 Framework Todo List
 ----------------------
-1. ability to remap controls across systems
+1. settings menu option for player 1 to use keyboard or controller
+	and transparently support using key pairs as a joystick axis
 2. Generally continue improving main ui.
 3. Windows support
 4. Stereo sound
@@ -252,8 +253,7 @@ command gets strobed in, begin alternating the output pin every 30 frames.
 Nintendo 64 Todo List
 ------------------------
 Overall:
-1. attempt to use new input mapping system
-2. Rewrite joybus handshakes
+1. Rewrite joybus handshakes
 Subsystems:
 1. VR4300: better TLB. find the spurious fpu exception and reenable them.
 2. VI: currently just all registers being r/w so I can display output. Actually do things per-line and v-int.

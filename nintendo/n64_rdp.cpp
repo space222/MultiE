@@ -1284,7 +1284,7 @@ bool n64_rdp::blender()
 	{
 		if( !other.force_blend )
 		{
-			//if( other.cov_x_alpha && CC.out.a == 0 ) return false; 
+			if( other.cov_x_alpha && CC.out.a == 0 ) return false; 
 			// ^ hack to get some decals&billboards to actually cut out, but I don't understand how coverage is calculated
 			//BL.out = CC.out;
 			return true;

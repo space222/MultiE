@@ -19,6 +19,15 @@ public:
 			r = R; g = G; b = B; a = A;
 		}
 		static dc from16(u16 c) { return { u8(((c>>11)&0x1F)<<3), u8(((c>>6)&0x1f)<<3), u8(((c>>1)&0x1f)<<3), u8((c&1)?0xff:0) }; }
+		
+		/*static dc from16(u16 c) 
+		{ 
+			u8 R = u8(((c>>11)&0x1F)<<3) | (((c>>11)&1)? 7 : 0);
+			u8 G = u8(((c>>6)&0x1f)<<3) | (((c>>6)&1) ? 7 : 0);
+			u8 B = u8(((c>>1)&0x1f)<<3) | ((c&2)?7:0);
+			return { R, G, B, u8((c&1)?0xff:0) }; 
+		}*/
+		
 		static dc from32(u32 c) { return { u8(c>>24), u8(c>>16), u8(c>>8), u8(c) }; }
 		u8 b, g, r, a;
 		u32 to32() const { return (r<<24)|(g<<16)|(b<<8)|a; }

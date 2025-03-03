@@ -111,7 +111,16 @@ public:
 	u32& SI_STATUS = si_regs[6];
 	u32 si_read(u32);
 	void si_write(u32, u32);
+	
+	struct pifhandshake
+	{
+		u8 start;
+	} pifchan[5];
+	
 	void pif_run();
+	void pif_parse();
+	void pif_shake();
+	void pif_device(u32 c, u8 tx, u8 rx, u8 cmd, u8 ts, u8 rs);
 	u64 si_cycles_til_irq;
 	
 	u8 DMEM[0x1000];

@@ -1,6 +1,7 @@
 #include <print>
 #include <array>
 #include <filesystem>
+#include "Settings.h"
 #include "n64.h"
 
 u32 flash_status = 0x11118001;
@@ -299,6 +300,11 @@ bool n64::loadROM(const std::string fname)
 	unu = fread(pifrom, 1, 0x7c0, fp);
 	fclose(fp);
 	do_boot_hle = false;
+	
+	std::vector<std::string> imap = Settings::get<std::vector<std::string>>("n64", "player1");
+	//for(auto e : imap) std::println("{}", e);
+	setPlayerInputMap(1, imap);
+	
 	return true;
 }
 
@@ -481,6 +487,8 @@ void n64::reset()
 	ai_dma_enabled = false;
 	ai_cycles_per_sample = 800;
 	ai_cycles = ai_output_cycles = 0;
+	
+	for(u32 i = 0; i < 5; ++i) pifchan[i].start = 0xff;
 }
 
 void n64::raise_mi_bit(u32 b)

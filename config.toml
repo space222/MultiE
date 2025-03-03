@@ -19,5 +19,6 @@ cd = "./roms/psx/Crash1.bin"
 
 
 [n64]
-player1 = ["key:z","key:x", "key:a","key:s", "key:q","key:w", "key:i","key:k","key:j","key:l", "key:up","key:down","key:left","key:right" ]
+player1 = ["key:x","key:z", "key:a","key:s", "key:q","key:w", 
+	"key:i","key:k","key:j","key:l", "key:up","key:down","key:left","key:right" ]
 

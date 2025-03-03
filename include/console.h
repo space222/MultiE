@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <vector>
 #include <array>
 #include <SDL.h>
 #include "itypes.h"
@@ -43,4 +44,7 @@ public:
 };
 
 void audio_add(float, float);
+void setPlayerInputMap(u32 player, std::vector<std::string>& m);
+int getInputState(u32 player, u32 map_index);
+
 
