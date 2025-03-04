@@ -870,8 +870,10 @@ void VR4300::invalidate(u32 pa)
 		[](VR4300& cpu, u32 opc) 
 		{ 
 			vr4300_instr INS = nullptr;
-			if( (opc >> 26) == 0 )
-			{
+			if( opc == 0 )
+			{ // cache nop as nothing rather than do SLL
+				INS = [](VR4300&, u32) {};
+			} else if( (opc >> 26) == 0 ) {
 				INS = decode_special(cpu, opc);
 			} else if( (opc >> 26) == 1 ) {
 				INS = decode_regimm(cpu, opc);

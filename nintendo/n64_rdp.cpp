@@ -365,10 +365,12 @@ void n64_rdp::set_tile(u64 cmd)
 	T.clampT = (cmd&BITL(19));
 	T.mirrorT = (cmd&BITL(18));
 	T.maskT = (1u<<((cmd>>14)&0xf))-1;
+	if( T.maskT == 0xffffFFFFu ) T.maskT = 0;
 	T.shiftT = (cmd>>10)&0xf;
 	T.clampS = cmd&BITL(9);
 	T.mirrorS = cmd&BITL(8);
 	T.maskS = (1u<<((cmd>>4)&0xf))-1;
+	if( T.maskS == 0xffffFFFFu ) T.maskS = 0;
 	T.shiftS = cmd&0xf;
 	
 	//if( T.clampT || T.mirrorT || T.clampS || T.mirrorS )
@@ -555,11 +557,7 @@ n64_rdp::dc n64_rdp::tex_sample(u32 tile, s64 s, s64 t)
 {
 	auto& T = tiles[tile];
 	
-	s -= T.SL>>2;
-	t -= T.TL>>2;
-
-	if( other.cycle_type != CYCLE_TYPE_COPY )
-	{
+	
 		if( T.shiftS < 11 ) 
 		{
 			s >>= T.shiftS;
@@ -573,48 +571,38 @@ n64_rdp::dc n64_rdp::tex_sample(u32 tile, s64 s, s64 t)
 			t <<= 16-T.shiftT;
 		}
 		
-		if( T.clampS ) { s = std::clamp(s, s64(0 /*T.SL>>2*/), s64(T.SH>>2)); }
-		if( T.clampT ) { t = std::clamp(t, s64(0 /*T.TL>>2*/), s64(T.TH>>2)); }
+		if( other.cycle_type != CYCLE_TYPE_COPY )
+		{
+			if( T.clampS || !T.maskS ) { s = std::clamp(s, s64(T.SL>>2), s64(T.SH>>2)); }
+			if( T.clampT || !T.maskT ) { t = std::clamp(t, s64(T.TL>>2), s64(T.TH>>2)); }
+		}
 		
+		s -= T.SL>>2;
+		t -= T.TL>>2;
+
 		if( T.mirrorS )
 		{
 			u32 mbit = s & (T.maskS+1);
-			s &= T.maskS;
-			if( mbit ) s ^= T.maskS;
+			if( T.maskS )
+			{
+				s &= T.maskS;
+				if( mbit ) s ^= T.maskS;
+			}
 		} else if( T.maskS ) {
 			s &= T.maskS;
 		}
 		if( T.mirrorT )
 		{
 			u32 mbit = t & (T.maskT+1);
-			t &= T.maskT;
-			if( mbit ) t ^= T.maskT;
+			if( T.maskT )
+			{
+				t &= T.maskT;
+				if( mbit ) t ^= T.maskT;
+			}
 		} else if( T.maskT ) {
 			t &= T.maskT;
 		}
 
-		if( s > (T.SH>>2) ) 
-		{
-			if( T.clampS ) 
-			{
-				s = T.SH>>2;
-			} else {
-				if( T.SH>>2 ) s %= T.SH>>2;
-				else s = 0;
-			}
-		}
-		if( t > (T.TH>>2) ) 
-		{
-			if( T.clampT ) 
-			{
-				t = T.TH>>2;
-			} else {
-				if( T.TH>>2 ) t %= T.TH>>2;
-				else t = 0;
-			}		
-		}
-		
-		
 		/*
 		s -= T.SL>>2;
 		t -= T.TL>>2;
@@ -632,7 +620,7 @@ n64_rdp::dc n64_rdp::tex_sample(u32 tile, s64 s, s64 t)
 		t &= T.maskT;
 		}
 		*/
-	}
+	//}
 	
 	u32 xorval = (t&1)?4:0;
 	

@@ -357,7 +357,7 @@ void n64::run_ai(u64 cc)
 	if( ai_dma_enabled && ai_buf[0].valid )
 	{
 		ai_cycles += cc;
-		if( ai_cycles >= ai_cycles_per_sample )
+		while( ai_cycles >= ai_cycles_per_sample )
 		{
 			ai_cycles -= ai_cycles_per_sample;
 			s16 L = __builtin_bswap16(*(u16*)&mem[ai_buf[0].ramaddr&0x7fffff]);
@@ -377,7 +377,7 @@ void n64::run_ai(u64 cc)
 			}
 			
 			ai_L = (L / 32768.f);
-			ai_R = (R / 32768.f);				
+			ai_R = (R / 32768.f);
 		}
 	}
 }
@@ -385,7 +385,7 @@ void n64::run_ai(u64 cc)
 void n64::ai_output_sample(u64 cc)
 {
 	ai_output_cycles += cc;
-	if( ai_output_cycles >= (93750000/44100) )
+	while( ai_output_cycles >= (93750000/44100) )
 	{
 		ai_output_cycles -= (93750000/44100);
 		audio_add(ai_L, ai_R);
