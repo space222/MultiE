@@ -38,9 +38,9 @@ void n64_rdp::recv(u64 cmd)
 		if( cmdbuf.size() < u32(4 + ((cmdbyte&4)?8:0) + ((cmdbyte&2)?8:0) + ((cmdbyte&1)?2:0) ) ) return;
 		RS.cmd = cmdbyte;
 		// give everything 16 fractional bits
-		RS.y3 = s32(((cmdbuf[0]>>32)&0x3FFF) << 19); RS.y3 >>= 5;
-		RS.y2 = s32(((cmdbuf[0]>>16)&0x3FFF) << 19); RS.y2 >>= 5;
-		RS.y1 = s32((cmdbuf[0]&0x3FFF) << 19); RS.y1 >>= 5;
+		RS.y3 = s32(((cmdbuf[0]>>32)&0x3FFF) << 18); RS.y3 >>= 4;
+		RS.y2 = s32(((cmdbuf[0]>>16)&0x3FFF) << 18); RS.y2 >>= 4;
+		RS.y1 = s32((cmdbuf[0]&0x3FFF) << 18); RS.y1 >>= 4;
 		RS.xl = s32((cmdbuf[1]>>32)<<4); RS.xl >>= 4;
 		RS.xh = s32((cmdbuf[2]>>32)<<4); RS.xh >>= 4;
 		RS.xm = s32((cmdbuf[3]>>32)<<4); RS.xm >>= 4;
@@ -49,7 +49,7 @@ void n64_rdp::recv(u64 cmd)
 		RS.DxmDy = s32((cmdbuf[3]<<2)); RS.DxmDy >>= 2;
 		TX.tile = (cmdbuf[0]>>48)&7;
 		u32 i = 4;
-		
+				
 		if( cmdbyte & 4 )
 		{ // grab shade attributes
 			RS.r = (field(cmdbuf[i], 48, 0xffff)<<16)|field(cmdbuf[i+2], 48, 0xffff);
@@ -94,6 +94,7 @@ void n64_rdp::recv(u64 cmd)
 			RS.DzDe = s32(cmdbuf[i+1]>>32);
 			RS.DzDy = s32(cmdbuf[i+1]);
 		}
+		
 		triangle();
 		}break;
 				
@@ -740,11 +741,11 @@ static struct {
     0, 0x3f800,
 };
 
-#define ZSHIFT 16
+#define ZSHIFT 13 // 13 when trying to do the Z-compression stuff 16 otherwise
 
 s64 decompress_z(u16 z)
 {
-	return z;	
+	//return z;	
 	z >>= 2;
 	u64 exp = z>>11;
 	u64 mant = z&0x7ff;
@@ -754,18 +755,18 @@ s64 decompress_z(u16 z)
 
 u16 compress_z(s64 z)
 {
-	return z>>ZSHIFT;	
+	//return z>>16;	
 	u32 Z = z>>ZSHIFT;
 	Z &= 0x3ffff;
-	u32 exp = std::countr_one(Z<<14);
+	//std::println("{:X}", Z);
+	u32 exp = std::countl_one(Z<<14);
 	if( exp > 7 ) exp = 7;
 	return ((exp<<11)|((Z>>z_format[exp].shift)&0x7ff))<<2;
 }
 
 bool n64_rdp::z_compare(u32 nz, u32 oz, u32 dz)
 {
-	return nz >= oz;
-	/*switch( other.z_func )
+	switch( other.z_func )
 	{
 	case 0:
 	
@@ -774,11 +775,12 @@ bool n64_rdp::z_compare(u32 nz, u32 oz, u32 dz)
 	
 	
 	case 2:
-	
+		return nz > oz;
 	
 	case 3:
-		
-	}*/
+		return nz != oz;	
+	}
+	return nz > oz;
 }
 
 void n64_rdp::triangle()
@@ -786,11 +788,7 @@ void n64_rdp::triangle()
 	const bool right = (cmdbuf[0] & BITL(55));
 	RS.shade_color = blend_color;
 	
-	//RS.y1 -= 0x0000;
-	//RS.y3 += 0x0000;
-	
-	u16 deltaZ = ((RS.DzDx>>16)&0x7fff) + ((RS.DzDy>>16)&0x7fff);
-	deltaZ = 15-std::countl_zero(deltaZ);
+	u16 deltaZ = 0;
 	
 	if( !right )
 	{
@@ -844,7 +842,7 @@ void n64_rdp::triangle()
 			RS.xm += RS.DxmDy;
 			ATTR_YINC;
 		}
-		for(s64 y = (RS.y2>>16)+1; y <= RS.y3>>16 && y < scissor.lrY; ++y)
+		for(s64 y = (RS.y2>>16)+1; y <= (RS.y3>>16) && y < scissor.lrY; ++y)
 		{
 			s64 r = RS.r;
 			s64 g = RS.g;

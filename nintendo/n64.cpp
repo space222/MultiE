@@ -1,3 +1,4 @@
+#include <chrono>
 #include <print>
 #include <array>
 #include <filesystem>
@@ -312,7 +313,8 @@ extern int countdiv;
 
 void n64::run_frame()
 {
-	cpu.in_infinite_loop = false;
+	//auto start = std::chrono::high_resolution_clock::now();
+	//cpu.in_infinite_loop = false;
 	for(u32 line = 0; line < 263; ++line)
 	{
 		if( (VI_CTRL & 3) > 1 )
@@ -335,11 +337,14 @@ void n64::run_frame()
 			run_ai(500);
 			ai_output_sample(500);
 		}
+		
 	}
 	
 	if( (VI_CTRL&BIT(6)) && (VI_CTRL&3) ) VI_V_CURRENT ^= 1;
 	
 	vi_draw_frame();
+	
+	
 }
 
 void n64::run_sp()
@@ -357,7 +362,7 @@ void n64::run_ai(u64 cc)
 	if( ai_dma_enabled && ai_buf[0].valid )
 	{
 		ai_cycles += cc;
-		while( ai_cycles >= ai_cycles_per_sample )
+		if( ai_cycles >= ai_cycles_per_sample )
 		{
 			ai_cycles -= ai_cycles_per_sample;
 			s16 L = __builtin_bswap16(*(u16*)&mem[ai_buf[0].ramaddr&0x7fffff]);
@@ -385,7 +390,7 @@ void n64::run_ai(u64 cc)
 void n64::ai_output_sample(u64 cc)
 {
 	ai_output_cycles += cc;
-	while( ai_output_cycles >= (93750000/44100) )
+	if( ai_output_cycles >= (93750000/44100) )
 	{
 		ai_output_cycles -= (93750000/44100);
 		audio_add(ai_L, ai_R);

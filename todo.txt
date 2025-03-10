@@ -253,7 +253,7 @@ command gets strobed in, begin alternating the output pin every 30 frames.
 Nintendo 64 Todo List
 ------------------------
 Overall:
-1. Rewrite joybus handshakes
+1. Implement EEPROM in new pif handshake code. Also Paks.
 Subsystems:
 1. VR4300: better TLB. find the spurious fpu exception and reenable them.
 2. VI: currently just all registers being r/w so I can display output. Actually do things per-line and v-int.
@@ -264,7 +264,7 @@ Subsystems:
 6. DP: Texture wordswapping imperfect. Improve texture sampling. Coverage. Blending alpha compare. Multitude of other things.
 Status:
 SP: a few load/stores left. Like all the rest of the DMAs (except AI), DMA is instant.
-DP: triangle gaps. wrong texture coords. z buffer is linear 16bit with no deltaz or 18bit fp.
+DP: still some triangle gaps and bad spans. wrong texture coords. z buffer is linear 16bit with no deltaz or 18bit fp.
 	YUV textures. RG/BA bank split.
 MI: done except for MI_MODE's repeat and ebus features
 PI: basic aligned cart->RAM implemented along with interrupt.
@@ -285,7 +285,7 @@ Notes (latest first):
 		This is probably papering over a different bug? 
 		Found a different based-on-bpp expression in MAME that also fixed Superman and Wave Race.
 	After c/p'ing pif hle code from dillonb/n64 to see how far off I was, there was no change until I
-	zero'd out the response to EEPROM/Pak commands and now a bunch of games boot 
+		zero'd out the response to EEPROM/Pak commands and now a bunch of games boot 
 		(apparently this wasn't what made them boot, so now I don't even know what I did right nevermind wrong)
 	After implementing LWC1/MTC1 and friends half mode odd registers, Namco's title screen and menu button music/sounds function.
 		Looks like odd register access isn't undefined in half mode; it's for getting data into upper parts of a double.
