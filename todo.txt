@@ -253,7 +253,11 @@ command gets strobed in, begin alternating the output pin every 30 frames.
 Nintendo 64 Todo List
 ------------------------
 Overall:
-1. Implement EEPROM in new pif handshake code. Also Paks.
+1. Find FPU bug.
+2. Controller Paks.
+3. Rest of RSP instructions.
+4. RDP 32bit texture RG/BA bank split and maybe YUV
+5. Accurate PI DMA? JIT? Better TLB?
 Subsystems:
 1. VR4300: better TLB. find the spurious fpu exception and reenable them.
 2. VI: currently just all registers being r/w so I can display output. Actually do things per-line and v-int.
@@ -272,6 +276,7 @@ SI: done, but DMAs instant. Not supporting the single-word xfer regs.
 AI: Audio works. Not supporting the delayed carry hardware bug. Sounding any good dependent on host running fast enough.
 PIF: Paks still. one controller and only arrow keys as stick + a/b/z/start currently implemented and working.
 Notes (latest first):
+	Resident Evil 2 appears sensitive to number of instructions per frame. Fails with "No Controller". 5k fails, 6k succeeds.
 	New idle loop detection didn't work out, but reworked run_frame better
 	in triangle rasterization y2 being part of the xm loop instead of xl fixes most of the gaps and popping lines
 	Turned out almost everything freezing was spurious fpu exceptions. Commenting out fpu exceptions "fixes" everything.

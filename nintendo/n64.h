@@ -100,8 +100,8 @@ public:
 		u32 length;
 		bool valid;
 	} ai_buf[2];
-	u64 ai_cycles_per_sample, ai_cycles;
-	u64 ai_output_cycles;
+	s64 ai_cycles_per_sample, ai_cycles;
+	s64 ai_output_cycles;
 	float ai_L, ai_R;
 	bool ai_dma_enabled;
 	u32 ai_read(u32);

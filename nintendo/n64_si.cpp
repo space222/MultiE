@@ -84,7 +84,9 @@ void n64::pif_device(u32 c, u8 tx, u8 rx, u8 cmd, u8 ts, u8 rs)
 			else if( getInputState(1, 11) ) pifram[rs+3] = -120;
 			if( getInputState(1, 12) ) pifram[rs+2] = -120;
 			else if( getInputState(1, 13) ) pifram[rs+2] = 120;
-		}	
+			return;
+		}
+		for(u32 i = 0; i < rx; ++i) pifram[rs+i] = 0;
 		return;
 	}
 	if( cmd == PIF_COMMAND_RESET || cmd == PIF_COMMAND_CONTROLLER_ID )
@@ -153,7 +155,7 @@ void n64::si_write(u32 addr, u32 v)
 	if( addr == 4 )
 	{	// SI_PIF_AD_WR64B
 		memcpy(pifram, mem.data()+(si_regs[0]&0x7fffff), 64);
-		pif_run();
+		pif_run(); // if any of the bits are set in pifram[0x3f], need to do stuff like parse the joybus handshake
 		raise_mi_bit(MI_INTR_SI_BIT);
 		si_regs[0] += 60; // ??
 		//si_cycles_til_irq = 0x2000;

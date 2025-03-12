@@ -327,7 +327,7 @@ void n64::run_frame()
 		} else {
 			VI_V_CURRENT = 0;
 		}
-		for(u32 i = 0; i < 5000;)
+		for(u32 i = 0; i < 6000;)
 		{
 			for(u32 x = 0; x < 500; ++x, ++i)
 			{
@@ -336,6 +336,11 @@ void n64::run_frame()
 			}
 			run_ai(500);
 			ai_output_sample(500);
+			
+			/*cpu.step();			
+			run_sp();
+			run_ai(1);
+			ai_output_sample(1);*/
 		}
 		
 	}
