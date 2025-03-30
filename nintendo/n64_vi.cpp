@@ -13,8 +13,14 @@ void n64::vi_draw_frame()
 		return;
 	}
 	
-	if( H_START != 108 ) std::println("H_START = {}", H_START);
-	if( H_END != 748 ) std::println("H_END = {}", H_END);
+	//if( H_START != 108 ) std::println("H_START = {}", H_START);
+	//if( H_END != 748 ) std::println("H_END = {}", H_END);
+	
+	u32 V_START = (VI_V_VIDEO>>16)&0x3ff;
+	if( V_START >= 35 ) V_START -= 35;
+	u32 V_END = VI_V_VIDEO&0x3ff;
+	if( V_END >= 35 ) V_END -= 35;
+	u32 v_height = (V_END - V_START)>>1;
 	
 	u32 width = ((H_END-H_START) * (VI_X_SCALE&0xfff)) / 0x400;
 	u32 height = (240.f * (VI_Y_SCALE&0xfff)) / 0x400;
@@ -28,9 +34,14 @@ void n64::vi_draw_frame()
 	{
 		u32 stride = VI_WIDTH*2;	
 		u32 offset = (VI_ORIGIN&0x1FFFffff);
-		for(u32 line = 0; line < height && offset < 8*1024*1024; ++line, offset+=stride)
+		for(u32 line = 0; line < v_height && offset < 8*1024*1024; ++line, offset+=stride)
 		{
-			for(u32 i = 0; i < width; ++i)
+			if( 0 ) // line < (V_START/2) )
+			{
+				memset(fbuf + line*width*2, 0, width*2);
+				continue;
+			}
+			for(u32 i = 0; i < width-1; ++i)
 			{
 				u16 p = __builtin_bswap16(*(u16*)&mem[offset + i*2]);
 				u8 b = (p>>11)&0x1f;
@@ -43,11 +54,12 @@ void n64::vi_draw_frame()
 	}
 
 	curbpp = 32;
-	u32 stride = VI_WIDTH*4;	
-	u32 offset = (VI_ORIGIN&0x1FFFffff) + (VI_WIDTH - width)*4;
-	for(u32 line = 0; line < height && offset < 8*1024*1024; ++line, offset+=stride)
+	u32 stride = VI_WIDTH*4;
+	u32 offset = (VI_ORIGIN&0x1FFFffff);// + (VI_WIDTH - width)*4;
+	memset(fbuf, 0, (V_START)*width*4);
+	for(u32 line = 0; line < v_height && offset < 8*1024*1024; ++line, offset+=stride)
 	{
-		for(u32 i = 0; i < width; ++i)
+		for(u32 i = 0; i < width-1; ++i)
 		{
 			*(u32*)&fbuf[line*width*4 + i*4] = __builtin_bswap32(*(u32*)&mem[offset + i*4]);
 		}
