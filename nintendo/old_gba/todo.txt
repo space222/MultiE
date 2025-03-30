@@ -1,0 +1,115 @@
+GBA Emulator TODO List
+--------------------------
+
+1. Find a ui for sfml or look at other window/widget toolkits
+2. Implement DMA-on-Hblank to see Yoshi's Island fail
+3. Basic RTC so Pokemon doesn't complain
+4. Rewrite main with better debugger and cycle counting
+5. Ask about the THUMB fuzzer fail.
+
+
+Notes
+-------
+
+3/30/25 - Included this old emulator just as a backup and likely reference..ish for the eventual new one as part of MultiE
+
+Implemented timers. I assume they'll be a bottleneck after rewriting main
+for proper cycle counts, but current fps is still >60 so maybe it won't
+be awful.
+
+I wasn't properly handling 256x512 backgrounds. Now the proper 
+offset for Y depends on X size (2048 vs 4096). Old code created
+a gap that resulted in garbled fight/item/run menu in pokemon.
+
+12/22/22: BIOS intro works, no more needing to skip it (although will 
+provide the option eventually). BIOS uses an 8bit write for irq ack.
+
+LDRH being able to put data in upper bits of Rd wasn't that bad to fix.
+A different test is implying the pre-indexed writeback of STR R0, [R0, 4]!
+happens post writeback instead when Rb == Rd. Hacking in a fix of that makes
+every but the test rom break. mGBA doesn't get remotely that far in the tests,
+so it can't be that important though.
+
+BIOS appears to read from nonsense areas of ROM space, well past
+the ROM, but a different place towards the end of ROM address space in each 
+ROM (like 0x0BFFFFFE0). Right now I'm reading from addr%romsize to get past 
+that. Debugging it in mGBA seems to show that the read should succeed, but 
+what should happen I don't know. After that the BIOS gets to the point of 
+using HALT mode (which I haven't implemented yet as of writing this).
+
+Booting directly to ROM makes most things work up til needing an interrupt or timers
+or code that was DMA'd to RAM (Harvest Moon).
+
+Booting from BIOS still doesn't work and I don't know what bits of hardware are
+necessary for that, but on the other hand, booting the game directly, but letting
+the BIOS SWI handler run appears to function.
+
+
+
+void arm7_block_transfer_cowbite(arm7& cpu, u32 opcode)
+{
+	u32 value;
+	u32 regList;
+	int offset;
+		
+	u32 Rn = (opcode>>16)&0xf;
+	u32 address = getreg(cpu, Rn);
+
+	if ( (opcode&(1ul<<23)) )
+		offset = 4;
+	else
+		offset = -4;
+
+	regList = opcode & 0x0000FFFF;
+
+	for (u32 j = 0; j < 16; j++) {
+		u32 i;
+	
+		if (offset < 0)
+			i = 15 - j;
+		else
+			i = j;
+		
+		if ( (regList >> i) & 0x1) {	//If bit "i" is set
+			
+			//Pre indexing
+			if ( (opcode&(1ul<<24)) ) {//Support::getBit (instruction, 24) ) {		//If P is set (pre-index
+				address += offset;
+				if ( opcode&(1ul<<21) ) //If only write back if W is set
+					setreg(cpu, Rn, address);
+
+				//Yes, I know that this is inneficient!!!
+				if ( opcode&(1ul<<20) ) {	//If this is a load
+					
+					value = mem_read32(address & 0xFFFFFFFC);				//Read the value
+					setreg(cpu, i, value);
+				} else {
+					mem_write32(  address, getreg(cpu, i) );
+				}
+					
+
+			} else {	//If P is not set, post-index 
+	
+				//Yes, I know that this is inneficient!!!
+				if ( opcode&(1ul<<20) ) {	//If this is a load
+					value = mem_read32 (address & 0xFFFFFFFC);				//Read the value
+					setreg(cpu, i, value);
+				} else {
+					mem_write32(address,  getreg(cpu, i)  );
+				}
+				address += offset;
+				if( opcode&(1ul<<21) ) //If only write back if W is set
+					setreg(cpu, Rn, address);
+			}
+		}//End of if
+	}//End of for
+
+
+
+	return;
+}
+
+
+
+
+
