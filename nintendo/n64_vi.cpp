@@ -1,22 +1,27 @@
+#include <print>
 #include <cstring>
 #include "n64.h"
 
-
-
 void n64::vi_draw_frame()
 {
-	u32 width = (640.f * (VI_X_SCALE&0xfff)) / 0x400;
-	u32 height = (240.f * (VI_Y_SCALE&0xfff)) / 0x400;
-	curwidth = width>0 ? width : 320;
-	curheight = height>0 ? height : 240;
-	curbpp = 16;
-
+	u32 H_START = (VI_H_VIDEO>>16)&0x3ff;
+	u32 H_END = (VI_H_VIDEO&0x3ff);
 	u32 type = VI_CTRL & 3;
-	if( type < 2 )
+	if( (H_START == 0 && H_END == 0) || type < 2 ) 
 	{
 		memset(fbuf, 0, 640*480*4);
 		return;
 	}
+	
+	if( H_START != 108 ) std::println("H_START = {}", H_START);
+	if( H_END != 748 ) std::println("H_END = {}", H_END);
+	
+	u32 width = ((H_END-H_START) * (VI_X_SCALE&0xfff)) / 0x400;
+	u32 height = (240.f * (VI_Y_SCALE&0xfff)) / 0x400;
+	curwidth = width>0 ? width : 320;
+	curheight = height>0 ? height : 240;
+	curbpp = 16;
+	
 	
 	//printf("VI type %i, %ix%i pixels\n", type, width, height);
 	if( type == 2 )

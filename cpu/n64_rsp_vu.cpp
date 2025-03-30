@@ -5,7 +5,7 @@
 extern u16 rcp_table[]; // at bottom
 extern u16 rsq_table[];
 typedef void (*rsp_instr)(n64_rsp&, u32);
-#define INSTR [](n64_rsp& rsp, u32 opc)
+#define INSTR [](n64_rsp& rsp, u32 opc) static
 #define VUWC2 u32 vt = (opc>>16)&0x1f; u32 base = (opc>>21)&0x1f; u32 e = (opc>>7)&15; s32 offs = s8(opc<<1)>>1
 #define VUFC2 u32 rt = (opc>>16)&0x1f; u32 vs = (opc>>11)&0x1f; u32 e = (opc>>7)&15
 #define VOPP u32 e=(opc>>21)&15; u32 vt=(opc>>16)&0x1f; u32 vs=(opc>>11)&0x1f; u32 vd=(opc>>6)&0x1f

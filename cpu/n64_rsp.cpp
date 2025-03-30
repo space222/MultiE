@@ -9,7 +9,7 @@
 #define DS_REL_ADDR (cpu.npc + (s32(s16(imm16))<<2))
 
 //typedef void (*rsp_instr)(n64_rsp&, u32);
-#define INSTR [](n64_rsp& cpu, u32 opc)
+#define INSTR [](n64_rsp& cpu, u32 opc) static
 
 n64_rsp::rsp_instr rsp_lwc2(n64_rsp&, u32);
 n64_rsp::rsp_instr rsp_swc2(n64_rsp&, u32);

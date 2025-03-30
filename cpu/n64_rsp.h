@@ -2,7 +2,7 @@
 #include <functional>
 #include "itypes.h"
 
-struct vreg
+struct alignas(16) vreg
 {
 	u8& b(u32 index) { index &= 15; return bytes[15-index]; }
 	u16& w(u32 index) { index &= 7;  return *(u16*)&bytes[((7-index)<<1)]; }
@@ -30,8 +30,8 @@ public:
 		IMEM = DMEM = nullptr;
 		pc = npc = nnpc = 0;
 	}
-	u64 a[8];
 	vreg v[32];
+	u64 a[8];
 	u16 VCO, VCC, VCE;
 	u16 DIV_OUT, DIV_IN;
 	bool divinloaded;

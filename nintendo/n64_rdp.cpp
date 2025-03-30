@@ -558,70 +558,50 @@ n64_rdp::dc n64_rdp::tex_sample(u32 tile, s64 s, s64 t)
 {
 	auto& T = tiles[tile];
 	
+	if( T.shiftS < 11 ) 
+	{
+		s >>= T.shiftS;
+	} else {
+		s <<= 16-T.shiftS;
+	}
+	if( T.shiftT < 11 ) 
+	{
+		t >>= T.shiftT;
+	} else {
+		t <<= 16-T.shiftT;
+	}
 	
-		if( T.shiftS < 11 ) 
-		{
-			s >>= T.shiftS;
-		} else {
-			s <<= 16-T.shiftS;
-		}
-		if( T.shiftT < 11 ) 
-		{
-			t >>= T.shiftT;
-		} else {
-			t <<= 16-T.shiftT;
-		}
-		
-		if( other.cycle_type != CYCLE_TYPE_COPY )
-		{
-			if( T.clampS || !T.maskS ) { s = std::clamp(s, s64(T.SL>>2), s64(T.SH>>2)); }
-			if( T.clampT || !T.maskT ) { t = std::clamp(t, s64(T.TL>>2), s64(T.TH>>2)); }
-		}
-		
-		s -= T.SL>>2;
-		t -= T.TL>>2;
+	if( other.cycle_type != CYCLE_TYPE_COPY )
+	{
+		if( T.clampS || !T.maskS ) { s = std::clamp(s, s64(T.SL>>2), s64(T.SH>>2)); }
+		if( T.clampT || !T.maskT ) { t = std::clamp(t, s64(T.TL>>2), s64(T.TH>>2)); }
+	}
+	
+	s -= T.SL>>2;
+	t -= T.TL>>2;
 
-		if( T.mirrorS )
+	if( T.mirrorS )
+	{
+		u32 mbit = s & (T.maskS+1);
+		if( T.maskS )
 		{
-			u32 mbit = s & (T.maskS+1);
-			if( T.maskS )
-			{
-				s &= T.maskS;
-				if( mbit ) s ^= T.maskS;
-			}
-		} else if( T.maskS ) {
 			s &= T.maskS;
+			if( mbit ) s ^= T.maskS;
 		}
-		if( T.mirrorT )
-		{
-			u32 mbit = t & (T.maskT+1);
-			if( T.maskT )
-			{
-				t &= T.maskT;
-				if( mbit ) t ^= T.maskT;
-			}
-		} else if( T.maskT ) {
-			t &= T.maskT;
-		}
-
-		/*
-		s -= T.SL>>2;
-		t -= T.TL>>2;
-		
-		
-		{// from: https://github.com/Hydr8gon/rokuyon/blob/main/src/rdp.cpp L410+
-		   // Clamp, mirror, or mask the S-coordinate based on tile settings
-		if( T.clampS ) s = std::max<s64>(std::min<s64>(s, ((T.SH>>2) - (T.SL>>2))), 0);
-		if( T.mirrorS && (s & (T.maskS+1)) ) s = ~s;
+	} else if( T.maskS ) {
 		s &= T.maskS;
-
-		// Clamp, mirror, or mask the T-coordinate based on tile settings
-		if( T.clampT ) t = std::max<s64>(std::min<s64>(t, ((T.TH>>2) - (T.TL>>2))), 0);
-		if( T.mirrorT && (t & (T.maskT+1)) ) t = ~t;
-		t &= T.maskT;
+	}
+	if( T.mirrorT )
+	{
+		u32 mbit = t & (T.maskT+1);
+		if( T.maskT )
+		{
+			t &= T.maskT;
+			if( mbit ) t ^= T.maskT;
 		}
-		*/
-	//}
+	} else if( T.maskT ) {
+		t &= T.maskT;
+	}
 	
 	u32 xorval = (t&1)?4:0;
 	
@@ -764,8 +744,58 @@ u16 compress_z(s64 z)
 	return ((exp<<11)|((Z>>z_format[exp].shift)&0x7ff))<<2;
 }
 
-bool n64_rdp::z_compare(u32 nz, u32 oz, u32 dz)
-{
+bool n64_rdp::z_compare(u32 sz, u32 oz, u32 dz)
+{  // temporarily ripped from AngryLion until I match it with the manual and figure it out and complete it
+	u32 olddz = b9[depth_image + (RS.cy*cimg.width*2) + RS.cx*2] & 3;
+	olddz |= ( 3 & *(u16*)&rdram[depth_image + (RS.cy*cimg.width*2) + RS.cx*2] ) << 2;
+	olddz = 1u << olddz;
+	olddz <<= 3;
+	dz <<= 3;
+	
+	u32 dznew = olddz > dz ? olddz : dz;
+
+	uint32_t farther = 0 || ((sz + dznew) >= oz);
+	
+	switch( other.z_func & 3 )
+	{
+	case 0:
+           { bool infront = sz < oz;
+            auto diff = (int32_t)sz - (int32_t)dznew;
+            bool nearer = 0 || (diff <= (int32_t)oz);
+            bool max = (oz == 0x3ffff);
+            return (max || (1 ? infront : nearer));
+            }break;
+        case 1:
+           { bool infront = sz < oz;
+            if (1) //!infront || !farther || 0)
+            {
+                auto diff = (int32_t)sz - (int32_t)dznew;
+                bool nearer = 0 || (diff <= (int32_t)oz);
+                bool max = (oz == 0x3ffff);
+                return (max || (1 ? infront : nearer));
+            }
+            }//else
+           if( 0 ) {
+               // dzenc = dz_compress(dznotshift & 0xffff);
+               // cvgcoeff = ((oz >> dzenc) - (sz >> dzenc)) & 0xf;
+               // *curpixel_cvg = ((cvgcoeff * (*curpixel_cvg)) >> 3) & 0xf;
+                return 1;
+            }
+            break;
+        case 2:
+            {bool infront = sz < oz;
+            bool max = (oz == 0x3ffff);
+            return (infront || max);
+            }break;
+        case 3:
+            {auto diff = (int32_t)sz - (int32_t)dznew;
+            bool nearer = 0 || (diff <= (int32_t)oz);
+            bool max = (oz == 0x3ffff);
+            return (farther && nearer && !max);
+            }break;
+        }
+	return true;
+	/*	
 	switch( other.z_func )
 	{
 	case 0:
@@ -781,6 +811,7 @@ bool n64_rdp::z_compare(u32 nz, u32 oz, u32 dz)
 		return nz != oz;	
 	}
 	return nz > oz;
+	*/
 }
 
 void n64_rdp::triangle()
@@ -788,11 +819,14 @@ void n64_rdp::triangle()
 	const bool right = (cmdbuf[0] & BITL(55));
 	RS.shade_color = blend_color;
 	
-	u16 deltaZ = 0;
+	u32 deltaZ = (RS.DzDy>>16) & 0xffff;
+	u32 temp = (RS.DzDx>>16);
+	if( deltaZ & 0x8000 ) deltaZ = deltaZ ^ 0xffffu;
+	deltaZ += ((temp&0x8000) ? ~temp : temp);
 	
 	if( !right )
 	{
-		for(s64 y = RS.y1>>16; y <= RS.y2>>16 && y < scissor.lrY; ++y)
+		for(s64 y = RS.y1>>16; y <= RS.y3>>16 && y < scissor.lrY; ++y)
 		{
 			s64 r = RS.r;
 			s64 g = RS.g;
@@ -811,7 +845,7 @@ void n64_rdp::triangle()
 				RS.cy = y;
 				//u16 Z = (z>>16)&0xffff;
 				if(other.z_compare&&
-					z_compare(z>>ZSHIFT, decompress_z(*(u16*)&rdram[depth_image+(cimg.width*2*y)+(x*2)]), deltaZ) )
+					!z_compare(z>>ZSHIFT, decompress_z(*(u16*)&rdram[depth_image+(cimg.width*2*y)+(x*2)]), deltaZ) )
 				{					
 					ATTR_XDEC;
 					continue;
@@ -823,6 +857,7 @@ void n64_rdp::triangle()
 					PERSP
 					TX.tex_sample = tex_sample(TX.tile, S>>5, T>>5);
 				}
+				if( other.cycle_type == CYCLE_TYPE_COPY ) std::println("copy mode tri");
 				color_combiner();
 				if( !blender() ) 
 				{
@@ -841,58 +876,14 @@ void n64_rdp::triangle()
 			RS.xh += RS.DxhDy;
 			RS.xm += RS.DxmDy;
 			ATTR_YINC;
-		}
-		for(s64 y = (RS.y2>>16)+1; y <= (RS.y3>>16) && y < scissor.lrY; ++y)
-		{
-			s64 r = RS.r;
-			s64 g = RS.g;
-			s64 b = RS.b;
-			s64 a = RS.a;
-			s64 s = RS.s;
-			s64 t = RS.t;
-			s64 z = RS.z;
-			s64 w = RS.w;
-			if( y >= scissor.ulY )
-			for(s64 x = (RS.xh+0x0000)>>16; x >= (RS.xl-0x0000)>>16; --x)
+			if( y == (RS.y2>>16) )
 			{
-				if( x < scissor.ulX ) break;
-				if( x > scissor.lrX ) { ATTR_XDEC; continue; }
-				RS.cx = x;
-				RS.cy = y;
-				if(other.z_compare&&
-					z_compare(z>>ZSHIFT, decompress_z(*(u16*)&rdram[depth_image+(cimg.width*2*y)+(x*2)]), deltaZ) )
-				{
-					ATTR_XDEC;
-					continue;
-				}
-				if( RS.cmd & 4 ) RS.shade_color = dc(r>>16,g>>16,b>>16,a>>16);
-				if( RS.cmd & 2 ) 
-				{
-					s64 S = s; s64 T = t;
-					PERSP
-					TX.tex_sample = tex_sample(TX.tile, S>>5, T>>5);
-				}
-				color_combiner();
-				if( !blender() ) 
-				{
-					ATTR_XDEC;
-					continue;
-				}
-				if( other.z_write ) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = compress_z(z);
-				if( cimg.bpp == 16 )
-				{
-					*(u16*)&rdram[cimg.addr + (cimg.width*2*y) + (x*2)]= __builtin_bswap16(BL.out.to16());
-				} else {
-					*(u32*)&rdram[cimg.addr + (cimg.width*4*y) + (x*4)] = __builtin_bswap32(BL.out.to32());
-				}
-				ATTR_XDEC;
+				RS.xm = RS.xl;
+				RS.DxmDy = RS.DxlDy;
 			}
-			RS.xh += RS.DxhDy;
-			RS.xl += RS.DxlDy;
-			ATTR_YINC;
-		}	
+		}
 	} else {
-		for(s64 y = RS.y1>>16; y <= RS.y2>>16 && y < scissor.lrY; ++y)
+		for(s64 y = RS.y1>>16; y <= RS.y3>>16 && y < scissor.lrY; ++y)
 		{
 			s64 r = RS.r;
 			s64 g = RS.g;
@@ -910,7 +901,7 @@ void n64_rdp::triangle()
 				RS.cx = x;
 				RS.cy = y;
 				if(other.z_compare&&
-					z_compare(z>>ZSHIFT, decompress_z(*(u16*)&rdram[depth_image+(cimg.width*2*y)+(x*2)]), deltaZ) )
+					!z_compare(z>>ZSHIFT, decompress_z(*(u16*)&rdram[depth_image+(cimg.width*2*y)+(x*2)]), deltaZ) )
 				{
 					ATTR_XINC;
 					continue;
@@ -922,6 +913,7 @@ void n64_rdp::triangle()
 					PERSP
 					TX.tex_sample = tex_sample(TX.tile, S>>5, T>>5);
 				}
+				if( other.cycle_type == CYCLE_TYPE_COPY ) std::println("copy mode tri");
 				color_combiner();
 				if( !blender() ) 
 				{
@@ -940,55 +932,11 @@ void n64_rdp::triangle()
 			RS.xh += RS.DxhDy;
 			RS.xm += RS.DxmDy;
 			ATTR_YINC;
-		}
-		for(s64 y = (RS.y2>>16)+1; y <= RS.y3>>16 && y < scissor.lrY; ++y)
-		{
-			s64 r = RS.r;
-			s64 g = RS.g;
-			s64 b = RS.b;
-			s64 a = RS.a;
-			s64 s = RS.s;
-			s64 t = RS.t;
-			s64 z = RS.z;
-			s64 w = RS.w;
-			if( y >= scissor.ulY )
-			for(s64 x = (RS.xh-0x0000)>>16; x <= (RS.xl+0x0000)>>16; ++x)
+			if( y == (RS.y2>>16) )
 			{
-				if( x < scissor.ulX ) { ATTR_XINC; continue; }
-				if( x > scissor.lrX ) break;
-				RS.cx = x;
-				RS.cy = y;
-				if(other.z_compare&&
-					z_compare(z>>ZSHIFT, decompress_z(*(u16*)&rdram[depth_image+(cimg.width*2*y)+(x*2)]), deltaZ) )
-				{
-					ATTR_XINC;
-					continue;
-				}
-				if( RS.cmd & 4 ) RS.shade_color = dc(r>>16,g>>16,b>>16,a>>16);
-				if( RS.cmd & 2 ) 
-				{
-					s64 S = s; s64 T = t;
-					PERSP
-					TX.tex_sample = tex_sample(TX.tile, S>>5, T>>5);
-				}
-				color_combiner();
-				if( !blender() ) 
-				{
-					ATTR_XINC;
-					continue;
-				}
-				if( other.z_write ) *(u16*)&rdram[depth_image + (cimg.width*2*y) + (x*2)] = compress_z(z);
-				if( cimg.bpp == 16 )
-				{
-					*(u16*)&rdram[cimg.addr + (cimg.width*2*y) + (x*2)]= __builtin_bswap16(BL.out.to16());
-				} else {
-					*(u32*)&rdram[cimg.addr + (cimg.width*4*y) + (x*4)] = __builtin_bswap32(BL.out.to32());
-				}
-				ATTR_XINC;
+				RS.xm = RS.xl;
+				RS.DxmDy = RS.DxlDy;
 			}
-			RS.xh += RS.DxhDy;
-			RS.xl += RS.DxlDy;
-			ATTR_YINC;
 		}
 	}
 }

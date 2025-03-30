@@ -10,7 +10,7 @@
 #define RTYPE [[maybe_unused]]u32 d = (opc>>11)&0x1f; [[maybe_unused]]u32 s = (opc>>21)&0x1f; \
 		[[maybe_unused]]u32 t = (opc>>16)&0x1f; [[maybe_unused]]u32 sa=(opc>>6)&0x1f
 #define ITYPE [[maybe_unused]]u32 t = (opc>>16)&0x1f; [[maybe_unused]]u32 s = (opc>>21)&0x1f; [[maybe_unused]]u16 imm16 = opc
-#define INSTR [](VR4300& cpu, u32 opc)
+#define INSTR [](VR4300& cpu, u32 opc) static
 #define OVERFLOW32(r, a, b) (((r)^(a))&((r)^(b))&BIT(31))
 #define OVERFLOW64(r, a, b) (((r)^(a))&((r)^(b))&BITL(63))
 #define LINK cpu.nnpc

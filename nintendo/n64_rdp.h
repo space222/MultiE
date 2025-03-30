@@ -152,6 +152,7 @@ private:
 		
 		dc shade_color;
 		s64 cx, cy;
+		u16 dznew;
 		
 		u8 cmd;
 	} RS;
