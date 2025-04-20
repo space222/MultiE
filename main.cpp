@@ -45,6 +45,7 @@
 #include "n64.h"
 #include "bally_astrocade.h"
 #include "Lynx.h"
+#include "SuperVision.h"
 void try_kirq();
 
 namespace fs = std::filesystem;
@@ -510,6 +511,22 @@ void imgui_run()
 			}
 			if( ImGui::BeginMenu("Alpha") )
 			{
+				if( ImGui::MenuItem("Watara SuperVision") )
+				{
+					std::string f = getOpenFile("Watara SuperVision");
+					if( !f.empty() )
+					{
+						delete sys;
+						sys = new SuperVision;
+						if( ! sys->loadROM(f) ) 
+						{
+							printf("unable to load ROM\n");
+							exit(1);
+						}
+						else newinstance = true;
+						crt_scale = 3.f;
+					}				
+				}
 				if( ImGui::MenuItem("Atari Lynx") )
 				{
 					std::string f = getOpenFile("Atari Lynx");

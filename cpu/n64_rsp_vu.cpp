@@ -1102,7 +1102,16 @@ rsp_instr rsp_swc2(n64_rsp&, u32 opcode)
 				// Rasky's docs say wrap addr, but only not wrapping passes tests
 			}
 		};
-	
+		
+	case 0xA: // SWV
+		return INSTR {
+			VUWC2;
+			u32 addr = (rsp.r[base] + offs*16); // 16?
+			for(u32 i = 0; i < 16; ++i, ++addr)
+			{
+				rsp.DMEM[addr&0xfff] = rsp.v[vt].b((e++)&0xf);
+			}		
+		};
 	case 0xB: return INSTR {}; // stv unimpl.
 	
 	default: printf("RSP SWC2: unimpl opcode $%X\n", (opcode>>11)&0x1f);

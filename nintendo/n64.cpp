@@ -306,6 +306,14 @@ bool n64::loadROM(const std::string fname)
 	//for(auto e : imap) std::println("{}", e);
 	setPlayerInputMap(1, imap);
 	
+	/*dpthread = std::jthread( [&](std::stop_token token) 
+		{
+			while( !token.stop_requested() )
+			{
+				RDP.run();
+			}	
+		});
+	*/
 	return true;
 }
 
@@ -329,14 +337,33 @@ void n64::run_frame()
 		}
 		for(u32 i = 0; i < 6000;)
 		{
-			for(u32 x = 0; x < 500; ++x, ++i)
+			int cc = 0;
+			for(; cc < 250; ++cc, ++i)
 			{
-				cpu.step();			
+				cpu.step();
+				if( cpu.in_infinite_loop )
+				{
+					for(; cc < 250; cc+=2, i+=2)
+					{
+						cpu.COUNT = (cpu.COUNT+1)&0xffffFFFFull;
+						if( u32(cpu.COUNT) == u32(cpu.COMPARE) )
+						{
+							cpu.CAUSE |= BIT(15);
+							break;
+						}
+					}
+					break;
+				}
+			}
+			
+			for(int x = 0; x < (cc*2)/3 && !(SP_STATUS & 1); ++x)
+			{
 				run_sp();
 			}
-			run_ai(500);
-			ai_output_sample(500);
-			
+						
+			run_ai(cc);
+			ai_output_sample(cc);
+						
 			/*cpu.step();			
 			run_sp();
 			run_ai(1);
@@ -346,17 +373,14 @@ void n64::run_frame()
 	}
 	
 	if( (VI_CTRL&BIT(6)) && (VI_CTRL&3) ) VI_V_CURRENT ^= 1;
-	
 	vi_draw_frame();
-	
-	
 }
 
 void n64::run_sp()
 {
-	rspdiv += 1;
-	if( rspdiv >= 3 ) rspdiv = 0;
-	if( !(SP_STATUS & 1) && (rspdiv != 2) )
+	//rspdiv += 1;
+	//if( rspdiv >= 3 ) rspdiv = 0;
+	//if( !(SP_STATUS & 1) && (rspdiv != 2) )
 	{
 		RSP.step();
 	}
@@ -604,6 +628,8 @@ u32 n64::mi_read(u32 addr)
 
 n64::~n64()
 {
+	//dpthread.request_stop();
+	//dpthread.join();
 	if( eeprom_written && save_file.size() )
 	{
 		FILE* fp = fopen(save_file.c_str(), "wb");

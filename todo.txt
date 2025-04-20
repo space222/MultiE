@@ -276,7 +276,7 @@ SI: done, but DMAs instant. Not supporting the single-word xfer regs.
 AI: Audio works. Not supporting the delayed carry hardware bug. Sounding any good dependent on host running fast enough.
 PIF: Paks still. one controller and only arrow keys as stick + a/b/z/start currently implemented and working.
 Notes (latest first):
-	Resident Evil 2 appears sensitive to number of instructions per frame. Fails with "No Controller". 5k fails, 6k succeeds.
+	Resident Evil 2 appears sensitive to number of instructions per line. Fails with "No Controller". 5k fails, 6k succeeds.
 	New idle loop detection didn't work out, but reworked run_frame better
 	in triangle rasterization y2 being part of the xm loop instead of xl fixes most of the gaps and popping lines
 	Turned out almost everything freezing was spurious fpu exceptions. Commenting out fpu exceptions "fixes" everything.
@@ -306,6 +306,15 @@ Atari Lynx Todo List
 1. Sprite blitter engine
 2. Timers
 3. Input? Sound? etc?
+
+
+
+Watara SuperVision Todo List
+-------------------------------
+1. Find more info about it
+2. Controller input to see if the one game that animates its title screen works
+3. Fix the timer irq
+4. Audio
 
 
 

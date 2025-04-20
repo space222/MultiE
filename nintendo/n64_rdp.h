@@ -1,11 +1,15 @@
 #pragma once
 #include <functional>
 #include <vector>
+#include <deque>
+#include <mutex>
 #include "itypes.h"
 
 class n64_rdp
 {
 public:
+	n64_rdp() { cmdbuf.reserve(256); }
+	std::mutex dplock;
 
 	struct dc
 	{
@@ -71,6 +75,7 @@ public:
 	};
 
 	void recv(u64);
+	void run();
 	std::function<void()> rdp_irq;
 
 	u8* rdram;

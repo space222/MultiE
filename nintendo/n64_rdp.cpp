@@ -3,6 +3,7 @@
 #include <string>
 #include <cstdio>
 #include <cstring>
+#include <mutex>
 #include <cstdlib>
 #include "n64_rdp.h"
 
@@ -12,17 +13,13 @@ const n64_rdp::dc white(0xff, 0xff, 0xff, 0xff);
 
 #define field(f, d, a) (((f)>>(d))&(a))
 
-void n64_rdp::recv(u64 cmd)
+void n64_rdp::run()
 {
-	//u8 cmdbyte = 0;
-	/*if( cmdbuf.empty() ) 
-	{
-		cmdbyte = (cmd>>56)&0x3F;
-	} else {
-		cmdbyte = (cmdbuf[0]>>56)&0x3F;
-	}*/
-	cmdbuf.push_back(cmd);
+	//std::unique_lock gg(dplock);
+	//if( cmdbuf.empty() ) return;
+	
 	u8 cmdbyte = (cmdbuf[0]>>56)&0x3F;
+	u64 cmd = cmdbuf[0];
 	//printf("RDP Cmd $%X\n", u8((cmd>>56)&0x3F));
 	switch( cmdbyte )
 	{
@@ -35,7 +32,8 @@ void n64_rdp::recv(u64 cmd)
 	case 0x0E:
 	case 0x0F:
 		{ // all the triangles
-		if( cmdbuf.size() < u32(4 + ((cmdbyte&4)?8:0) + ((cmdbyte&2)?8:0) + ((cmdbyte&1)?2:0) ) ) return;
+		u32 cmd_size =  u32(4 + ((cmdbyte&4)?8:0) + ((cmdbyte&2)?8:0) + ((cmdbyte&1)?2:0) );
+		if( cmdbuf.size() < cmd_size ) return;
 		RS.cmd = cmdbyte;
 		// give everything 16 fractional bits
 		RS.y3 = s32(((cmdbuf[0]>>32)&0x3FFF) << 18); RS.y3 >>= 4;
@@ -94,19 +92,32 @@ void n64_rdp::recv(u64 cmd)
 			RS.DzDe = s32(cmdbuf[i+1]>>32);
 			RS.DzDy = s32(cmdbuf[i+1]);
 		}
-		
+		cmdbuf.clear();
+		//for(u32 nn = 0; nn < cmd_size; ++nn) cmdbuf.pop_front();	
+		//gg.unlock();
 		triangle();
-		}break;
+		}return;
 				
-	case 0x24: // texture rectangle
+	case 0x24:{ // texture rectangle
 		if( cmdbuf.size() < 2 ) return;
-		texture_rect(cmdbuf[0], cmdbuf[1]);
-		break;
-	case 0x25: // texture flipped rect
+		u64 a = cmdbuf[0];
+		u64 b = cmdbuf[1];
+		//cmdbuf.pop_front();
+		//cmdbuf.pop_front();	
+		//gg.unlock();
+		texture_rect(a, b);
+		//}return;
+		}break;
+	case 0x25:{ // texture flipped rect
 		if( cmdbuf.size() < 2 ) return;
-		texture_rect_flip(cmdbuf[0], cmdbuf[1]);
-		break;
-		
+		u64 a = cmdbuf[0];
+		u64 b = cmdbuf[1];
+		//cmdbuf.pop_front();
+		//cmdbuf.pop_front();	
+		//gg.unlock();
+		texture_rect_flip(a, b);
+		//}return;
+		}break;
 	case 0x2A: // Set Key GB
 		//printf("set key gb = $%lX\n", cmd);
 		break;
@@ -270,6 +281,11 @@ void n64_rdp::recv(u64 cmd)
 	cmdbuf.clear();	
 }
 
+void n64_rdp::recv(u64 cmd)
+{
+	cmdbuf.push_back(cmd);
+	run();
+}
 
 void n64_rdp::fill_rect(u64 cmd)
 {
@@ -571,22 +587,26 @@ n64_rdp::dc n64_rdp::tex_sample(u32 tile, s64 s, s64 t)
 		t <<= 16-T.shiftT;
 	}
 	
-	if( other.cycle_type != CYCLE_TYPE_COPY )
-	{
-		if( T.clampS || !T.maskS ) { s = std::clamp(s, s64(T.SL>>2), s64(T.SH>>2)); }
-		if( T.clampT || !T.maskT ) { t = std::clamp(t, s64(T.TL>>2), s64(T.TH>>2)); }
-	}
-	
 	s -= T.SL>>2;
 	t -= T.TL>>2;
+	
+	if( other.cycle_type != CYCLE_TYPE_COPY )
+	{
+		//if( T.clampS || !T.maskS ) { s = std::clamp(s, s64(T.SL>>2), s64(T.SH>>2)); }
+		//if( T.clampT || !T.maskT ) { t = std::clamp(t, s64(T.TL>>2), s64(T.TH>>2)); }
+		if( T.clampS || !T.maskS ) { s = std::clamp(s, s64(0), s64(T.SH>>2)-s64(T.SL>>2)); }
+		if( T.clampT || !T.maskT ) { t = std::clamp(t, s64(0), s64(T.TH>>2)-s64(T.TL>>2)); }
+	}
+	
+	
 
 	if( T.mirrorS )
 	{
 		u32 mbit = s & (T.maskS+1);
+		if( mbit ) s ^= T.maskS;
 		if( T.maskS )
 		{
 			s &= T.maskS;
-			if( mbit ) s ^= T.maskS;
 		}
 	} else if( T.maskS ) {
 		s &= T.maskS;
@@ -594,10 +614,10 @@ n64_rdp::dc n64_rdp::tex_sample(u32 tile, s64 s, s64 t)
 	if( T.mirrorT )
 	{
 		u32 mbit = t & (T.maskT+1);
+		if( mbit ) t ^= T.maskT;
 		if( T.maskT )
 		{
-			t &= T.maskT;
-			if( mbit ) t ^= T.maskT;
+			t &= T.maskT;		
 		}
 	} else if( T.maskT ) {
 		t &= T.maskT;
@@ -705,7 +725,7 @@ n64_rdp::dc n64_rdp::tex_sample(u32 tile, s64 s, s64 t)
 		  
 #define PERSP  int W = ( other.perspective ) ? (int(w)>>15) : 0x10000; \
 	S /= (W ? W : 0x10000); \
-	T /= (W ? W : 0x10000); \
+	T /= (W ? W : 0x10000);
 
 static struct {
     int shift;
@@ -821,12 +841,12 @@ void n64_rdp::triangle()
 	
 	u32 deltaZ = (RS.DzDy>>16) & 0xffff;
 	u32 temp = (RS.DzDx>>16);
-	if( deltaZ & 0x8000 ) deltaZ = deltaZ ^ 0xffffu;
+	if( deltaZ & 0x8000 ) deltaZ ^= 0xffffu;
 	deltaZ += ((temp&0x8000) ? ~temp : temp);
-	
+
 	if( !right )
 	{
-		for(s64 y = RS.y1>>16; y <= RS.y3>>16 && y < scissor.lrY; ++y)
+		for(s64 y = RS.y1>>16; y <= (RS.y3>>16) && y < scissor.lrY; ++y)
 		{
 			s64 r = RS.r;
 			s64 g = RS.g;
@@ -883,7 +903,7 @@ void n64_rdp::triangle()
 			}
 		}
 	} else {
-		for(s64 y = RS.y1>>16; y <= RS.y3>>16 && y < scissor.lrY; ++y)
+		for(s64 y = RS.y1>>16; y <= (RS.y3>>16) && y < scissor.lrY; ++y)
 		{
 			s64 r = RS.r;
 			s64 g = RS.g;

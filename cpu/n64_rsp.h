@@ -2,7 +2,7 @@
 #include <functional>
 #include "itypes.h"
 
-struct alignas(16) vreg
+struct alignas(32) vreg
 {
 	u8& b(u32 index) { index &= 15; return bytes[15-index]; }
 	u16& w(u32 index) { index &= 7;  return *(u16*)&bytes[((7-index)<<1)]; }

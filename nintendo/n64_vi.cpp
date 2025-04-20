@@ -20,7 +20,7 @@ void n64::vi_draw_frame()
 	if( V_START >= 35 ) V_START -= 35;
 	u32 V_END = VI_V_VIDEO&0x3ff;
 	if( V_END >= 35 ) V_END -= 35;
-	u32 v_height = (V_END - V_START)>>1;
+	u32 v_height = (V_END - V_START)>>((VI_CTRL&BIT(6))?0:1);
 	
 	u32 width = ((H_END-H_START) * (VI_X_SCALE&0xfff)) / 0x400;
 	u32 height = (240.f * (VI_Y_SCALE&0xfff)) / 0x400;

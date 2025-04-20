@@ -1,4 +1,5 @@
 #pragma once
+#include <thread>
 #include "console.h"
 #include "VR4300.h"
 #include "n64_rsp.h"
@@ -15,6 +16,8 @@ public:
 	u32 fb_scale_w() override { return 640; }
 	u32 fb_scale_h() override { return 480; }
 	u8* framebuffer() override { return &fbuf[0]; }
+	
+	std::jthread dpthread;
 	
 	bool loadROM(const std::string) override;
 	void run_frame() override;
