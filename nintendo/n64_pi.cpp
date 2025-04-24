@@ -13,8 +13,7 @@ void n64::pi_dma(bool write)
 		if( PI_CART_ADDR < 0x10000000 )
 		{
 			fprintf(stderr, "PI DMA: cart $%X, ram $%X, len $%X\n", PI_CART_ADDR, PI_DRAM_ADDR, PI_WR_LEN+1);
-			u32 cart = PI_CART_ADDR - 0x8000000;
-			//if( cart >= 0x8000 ) return;
+			u32 cart = PI_CART_ADDR - 0x8000000;		
 			u32 ramaddr = (PI_DRAM_ADDR & 0x7ffffe);
 			if( ramaddr & 7 )
 			{
@@ -22,7 +21,12 @@ void n64::pi_dma(bool write)
 				//exit(1);
 			}
 			u32 len = (PI_WR_LEN & 0xffFFff)+1;
-			memcpy(mem.data()+ramaddr, sram+cart, len);
+			if( cart >= 0x8000 ) 
+			{
+				for(u32 i = 0; i < len; ++i) memset(mem.data()+ramaddr, 0, len);
+			} else {
+				memcpy(mem.data()+ramaddr, sram+cart, len);
+			}
 			for(u32 i = (ramaddr)&0x7ffffc; i < ((ramaddr+len+3)&0x7ffffc); i += 4) cpu.invalidate(i);
 			PI_CART_ADDR += (len+1)&~1;
 			PI_DRAM_ADDR += (len+7)&~7;
