@@ -12,6 +12,9 @@ public:
 	void run_frame() override;
 
 	bool loadROM(const std::string) override;
+	
+	void write(u16, u8);
+	u8 read(u16);
 
 	rca1802 cpu;
 	u8 ram[512];

@@ -410,5 +410,6 @@ void rca1802::reset()
 	waiting = false;
 	X = P = Q = R[0] = 0; // cpu starts with R0 as PC, with value=zero
 	IE = 1;
+	EF[0] = EF[1] = EF[2] = EF[3] = 0;
 }
 
