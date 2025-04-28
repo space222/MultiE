@@ -894,13 +894,14 @@ void n64_rdp::triangle()
 				ATTR_XDEC;
 			}
 			RS.xh += RS.DxhDy;
-			RS.xm += RS.DxmDy;
 			ATTR_YINC;
 			if( y == (RS.y2>>16) )
 			{
 				RS.xm = RS.xl;
 				RS.DxmDy = RS.DxlDy;
-			}
+			} else {
+				RS.xm += RS.DxmDy;
+			}			
 		}
 	} else {
 		for(s64 y = RS.y1>>16; y <= (RS.y3>>16) && y < scissor.lrY; ++y)
@@ -950,12 +951,13 @@ void n64_rdp::triangle()
 				ATTR_XINC;
 			}
 			RS.xh += RS.DxhDy;
-			RS.xm += RS.DxmDy;
 			ATTR_YINC;
 			if( y == (RS.y2>>16) )
 			{
 				RS.xm = RS.xl;
 				RS.DxmDy = RS.DxlDy;
+			} else {
+				RS.xm += RS.DxmDy;
 			}
 		}
 	}
