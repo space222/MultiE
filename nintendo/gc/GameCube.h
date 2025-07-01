@@ -49,7 +49,7 @@ public:
 	} pi;
 	
 	
-	bool debug_float;
+	int debug_type;
 
 	gekko cpu;
 	

@@ -3,7 +3,6 @@
 #include "itypes.h"
 
 #define CR(a) ((cpu.cr.v >> (31-((a)&0x1f)))&1)
-#define setCR(a, b) cpu.cr.v |= ((b)?1:0) << (31-((a)&0x1f))
 
 union cond
 {

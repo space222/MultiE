@@ -216,6 +216,14 @@ gekko_instr decode_19(u32 opcode)
 			cpu.cr.v &= ~(1u<<crbD);
 			cpu.cr.v |= (((cpu.cr.v>>crbA)&1)^((cpu.cr.v>>crbB)&1))<<crbD;
 		}; // crxor
+		
+	case 289: return instr {
+			const u32 crbD = 31 - ((opc>>21)&0x1f);
+			const u32 crbA = 31 - ((opc>>16)&0x1f);
+			const u32 crbB = 31 - ((opc>>11)&0x1f);
+			cpu.cr.v &= ~(1u<<crbD);
+			cpu.cr.v |= (1^(((cpu.cr.v>>crbA)&1)^((cpu.cr.v>>crbB)&1)))<<crbD;
+		}; // 
 	default: std::println("In decode_19: btm10 = {}", btm10); break;
 	}
 	return nullptr;
@@ -386,7 +394,7 @@ void gekko::step()
 	{
 		i(*this, opcode);
 	} else {
-		std::println("Undef opcode. halting", opcode);
+		std::println("${:X}: Undef opcode. halting", pc-4, opcode);
 		exit(1);
 	}
 }

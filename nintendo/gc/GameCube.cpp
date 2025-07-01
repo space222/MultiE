@@ -61,7 +61,7 @@ void GameCube::run_frame()
 
 void GameCube::reset()
 {
-	debug_float = false;
+	debug_type = 0;
 }
 
 bool GameCube::loadROM(std::string fname)
@@ -170,6 +170,7 @@ u32 GameCube::read(u32 addr, int size)
 		if( size == 16) return __builtin_bswap16(*(u16*)&mem1[addr]);
 		return __builtin_bswap32(*(u32*)&mem1[addr]);
 	}
+	std::println("${:X}: read{} ${:X}", cpu.pc-4, size, addr);
 	return 0xcafe;
 }
 
@@ -185,28 +186,29 @@ void GameCube::write(u32 addr, u32 v, int size)
 		
 		if( addr == 0xcc00302c )
 		{ // hw revision register, hopefully writing to it is simply ignored and I can use for debug output
-			if( debug_float )
+			if( debug_type == 0 )
 			{
-				debug_float = false;
-				float a = 0;
-				memcpy(&a, &v, 4);
-				std::print("{}", a);
+				if( v & 0x80000000u )
+				{
+					std::putchar(v&0xff);
+					return;
+				}
+				debug_type = v >> 24;
 				return;
 			}
-			if( v & 0x80000000u )
+			if( debug_type == 1 )
 			{
-				std::print("{}", (char)(v&0xff));
-			} else if( v & 0x40000000u ) {
-				std::print("{}", s16(v&0xffff));
-			} else if( v & 0x20000000u ) {
-				std::print("{}", u16(v&0xffff));
-			} else if( v & 0x10000000u ) {
-                   		debug_float = true;
+				std::printf("%i", (int)v);
+			} else if( debug_type == 2 ) {
+				std::printf("%u", (unsigned int)v);
+			} else if( debug_type == 3 ) {
+				float a = 0;
+				memcpy(&a, &v, 4);
+				std::printf("%f", a);
 			}
+			debug_type = 0;
 			return;
 		}
-		
-		std::println("write{} ${:X} = ${:X}", size, addr, v);
 		return;
 	}
 	if( (addr&0x1fffFFFFu) < 24*1024*1024 )
@@ -217,6 +219,7 @@ void GameCube::write(u32 addr, u32 v, int size)
 		else *(u32*)&mem1[addr] = __builtin_bswap32(v);
 		return;
 	}
+	std::println("write{} ${:X} = ${:X}", size, addr, v);
 }
 
 void GameCube::setINTSR(u32 b)
