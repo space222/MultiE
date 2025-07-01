@@ -24,6 +24,7 @@ other/WonderSwan.cpp other/CreatiVision.cpp cpu/6502coru.cpp other/apple2e.cpp o
 cpu/VR4300.cpp nintendo/n64.cpp nintendo/n64_vi.cpp nintendo/n64_pi.cpp nintendo/n64_ai.cpp nintendo/n64_si.cpp
 cpu/VR4300_fpu.cpp nintendo/n64_rdp.cpp nintendo/n64_dp.cpp nintendo/n64_sp.cpp cpu/n64_rsp.cpp cpu/n64_rsp_vu.cpp
 neogeo/aes.cpp other/bally_astrocade.cpp atari/Lynx.cpp other/SuperVision.cpp other/rca_studio_ii.cpp cpu/rca1802.cpp
+cpu/gekko.cpp nintendo/gc/GameCube.cpp
 )
 
 add_library(ym3438 SHARED sega/ym3438.cpp)

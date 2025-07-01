@@ -318,4 +318,10 @@ Watara SuperVision Todo List
 
 
 
+Nintendo GameCube Todo List
+------------------------------
+1. Add a really hacky debug output to Dolphin.
+2. More cpu instructions as they come up.
+3. Write tests, and try to start my own porplib (I'm not using devkitppc or libogc)
+Status: panda.dol works. no idea whether cpu instructions or irqs or etc is wrong at this point, time for tests.
 

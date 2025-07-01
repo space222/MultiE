@@ -47,6 +47,7 @@
 #include "Lynx.h"
 #include "SuperVision.h"
 #include "rca_studio_ii.h"
+#include "gc/GameCube.h"
 void try_kirq();
 
 namespace fs = std::filesystem;
@@ -512,6 +513,22 @@ void imgui_run()
 			}
 			if( ImGui::BeginMenu("Alpha") )
 			{
+				if( ImGui::MenuItem("Nintendo GameCube") )
+				{
+					std::string f = getOpenFile("Nintendo GameCube");
+					if( !f.empty() )
+					{
+						delete sys;
+						sys = new GameCube;
+						if( ! sys->loadROM(f) ) 
+						{
+							printf("unable to load ROM\n");
+							exit(1);
+						}
+						else newinstance = true;
+						crt_scale = 1.f;
+					}				
+				}
 				if( ImGui::MenuItem("RCA Studio II") )
 				{
 					std::string f = getOpenFile("RCA Studio II");
