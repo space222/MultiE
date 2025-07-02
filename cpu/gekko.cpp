@@ -37,7 +37,7 @@ gekko_instr decode_31(u32 opcode)
 				c |= 2;
 			}
 			u32 crfD = (opc>>(31-8))&7;
-			cpu.cr.v &= crmasks[crfD];
+			cpu.cr.v &= ~crmasks[crfD];
 			cpu.cr.v |= (c << ((crfD^7)*4));
 		}; // cmp
 	case 32: return instr {
@@ -51,7 +51,7 @@ gekko_instr decode_31(u32 opcode)
 				c |= 2;
 			}
 			u32 crfD = (opc>>(31-8))&7;
-			cpu.cr.v &= crmasks[crfD];
+			cpu.cr.v &= ~crmasks[crfD];
 			cpu.cr.v |= (c << ((crfD^7)*4));
 		}; // cmpl
 	case 19: return instr { rD = cpu.cr.v; }; // mfcr
@@ -235,11 +235,14 @@ gekko_instr decode_63(u32 opcode)
 	
 	switch( btm10 )
 	{
+	case 12: return instr {
+			fD = (double)(float)fB;
+		}; // frsp todo: actual rounding modes and flags
 	
 	case 38: return nopped; //todo: mtfsb1
 	case 70: return nopped; //todo: mtfsb0
 	
-	case 72: return instr { fD = fB; std::println("f{} = f{} (fmr)", (opc>>21)&0x1f, (opc>>11)&0x1f);}; // fmr todo: flags
+	case 72: return instr { fD = fB; }; // fmr todo: flags
 	
 	
 	case 711: return nopped; // todo mtfsf
@@ -270,7 +273,7 @@ gekko_instr decode(u32 opcode)
 				c |= 2;
 			}
 			u32 crfD = (opc>>(31-8))&7;
-			cpu.cr.v &= crmasks[crfD];
+			cpu.cr.v &= ~crmasks[crfD];
 			cpu.cr.v |= (c << ((crfD^7)*4));
 		}; // cmpli
 	case 11: return instr {
@@ -284,7 +287,7 @@ gekko_instr decode(u32 opcode)
 				c |= 2;
 			}
 			u32 crfD = (opc>>(31-8))&7;
-			cpu.cr.v &= crmasks[crfD];
+			cpu.cr.v &= ~crmasks[crfD];
 			cpu.cr.v |= (c << ((crfD^7)*4));
 		}; // cmpi
 	case 12: return instr { u64 t = rA; t += simm16; carry = t>>32; rD = t; }; // addic
@@ -364,10 +367,18 @@ gekko_instr decode(u32 opcode)
 
 	case 50: return instr { 
 			u32 EA = A0+simm16; u64 t = cpu.read(EA,32); t<<=32; t|=cpu.read(EA+4,32); memcpy(&cpu.f[(opc>>21)&0x1f], &t, 8);
-			std::println("loaded f{} = {}", (opc>>21)&0x1f, cpu.f[(opc>>21)&0x1f]);
-			};//lfd
+			//std::println("loaded f{} = {}", (opc>>21)&0x1f, cpu.f[(opc>>21)&0x1f]);
+		}; // lfd
+	
+	case 52: return instr {
+			u32 EA = A0+simm16; u32 v = 0; float vf = fD; memcpy(&v,&vf,4); cpu.write(EA, v, 4);	
+		}; // stfs
+						
+	case 54: return instr {
+			u32 EA = A0+simm16; cpu.writed(EA, fD);	
+		}; // stfd
 			
-	case 56: return nopped; // todo psq_l
+	//case 56: return nopped; // todo psq_l
 	
 	case 63: return decode_63(opcode);
 	default: std::println("In decode: undef opcode top6 = {}", top6); break;
@@ -386,7 +397,7 @@ void gekko::step()
 	}
 
 	u32 opcode = fetcher(pc);
-	//std::println("${:X} = ${:X}", pc, opcode);
+	//if( pc < 0x80003704 )std::println("${:X} = ${:X}", pc, opcode);
 	pc += 4;
 	
 	auto i = decode(opcode);

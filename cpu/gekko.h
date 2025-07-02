@@ -108,6 +108,16 @@ public:
 	u32 read(u32, int);
 	void write(u32, u32, int);
 	
+	double read_double(u32);
+	float read_float(u32);
+	void write_double(u32, double);
+	void write_float(u32, float);
+	
+	std::function<float(u32)> readf;
+	std::function<double(u32)> readd;
+	std::function<void(u32, float)> writef;
+	std::function<void(u32, double)> writed;
+	
 	std::function<u32(u32)> fetcher;
 	std::function<u32(u32,int)> reader;
 	std::function<void(u32,u32,int)> writer;

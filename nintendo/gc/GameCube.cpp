@@ -121,6 +121,11 @@ bool GameCube::loadROM(std::string fname)
 		cpu.fetcher = [&](u32 a)->u32 { return fetch(a); };
 		cpu.reader = [&](u32 a, int s)->u32 { return read(a, s); };
 		cpu.writer = [&](u32 a, u32 v, int s) { write(a,v,s); };
+		
+		cpu.readf = [&](u32 a)->float { float v = 0; u32 b = read(a,32); memcpy(&v,&b,4); return v; };
+		cpu.readd = [&](u32 a)->double { return read_double(a); };
+		cpu.writef = [&](u32 a, float f) { u32 b = 0; memcpy(&b,&f,4); write(a,b,32); };
+		cpu.writed = [&](u32 a, double d) { write_double(a, d); };
 			
 		return true;	
 	}
@@ -186,6 +191,7 @@ void GameCube::write(u32 addr, u32 v, int size)
 		
 		if( addr == 0xcc00302c )
 		{ // hw revision register, hopefully writing to it is simply ignored and I can use for debug output
+			//std::println("debug out = ${:X}", v);
 			if( debug_type == 0 )
 			{
 				if( v & 0x80000000u )
@@ -221,6 +227,46 @@ void GameCube::write(u32 addr, u32 v, int size)
 	}
 	std::println("write{} ${:X} = ${:X}", size, addr, v);
 }
+
+void GameCube::write_double(u32 addr, double d)
+{
+	if( (addr >> 24) == 0xcc )
+	{
+		std::println("${:X}: write double to ${:X}", cpu.pc-4, addr);
+		return;
+	}
+	if( (addr&0x1fffFFFFu) < 24*1024*1024 )
+	{
+		u64 v = 0;
+		memcpy(&v,&d,8);
+		v = __builtin_bswap64(v);
+		memcpy(mem1+(addr&0x1fffFFFFu), &v, 8);
+		return;
+	}
+	std::println("${:X}: write double to ${:X}", cpu.pc-4, addr);
+	return;
+}
+
+double GameCube::read_double(u32 addr)
+{
+	if( (addr >> 24) == 0xcc )
+	{
+		std::println("${:X}: read double from ${:X}", cpu.pc-4, addr);
+		return 0;
+	}
+	if( (addr&0x1fffFFFFu) < 24*1024*1024 )
+	{
+		u64 u = 0;
+		memcpy(&u, mem1+(addr&0x1fffFFFFu), 8);
+		u = __builtin_bswap64(u);
+		double dd = 0;
+		memcpy(&dd, &u, 8);
+		return dd;
+	}
+	std::println("${:X}: read double from ${:X}", cpu.pc-4, addr);
+	return 42;
+}
+
 
 void GameCube::setINTSR(u32 b)
 {

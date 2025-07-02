@@ -24,6 +24,9 @@ public:
 	u32 read(u32, int);
 	void write(u32, u32, int);
 	
+	double read_double(u32);
+	void write_double(u32, double);
+	
 	void setINTSR(u32);
 
 	struct {
