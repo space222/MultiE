@@ -16,14 +16,22 @@ void GameCube::exi_write(u32 addr, u32 v, int size)
 {
 	switch(addr)
 	{
-	case EXI2DATA_ADDR: szchk(32); exi.EXI2DATA = v; return;
+	case EXI2DATA_ADDR: szchk(32); exi.EXI2DATA = v; /*std::println("${:X}: EXI2DATA = ${:X}", cpu.pc-4, exi.EXI2DATA);*/ return;
 	case EXI2CSR_ADDR: szchk(32); exi.EXI2CSR = v; return;
 	case EXI2CR_ADDR: szchk(32); {
 			exi.EXI2CR = v;
 			if( v & 1 )
-			{ // start EXI xfer
-							
-			}	 
+			{ // start EXI xfer, AD16 is the only channel2 device and doesn't do much. so cheap hack time
+				//std::println("AD16 exi2cr write with imm = ${:X}", exi.EXI2DATA);
+				if( exi.EXI2DATA == 0 ) 
+				{
+					exi.EXI2DATA = 0x04120000u;
+				} else if( exi.EXI2DATA == 0xA0000000u ) {
+					; 
+				} else {
+					std::println("AD16 written with ${:X}", exi.EXI2DATA);
+				}
+			}
 	 	} return;
 
 	case EXI0DATA_ADDR: szchk(32); exi.EXI0DATA = v; return;
@@ -35,7 +43,7 @@ void GameCube::exi_write(u32 addr, u32 v, int size)
 			if( v & 1 )
 			{ // start EXI xfer
 							
-			}	 
+			}
 	 	} return;	
 	default:
 		std::println("${:X}: exi{} ${:X} = ${:X}", cpu.pc-4, size, addr, v);

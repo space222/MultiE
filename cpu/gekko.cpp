@@ -576,6 +576,8 @@ void gekko::step()
 	}
 
 	u32 opcode = fetcher(pc);
+	
+	if( pc >= 0x80000000u && pc <= 0x90000000u ) { std::println("PC reached ${:X}", pc); exit(1); }
 	//std::println("${:X} = ${:X}", pc, opcode);
 	pc += 4;
 	

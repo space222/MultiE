@@ -256,7 +256,7 @@ u32 GameCube::read(u32 addr, int size)
 	if( (addr&0x1fffFFFFu) < 24*1024*1024 )
 	{
 		addr &= 0x1fffFFFFu;
-		if( addr >= 0x20 && addr <= 0x30 ) { std::println("read ${:X}", addr); exit(1); }
+		//if( addr >= 0x20 && addr <= 0x30 ) { std::println("read ${:X}", addr); exit(1); }
 		if( size == 8 ) return mem1[addr];
 		if( size == 16) return __builtin_bswap16(*(u16*)&mem1[addr]);
 		return __builtin_bswap32(*(u32*)&mem1[addr]);
