@@ -17,6 +17,8 @@ typedef void (*gekko_instr)(gekko&, u32);
 #define A0 ( ((opc>>16)&0x1f) ? cpu.r[(opc>>16)&0x1f] : 0 )
 #define simm16 ( (s16)(opc&0xffff) )
 #define carry cpu.xer.b.CA
+#define OE (opc&BIT(10))  
+
 
 static u32 crmasks[] = { 0xf0000000u, 0x0f000000u, 0x00f00000u, 0xf0000u, 0xf000u, 0xf00u, 0xf0u, 0xfu };
 
@@ -56,7 +58,25 @@ gekko_instr decode_31(u32 opcode)
 		}; // cmpl
 	case 19: return instr { rD = cpu.cr.v; }; // mfcr
 	
+	case 11: return instr { // mulhwu/.
+			u64 a = rA;
+			a *= rB;
+			rD = a>>32;
+			if( opc & 1 ) { cpu.crlog(rD); }
+		};
+	
 	case 23: return instr { u32 EA = A0+rB; rD = cpu.read(EA,32); }; // lwzx
+	
+	case 24: return instr {
+			const u32 sh = rB&0x3F;
+			if( sh > 31 )
+			{
+				rA = 0;
+			} else {
+				rA = rD << sh;
+			}
+			if( opc&1 ) { cpu.crlog(rA); }	
+		}; // slw/.
 	
 	case 28: return instr { rA = rD & rB; if( opc & 1 ) { cpu.crlog(rA); } }; // and/.
 	case 60: return instr { rA = rD & ~rB; if( opc & 1 ) { cpu.crlog(rA); } }; // andc/.
@@ -67,7 +87,46 @@ gekko_instr decode_31(u32 opcode)
 	
 	case 87: return instr { u32 EA = A0 + rB; rD = cpu.read(EA, 8); }; // lbzx
 	
+	case 104|BIT(9):
+	case 104: return instr { // neg/o.
+			if( rA == 0x80000000u )
+			{
+				rD = rA;
+				if( OE ) { cpu.xer.b.SO = cpu.xer.b.OV = 1; }
+			} else {
+				rD = 1 + ~rA;			
+				if( OE ) { cpu.xer.b.OV = 0; }
+			}
+			if( opc & 1 ) { cpu.crlog(rD); }
+		};
+	
 	case 119: return instr { u32 EA = rA + rB; rD = cpu.read(EA, 8); rA = EA; }; // lbzux
+	
+	case 136: return instr { // subfe/o.
+			u64 t = (rA ^ 0xffffFFFFu);
+			t += rB;
+			t += carry;
+			if( OE )
+			{
+				cpu.xer.b.OV = (((t^rB) & (t^rA) & BIT(31))?1:0);
+				cpu.xer.b.SO |= cpu.xer.b.OV;
+			}
+			rD = t;
+			if( opc&1 ) { cpu.crlog(rD); }
+		};
+	
+	case 144: return instr { // mtcrf
+			const u32 crm = (opc>>12)&0xff;
+			u32 mask = 0;
+			for(u32 i = 0; i < 8; ++i)
+			{
+				if( crm & (1u<<i) )
+				{
+					mask |= 0xf<<(i*4);
+				}
+			}
+			cpu.cr.v = (rD & mask) | (cpu.cr.v & ~mask);
+		};
 	
 	case 151: return instr { cpu.write(A0+rB, rD, 32); }; // stwx
 
@@ -75,16 +134,24 @@ gekko_instr decode_31(u32 opcode)
 	case 444: return instr { rA =  (rD | rB);  if( opc & 1 ) { cpu.crlog(rA); } }; // or/.
 	case 412: return instr { rA =  (rD | ~rB); if( opc & 1 ) { cpu.crlog(rA); } }; // orc/.
 	
+	case 316: return instr { rA = rD ^ rB; if( opc & 1) { cpu.crlog(rA); } }; // xor/.
+	
 	case 146: return instr { cpu.msr.v = rD; cpu.msr.b.pad0 = cpu.msr.b.pad1 = cpu.msr.b.pad2 = 0; }; // mtmsr
 	
 	case 210: return nopped; // todo: mtsr
+	
+	case 26: return instr { // cntlzw/.
+			rA = std::countl_zero(rD);
+			if( opc & 1 ) { cpu.crlog(rA); }
+		};
 
 	case 40|BIT(9): // fallthru
 	case 40: return instr { // subf/o.
 			u64 t = rA ^ 0xffffFFFFu;
 			t += rB;
 			t += 1;
-			if( opc & BIT(9) )
+	//std::println("${:X}: r{}({}) = r{}({}) - r{}({})", cpu.pc-4, (opc>>21)&0x1f, u32(t), (opc>>16)&0x1f, rA, (opc>>11)&0x1f, rB);
+			if( OE )
 			{
 				cpu.xer.b.OV = (( (t^rB) & (t^rA) & BIT(31) ) ? 1 : 0);
 				cpu.xer.b.SO |= cpu.xer.b.OV;
@@ -111,7 +178,7 @@ gekko_instr decode_31(u32 opcode)
 	case 266: return instr { // add/o.
 			u64 t = rA;
 			t += rB;
-			if( opc & BIT(9) )
+			if( OE )
 			{
 				cpu.xer.b.OV = (( (t^rB) & (t^rA) & BIT(31) ) ? 1 : 0);
 				cpu.xer.b.SO |= cpu.xer.b.OV;
@@ -123,7 +190,7 @@ gekko_instr decode_31(u32 opcode)
 	case 10: return instr { // addc/o.
 			u64 t = rA;
 			t += rB;
-			if( opc & BIT(9) )
+			if( OE )
 			{
 				cpu.xer.b.OV = (( (t^rB) & (t^rA) & BIT(31) ) ? 1 : 0);
 				cpu.xer.b.SO |= cpu.xer.b.OV;
@@ -137,7 +204,7 @@ gekko_instr decode_31(u32 opcode)
 			u64 t = rA;
 			t += rB;
 			t += cpu.xer.b.CA;
-			if( opc & BIT(9) )
+			if( OE )
 			{
 				cpu.xer.b.OV = (( (t^rB) & (t^rA) & BIT(31) ) ? 1 : 0);
 				cpu.xer.b.SO |= cpu.xer.b.OV;
@@ -146,11 +213,67 @@ gekko_instr decode_31(u32 opcode)
 			rD = t;
 			if( opc & 1 ) { cpu.crlog(rD); }	
 		};
+		
+	case 8|BIT(9):
+	case 8: return instr { // subfc/o.
+			u64 t = rA^0xffffFFFFu;
+			t += rB;
+			t += 1;
+			if( OE )
+			{
+				cpu.xer.b.OV = (( (t^rB) & (t^rA) & BIT(31) ) ? 1 : 0);
+				cpu.xer.b.SO |= cpu.xer.b.OV;
+			}
+			carry = t>>32;
+			rD = t;
+			if( opc&1 ) { cpu.crlog(rD); }
+		};
 
 
 	case 339: return instr { u32 spr = (opc>>11)&0x3ff; spr = ((spr<<5)&0x3ff)|(spr>>5); rD = cpu.read_spr(spr); }; // mfspr
 	case 467: return instr { u32 spr = (opc>>11)&0x3ff; spr = ((spr<<5)&0x3ff)|(spr>>5); cpu.write_spr(spr, rD); }; // mtspr
+
+	case 371: return instr { // mftb
+			u32 spr = (opc>>11)&0x3ff; spr = ((spr<<5)&0x3ff)|(spr>>5);
+			if( spr == 268 )
+			{
+				rD = cpu.time_base;
+			} else if( spr == 269 ) {
+				rD = cpu.time_base>>32;
+			}	
+		};
+
+	case 459|BIT(9):
+	case 459: return instr {
+			if( OE )
+			{
+				cpu.xer.b.OV = ((rB==0)?1:0);
+				cpu.xer.b.SO |= cpu.xer.b.OV;
+			}
+			if( rB == 0 ) { if( opc & 1 ) { cpu.cr.b.SO = cpu.xer.b.SO; } return; }
+			rD = rA / rB;
+			if( opc & 1 ) { cpu.crlog(rD); }
+		}; // divwu/o.
+		
+	case 235|BIT(9):
+	case 235: return instr {
+			s64 res = s32(rA);
+			res *= s32(rB);
+			rD = res;
+			if( OE )
+			{
+				u32 top = res>>32;
+				cpu.xer.b.OV = (top==0 && !(rD&BIT(31)))||(top==0xffffFFFFu && (rD&BIT(31)));
+				cpu.xer.b.SO |= cpu.xer.b.OV;
+			}
+			if( opc&1 ) { cpu.crlog(rD); }
+		}; // mullw/o.
 	
+	case 279: return instr { // lhzx
+			u32 EA = A0 + rB;
+			rD = cpu.read(EA, 16);	
+		};
+
 	case 536: return instr {
 			rA = rD >> (rB & 0x1f);
 			if( opc & 1 ) { cpu.crlog(rA); }
@@ -172,7 +295,29 @@ gekko_instr decode_31(u32 opcode)
 		}; // srawi
 	
 	case 86: return nopped; // dcbf
+	case 470: return nopped; // dcbi
 	case 598: return nopped; // sync
+	
+	case 792: return instr {
+			const u32 SH = rB & 0x3F;
+			if( SH == 0 )
+			{
+				carry = 0;
+				rA = rD;
+				if( opc&1 ) { cpu.crlog(rA); }
+				return;
+			} else if( SH > 31 ) {
+				carry = rD>>31;
+				rA = ((rD&BIT(31)) ? 0xffffFFFFu : 0);
+				if( opc&1 ) { cpu.crlog(rA); }
+				return;
+			}
+			const u32 bitsout = rD & ((1ull<<(SH+1))-1);
+			bool neg = rD & 1;
+			rA = s32(rD) >> SH;
+			carry = (bitsout && neg);
+			cpu.crlog(rA);
+		}; // sraw/.
 	
 	case 982: return nopped; // icbi
 	default: std::println("In decode_31: btm10 = {}", btm10); break;
@@ -196,15 +341,17 @@ gekko_instr decode_19(u32 opcode)
 			bool cond_ok = (BO&0x10) || (((cpu.cr.v>>BI)&1) ^ (((BO>>3)&1)^1));
 			if( ctr_ok && cond_ok )
 			{
-				if( opc & 1 ) { cpu.lr = cpu.pc; }
+				if( opc & 1 ) { std::println("did a link in a blr!"); exit(1); cpu.lr = cpu.pc; }
 				cpu.pc = cpu.lr & ~3;			
 			}
-			//std::println("bclr to ${:X}", cpu.pc);
-		}; // bc
+			//std::println("blr to ${:X}", cpu.pc);
+		}; // blr
 	
 	case 50: return instr {
+			(void)opc;
 			std::println("${:X} rfi", cpu.pc-4);
 			cpu.pc = cpu.srr0;
+			cpu.msr.v = cpu.srr1;
 		};
 	
 	case 150: return nopped; // isync
@@ -223,7 +370,19 @@ gekko_instr decode_19(u32 opcode)
 			const u32 crbB = 31 - ((opc>>11)&0x1f);
 			cpu.cr.v &= ~(1u<<crbD);
 			cpu.cr.v |= (1^(((cpu.cr.v>>crbA)&1)^((cpu.cr.v>>crbB)&1)))<<crbD;
-		}; // 
+		}; // creqv
+		
+		
+	case 528: return instr {
+			const u32 BO = (opc>>21)&0x1f;
+			const u32 BI = 31 - ((opc>>16)&0x1f);
+			const bool cond_ok = (BO&0x10)||(1^(((cpu.cr.v>>BI)&1) ^ ((BO>>3)&1)));
+			if( cond_ok )
+			{
+				if( opc&1 ) cpu.lr = cpu.pc;
+				cpu.pc = cpu.ctr&~3;
+			}
+		}; // bcctr
 	default: std::println("In decode_19: btm10 = {}", btm10); break;
 	}
 	return nullptr;
@@ -290,8 +449,8 @@ gekko_instr decode(u32 opcode)
 			cpu.cr.v &= ~crmasks[crfD];
 			cpu.cr.v |= (c << ((crfD^7)*4));
 		}; // cmpi
-	case 12: return instr { u64 t = rA; t += simm16; carry = t>>32; rD = t; }; // addic
-	case 13: return instr { u64 t = rA; t += simm16; carry = t>>32; rD = t; cpu.crlog(rD); }; // addic.
+	case 12: return instr { u64 t = rA; t += (u32)(s32)simm16; carry = t>>32; rD = t; }; // addic
+	case 13: return instr { u64 t = rA; t += (u32)(s32)simm16; carry = t>>32; rD = t; cpu.crlog(rD); }; // addic.
 	case 14: return instr { rD = A0 + simm16; };    // addi
 	case 15: return instr { rD = A0 + (opc<<16); }; // addis
 	case 16: return instr {
@@ -308,7 +467,7 @@ gekko_instr decode(u32 opcode)
 			}
 			//std::println("bcc to ${:X}", cpu.pc);
 		}; // bc
-	
+	case 17: return nopped; // sc todo: actually do system call?
 	case 18: return instr {
 			//std::println("b opcode = ${:X}", opc);
 			if( opc & 1 ) { cpu.lr = cpu.pc; }
@@ -318,7 +477,25 @@ gekko_instr decode(u32 opcode)
 			//std::println("branch to ${:X}", cpu.pc);
 		}; // b
 	case 19: return decode_19(opcode);
-	
+	case 20: return instr {
+			u32 SH = (opc>>11)&0x1f;
+			//std::println("SH = {}", SH);
+			u32 r = std::rotl(rD, SH);
+			u32 ME = (opc>>1)&0x1f;
+			u32 MB = (opc>>6)&0x1f;
+			//std::println("ME = {} | MB = {}", ME, MB);
+			u32 m = 0;
+			while( MB != ME )
+			{
+				m |= 1<<(31-MB);
+				MB = (MB+1)&31;
+			}
+			m |= 1<<(31-MB);
+			r = (r & m) | (rA & ~m);
+			//std::println("rD = ${:X}, r = ${:X}, m = ${:X}", rD, r, m);
+			rA = r;
+			if( opc & 1 ) { cpu.crlog(rA); }
+		}; // rlwimi	
 	case 21: return instr {
 			u32 SH = (opc>>11)&0x1f;
 			//std::println("SH = {}", SH);
@@ -378,7 +555,7 @@ gekko_instr decode(u32 opcode)
 			u32 EA = A0+simm16; cpu.writed(EA, fD);	
 		}; // stfd
 			
-	//case 56: return nopped; // todo psq_l
+	case 56: return nopped; // todo psq_l
 	
 	case 63: return decode_63(opcode);
 	default: std::println("In decode: undef opcode top6 = {}", top6); break;
@@ -388,16 +565,18 @@ gekko_instr decode(u32 opcode)
 
 void gekko::step()
 {
+	time_base += 1;
+	
 	if( irq_line && msr.b.EE )
 	{
 		srr1 = msr.v;
 		msr.b.EE = 0;
 		srr0 = pc;
-		pc = 0x80000500u;
+		pc = 0x00000500u;
 	}
 
 	u32 opcode = fetcher(pc);
-	//if( pc < 0x80003704 )std::println("${:X} = ${:X}", pc, opcode);
+	//std::println("${:X} = ${:X}", pc, opcode);
 	pc += 4;
 	
 	auto i = decode(opcode);
@@ -419,6 +598,11 @@ u32 gekko::read_spr(u32 spr)
 	case 8: return lr;
 	case 9: return ctr;
 	case 26: return srr0;
+	case 272: return sprg0;
+	case 273: return sprg1;
+	case 274: return sprg2;
+	case 275: return sprg3;
+	
 	case 912:
 	case 913:
 	case 914:
@@ -446,6 +630,12 @@ void gekko::write_spr(u32 spr, u32 val)
 	case 8: lr = val; return;
 	case 9: ctr = val; /*std::println("set ctr = ${:X}", val);*/ return;
 	case 26: srr0 = val; return;
+	
+	case 272: sprg0 = val; return;
+	case 273: sprg1 = val; return;
+	case 274: sprg2 = val; return;
+	case 275: sprg3 = val; return;
+	
 	case 912:
 	case 913:
 	case 914:

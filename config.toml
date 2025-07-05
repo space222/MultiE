@@ -22,3 +22,7 @@ cd = "./roms/psx/Crash1.bin"
 player1 = ["key:x","key:z", "key:a","key:s", "key:q","key:w", 
 	"key:i","key:k","key:j","key:l", "key:up","key:down","key:left","key:right" ]
 
+
+[gamecube]
+bios = "./bios/gc-ntsc-12.bin"
+

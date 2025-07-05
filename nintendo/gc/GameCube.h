@@ -1,4 +1,6 @@
 #pragma once
+#include <print>
+#include <vector>
 #include "console.h"
 #include "gekko.h"
 
@@ -15,9 +17,10 @@ public:
 	
 	void key_down(int) override
 	{
-		FILE* fp = fopen("intr.bin", "wb");
-		fwrite(mem1+0x500, 512, 1, fp);
-		fclose(fp);
+		//FILE* fp = fopen("intr.bin", "wb");
+		//fwrite(mem1+0x500, 512, 1, fp);
+		//fclose(fp);
+		std::println("pc = ${:X}", cpu.pc);
 	}
 
 	u32 fetch(u32);
@@ -28,9 +31,19 @@ public:
 	void write_double(u32, double);
 	
 	void setINTSR(u32);
-
+	void clearINTSR(u32);
+	
+	void descramble(u8*, u32);
+	
 	struct {
-		u32 dpv;
+		u32 EXI2DATA, EXI2CSR, EXI2CR;
+		u32 EXI0DATA, EXI0CSR, EXI0CR, EXI0MAR, EXI0LENGTH;
+	} exi;
+	void exi_write(u32,u32,int);
+	u32 exi_read(u32,int);
+	
+	struct {
+		u32 dpv, fbaddr;
 		union __attribute__((packed)) {
 			struct __attribute__((packed))
 			{
@@ -57,8 +70,8 @@ public:
 	gekko cpu;
 	
 	u8 mem1[24*1024*1024];
-	
 	u32 fbuf[720*480];
+	std::vector<u8> ipl, ipl_clear;
 };
 
 #define INTSR_VI_BIT BIT(8)

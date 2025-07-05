@@ -131,6 +131,8 @@ public:
 	u32 r[32];
 	u32 pc, lr, ctr, srr0, l2cr;
 	u32 srr1;
+	u64 time_base;
+	u32 sprg0, sprg1, sprg2, sprg3;
 	cond cr;
 	mstrg msr;
 	intex xer;
