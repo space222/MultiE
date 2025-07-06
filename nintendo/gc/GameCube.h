@@ -3,6 +3,7 @@
 #include <vector>
 #include "console.h"
 #include "gekko.h"
+#include "gc_dsp_cpu.h"
 
 class GameCube : public console
 {
@@ -17,9 +18,9 @@ public:
 	
 	void key_down(int) override
 	{
-		//FILE* fp = fopen("intr.bin", "wb");
-		//fwrite(mem1+0x500, 512, 1, fp);
-		//fclose(fp);
+		FILE* fp = fopen("bs2.bin", "wb");
+		fwrite(mem1+0x1300000, 2*1024*1024, 1, fp);
+		fclose(fp);
 		std::println("pc = ${:X}", cpu.pc);
 	}
 
@@ -38,6 +39,8 @@ public:
 	struct {
 		u32 EXI2DATA, EXI2CSR, EXI2CR;
 		u32 EXI0DATA, EXI0CSR, EXI0CR, EXI0MAR, EXI0LENGTH;
+		u32 EXI1DATA, EXI1CSR, EXI1CR, EXI1MAR, EXI1LENGTH;
+		u32 offset;
 	} exi;
 	void exi_write(u32,u32,int);
 	u32 exi_read(u32,int);
@@ -64,6 +67,10 @@ public:
 		u32 INTMR;
 	} pi;
 	
+	GCDsp dsp;	
+	void dsp_io_write(u32, u32, int);
+	u32 dsp_io_read(u32, int);
+	
 	
 	int debug_type;
 
@@ -73,6 +80,8 @@ public:
 	u32 fbuf[720*480];
 	std::vector<u8> ipl, ipl_clear;
 };
+
+#define szchk(a) if( size != (a) ) { std::println("addr ${:X} size check fail g{}!=a{}",addr,size,a); exit(1); }
 
 #define INTSR_VI_BIT BIT(8)
 

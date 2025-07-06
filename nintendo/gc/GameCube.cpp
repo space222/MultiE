@@ -14,7 +14,7 @@ void GameCube::run_frame()
 			if( vi.di[i].b.e && vi.di[i].b.vpos == vi.dpv )
 			{
 				vi.di[i].b.i = 1;
-				//setINTSR(INTSR_VI_BIT);
+				setINTSR(INTSR_VI_BIT);
 				//std::println("VI di{} irq: vpos = {}, dpv = {}", i, (u32)vi.di[i].b.vpos, vi.dpv);
 			}
 		}
@@ -63,6 +63,7 @@ void GameCube::run_frame()
 
 void GameCube::reset()
 {
+	cpu.reset();
 	debug_type = 0;
 	vi.di[0].v = vi.di[1].v = vi.di[2].v = vi.di[3].v = 0;
 	cpu.msr.b.EE = 0;
@@ -178,11 +179,9 @@ bool GameCube::loadROM(std::string fname)
 	ipl.resize(2097152);
 	[[maybe_unused]] int unu = fread(ipl.data(), 1, ipl.size(), fp);
 	fclose(fp);
-	std::println("Got here");
 	std::copy(ipl.begin(), ipl.end(), std::back_inserter(ipl_clear));
 	descramble(ipl_clear.data()+0x100, ipl_clear.size()-0x100);
 	cpu.pc = 0xfff00100u;
-	std::println("Got here");	
 	return true;
 }
 
@@ -210,8 +209,6 @@ u32 GameCube::read(u32 addr, int size)
 		addr |= 0xc0000000u;
 		if( addr == 0xCC00302c ) return 0x246500B1; // hw revision reg
 		if( addr == 0xcc00202c ) return vi.dpv;
-		if( addr == 0xcc005004 ) return 0x7fff; // dsp mailbox stuff
-		if( addr == 0xcc005006 ) return -1; // dsp mailbox stuff
 		if( addr == 0xcc006404 )
 		{
 			auto keys = SDL_GetKeyboardState(nullptr);
@@ -227,8 +224,14 @@ u32 GameCube::read(u32 addr, int size)
 			return exi_read(addr, size);
 		}
 		
+		
+		if( addr >= 0xcc005000u && addr < 0xcc005100u )
+		{
+			return dsp_io_read(addr, size);
+		}
+		
 		std::println("${:X}: read{} ${:X}", cpu.pc-4, size, addr);
-		if( addr == 0xcc00500a ) return 0x20; // AI status?
+				
 		if( addr == 0xcc002030 ) return vi.di[0].v;
 		if( addr == 0xcc002034 ) return vi.di[1].v;
 		if( addr == 0xcc002038 ) return vi.di[2].v;
@@ -274,7 +277,9 @@ void GameCube::write(u32 addr, u32 v, int size)
 		if( addr >= 0xcc002030 && addr <= 0xcc00203c ) 
 		{
 			u32 direg = (addr>>2)&3;
-			vi.di[direg].v = v; 
+			vi.di[direg].v &= BIT(31);
+			vi.di[direg].v |= v&~BIT(31);
+			if( v & BIT(31) ) vi.di[direg].v &= ~BIT(31);
 			std::println("di{} = 0x{:X}", direg, v);
 			if( !(vi.di[0].b.i || vi.di[1].b.i || vi.di[2].b.i || vi.di[3].b.i) )
 			{
@@ -307,6 +312,11 @@ void GameCube::write(u32 addr, u32 v, int size)
 				std::printf("%f", a);
 			}
 			debug_type = 0;
+			return;
+		}
+		if( addr >= 0xcc005000u && addr < 0xcc005100u )
+		{
+			dsp_io_write(addr, v, size);
 			return;
 		}
 		if( addr >= 0xcc006800u && addr < 0xcc006900u )

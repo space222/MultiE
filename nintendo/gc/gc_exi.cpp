@@ -1,6 +1,5 @@
 #include <print>
 #include "GameCube.h"
-#define szchk(a) if( size != (a) ) { std::println("addr ${:X} size check fail g{}!=a{}",addr,size,a); exit(1); }
 
 #define EXI2DATA_ADDR 0xcc006838
 #define EXI2CSR_ADDR  0xcc006828
@@ -11,6 +10,13 @@
 #define EXI0CR_ADDR   0xcc00680C
 #define EXI0MAR_ADDR  0xcc006804
 #define EXI0LENGTH_ADDR 0xcc006808
+
+#define EXI1CSR_ADDR 0xcc006814
+#define EXI1MAR_ADDR 0xcc006818
+#define EXI1LENGTH_ADDR 0xcc00681c
+#define EXI1CR_ADDR 0xcc006820
+#define EXI1DATA_ADDR 0xcc006824
+
 
 void GameCube::exi_write(u32 addr, u32 v, int size)
 {
@@ -40,10 +46,28 @@ void GameCube::exi_write(u32 addr, u32 v, int size)
 	case EXI0LENGTH_ADDR: szchk(32); exi.EXI0LENGTH = v; return;
 	case EXI0CR_ADDR: szchk(32); {
 			exi.EXI0CR = v;
-			if( v & 1 )
-			{ // start EXI xfer
-							
+			if( (v & 3)==1 )
+			{
+				exi.offset = exi.EXI0DATA>>6;
+				return;
 			}
+			if( (v & 3)==3 )
+			{ // start EXI xfer
+				if( exi.EXI0LENGTH == 0 ) return;
+				//std::println("data = ${:X}, addr = ${:X}, len = ${:X}", exi.offset, exi.EXI0MAR, exi.EXI0LENGTH);
+				if( exi.offset + exi.EXI0LENGTH >= 2*1024*1024 || exi.EXI0MAR + exi.EXI0LENGTH >= 24*1024*1024 ) return;
+				for(u32 i = 0; i < exi.EXI0LENGTH; ++i) mem1[exi.EXI0MAR+i] = ipl_clear[exi.offset+i];
+				return;
+			}
+	 	} return;
+	 	
+	case EXI1DATA_ADDR: szchk(32); exi.EXI1DATA = v; return;
+	case EXI1CSR_ADDR: szchk(32); exi.EXI1CSR = v; return;
+	case EXI1MAR_ADDR: szchk(32); exi.EXI1MAR = v; return;
+	case EXI1LENGTH_ADDR: szchk(32); exi.EXI1LENGTH = v; return;
+	case EXI1CR_ADDR: szchk(32); {
+			exi.EXI1CR = v;
+			
 	 	} return;	
 	default:
 		std::println("${:X}: exi{} ${:X} = ${:X}", cpu.pc-4, size, addr, v);
@@ -64,6 +88,12 @@ u32 GameCube::exi_read(u32 addr, int size)
 	case EXI0CR_ADDR: szchk(32); { u32 t = exi.EXI0CR; exi.EXI0CR&=~1; return t; }
 	case EXI0MAR_ADDR: szchk(32); return exi.EXI0MAR;
 	case EXI0LENGTH_ADDR: szchk(32); return exi.EXI0LENGTH;
+
+	case EXI1DATA_ADDR: szchk(32); return exi.EXI1DATA;
+	case EXI1CSR_ADDR: szchk(32); return exi.EXI1CSR;
+	case EXI1CR_ADDR: szchk(32); { u32 t = exi.EXI1CR; exi.EXI1CR&=~1; return t; }
+	case EXI1MAR_ADDR: szchk(32); return exi.EXI1MAR;
+	case EXI1LENGTH_ADDR: szchk(32); return exi.EXI1LENGTH;
 	
 	default:
 		std::println("${:X}: exi{} <${:X}", cpu.pc-4, size, addr);
