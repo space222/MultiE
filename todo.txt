@@ -320,8 +320,12 @@ Watara SuperVision Todo List
 
 Nintendo GameCube Todo List
 ------------------------------
-1. Add a really hacky debug output to Dolphin.
-2. More cpu instructions as they come up.
-3. Write tests, and try to start my own porplib (I'm not using devkitppc or libogc)
+1. Go all-out with bitfields on the regs. Various status, ctrl, and write-1-to-clear-irq bits are all mixed in same reg.
+2. Figure which dsp mailboxes are to/from cpu. DSP manual uses dest naming, YAGCD uses src naming?
+3. Start implementing some DSP instructions, try to get BS2 past DSP init.
+4. Write tests, and try to start my own porplib (I'm not using devkitppc or libogc)
 Status: panda.dol works. no idea whether cpu instructions or irqs or etc is wrong at this point, time for tests.
+	Fruit Remover looks like it sets up VI irqs and enables interrupts, but really doesn't like recv'in them.
+	Everything else looks like it uses the same library that inits DSP in an identical manner to the BS2 firmware.
+
 

@@ -1,4 +1,5 @@
 #include <cstdlib>
+#include <cstdio>
 #include <cstring>
 #include <bit>
 #include <print>
@@ -18,7 +19,6 @@ typedef void (*gekko_instr)(gekko&, u32);
 #define simm16 ( (s16)(opc&0xffff) )
 #define carry cpu.xer.b.CA
 #define OE (opc&BIT(10))  
-
 
 static u32 crmasks[] = { 0xf0000000u, 0x0f000000u, 0x00f00000u, 0xf0000u, 0xf000u, 0xf00u, 0xf0u, 0xfu };
 
@@ -244,6 +244,10 @@ gekko_instr decode_31(u32 opcode)
 			}	
 		};
 
+	case 407: return instr { // sthx
+			u32 EA = A0+rB; cpu.write(EA, rD&0xffff, 16);	
+		};
+
 	case 459|BIT(9):
 	case 459: return instr {
 			if( OE )
@@ -255,6 +259,22 @@ gekko_instr decode_31(u32 opcode)
 			rD = rA / rB;
 			if( opc & 1 ) { cpu.crlog(rD); }
 		}; // divwu/o.
+		
+		
+	case 491|BIT(9):
+	case 491: return instr {
+			cpu.xer.b.OV = 0;
+			s32 dividend = rA;
+			s32 divisor = rB;
+			if( divisor == 0 || (divisor == -1 && rA == 0x80000000u) )
+			{
+				cpu.xer.b.SO = cpu.xer.b.OV = 1;
+				if( opc & 1 ) { cpu.cr.b.SO = 1; }
+				return;
+			}
+			rD = dividend / divisor;
+			if( opc & 1 ) { cpu.crlog(rD); }	
+		}; // divw/o.
 		
 	case 235|BIT(9):
 	case 235: return instr {
@@ -324,11 +344,15 @@ gekko_instr decode_31(u32 opcode)
 			rA = s16(rD);
 			if(opc&1) { cpu.crlog(rA); }
 		};
-	
+	case 954: return instr { // extsb.
+			rA = s8(rD);
+			if(opc&1) { cpu.crlog(rA); }
+		};
+
 	case 982: return nopped; // icbi
 	default: std::println("In decode_31: btm10 = {}", btm10); break;
 	}
-	return nullptr;
+	return nopped;
 }
 
 gekko_instr decode_19(u32 opcode)
@@ -337,7 +361,15 @@ gekko_instr decode_19(u32 opcode)
 	
 	switch( btm10 )
 	{
-	
+	case 0: return instr {   // mcrf
+			const u32 crfD = 4 * (((opc>>(31-8))&7)^7);
+			const u32 crfS = 4 * (((opc>>(31-13))&7)^7);
+			
+			u32 val = ((cpu.cr.v >> crfS) & 15)<<crfD;
+			cpu.cr.v &= ~crmasks[crfD>>2];
+			cpu.cr.v |= val;	
+		};
+		
 	case 16: return instr {
 			const u32 BO = (opc>>21)&0x1f;
 			const u32 BI = 31 - ((opc>>16)&0x1f);
@@ -356,7 +388,7 @@ gekko_instr decode_19(u32 opcode)
 	
 	case 50: return instr {
 			(void)opc;
-			std::println("${:X} rfi", cpu.pc-4);
+			//std::println("${:X} rfi to ${:X}", cpu.pc-4, cpu.srr0);
 			cpu.pc = cpu.srr0;
 			cpu.msr.v = cpu.srr1;
 		};
@@ -370,6 +402,14 @@ gekko_instr decode_19(u32 opcode)
 			cpu.cr.v &= ~(1u<<crbD);
 			cpu.cr.v |= (((cpu.cr.v>>crbA)&1)^((cpu.cr.v>>crbB)&1))<<crbD;
 		}; // crxor
+		
+	case 449: return instr {
+			const u32 crbD = 31 - ((opc>>21)&0x1f);
+			const u32 crbA = 31 - ((opc>>16)&0x1f);
+			const u32 crbB = 31 - ((opc>>11)&0x1f);
+			cpu.cr.v &= ~(1u<<crbD);
+			cpu.cr.v |= (((cpu.cr.v>>crbA)&1)|((cpu.cr.v>>crbB)&1))<<crbD;
+		}; // cror
 		
 	case 289: return instr {
 			const u32 crbD = 31 - ((opc>>21)&0x1f);
@@ -401,6 +441,8 @@ gekko_instr decode_63(u32 opcode)
 	
 	switch( btm10 )
 	{
+	case 0: return nopped; // todo: fcmpu
+	
 	case 12: return instr {
 			fD = (double)(float)fB;
 		}; // frsp todo: actual rounding modes and flags
@@ -410,9 +452,15 @@ gekko_instr decode_63(u32 opcode)
 	
 	case 72: return instr { fD = fB; }; // fmr todo: flags
 	
+	case 40: return instr {
+			u64 a = 0;
+			memcpy(&a, &fB, 8);
+			a ^= (1ull<<63);
+			memcpy(&fD, &a, 8);
+		}; // fneg
 	
 	case 711: return nopped; // todo mtfsf
-	default: std::println("In decode_63: btm10 = {}", btm10); break;
+	default: std::println("In decode_63: btm10 = {}", btm10); return nopped;
 	}
 	return nullptr;
 }
@@ -523,7 +571,26 @@ gekko_instr decode(u32 opcode)
 			if( opc & 1 ) { cpu.crlog(rA); }
 			//exit(1);
 		}; // rlwinm
-	
+	case 23: return instr {
+			u32 SH = rB & 0x1f;
+			//std::println("SH = {}", SH);
+			u32 r = std::rotl(rD, SH);
+			u32 ME = (opc>>1)&0x1f;
+			u32 MB = (opc>>6)&0x1f;
+			//std::println("ME = {} | MB = {}", ME, MB);
+			u32 m = 0;
+			while( MB != ME )
+			{
+				m |= 1<<(31-MB);
+				MB = (MB+1)&31;
+			}
+			m |= 1<<(31-MB);
+			r &= m;
+			//std::println("rD = ${:X}, r = ${:X}, m = ${:X}", rD, r, m);
+			rA = r;
+			if( opc & 1 ) { cpu.crlog(rA); }
+			//exit(1);
+		}; // rlwnm	
 	case 24: return instr { rA = rD | (opc&0xffff); }; // ori
 	case 25: return instr { rA = rD | (opc<<16); };    // oris
 	case 26: return instr { rA = rD ^ (opc&0xffff); }; // xori
@@ -567,6 +634,8 @@ gekko_instr decode(u32 opcode)
 		}; // stfd
 			
 	case 56: return nopped; // todo psq_l
+	case 59: return nopped; // todo psq_l
+	case 60: return nopped; // todo psq stuff
 	
 	case 63: return decode_63(opcode);
 	default: std::println("In decode: undef opcode top6 = {}", top6); break;
@@ -578,14 +647,33 @@ void gekko::step()
 {
 	time_base += 1;
 	
+	dec_div+=1;
+	if( dec_div == 12 )
+	{
+		dec_div = 0;
+		dec -= 1;
+		if( dec == 0xffffFFFFu )
+		{
+			dec_happened = true;
+		}
+	}
+	
 	if( irq_line && msr.b.EE )
 	{
 		srr1 = msr.v;
 		msr.b.EE = 0;
 		srr0 = pc;
-		pc = 0x00000500u;
+		pc = 0x500u;
+		std::println("IRQ taken");
+	} else if( 0 ) {//dec_happened && msr.b.EE ) {
+		dec_happened = false;
+		srr1 = msr.v;
+		msr.b.EE = 0;
+		srr0 = pc;
+		pc = 0x900u;
 	}
 
+	//lastpc = pc;
 	u32 opcode = fetcher(pc);
 	
 	//if( pc >= 0x80000000u && pc <= 0x90000000u ) { std::println("PC reached ${:X}", pc); exit(1); }
@@ -600,6 +688,8 @@ void gekko::step()
 		std::println("${:X}: Undef opcode. halting", pc-4, opcode);
 		exit(1);
 	}
+	
+	//if( pc == 0x8001ef44u ) { std::println("lastpc = ${:X}", lastpc); exit(1); }
 }
 
 u32 gekko::read_spr(u32 spr)
@@ -610,6 +700,11 @@ u32 gekko::read_spr(u32 spr)
 	case 1: return xer.v;
 	case 8: return lr;
 	case 9: return ctr;
+	
+	case 19: return 0; // DAR unimpl.
+	
+	case 22: return dec;
+	
 	case 26: return srr0;
 	case 27: return srr1;
 	
@@ -644,6 +739,9 @@ void gekko::write_spr(u32 spr, u32 val)
 	case 1: xer.v = val; return;
 	case 8: lr = val; return;
 	case 9: ctr = val; /*std::println("set ctr = ${:X}", val);*/ return;
+	
+	case 22: dec = val; return;
+	
 	case 26: srr0 = val; return;
 	case 27: srr1 = val; return;
 	
@@ -672,7 +770,7 @@ void gekko::write_spr(u32 spr, u32 val)
 }
 
 u32 gekko::fetch(u32 /*addr*/)
-{
+{ // unused
 	return 0;
 }
 
@@ -690,6 +788,8 @@ void gekko::reset()
 {
 	l2cr = 0;
 	msr.b.EE = 0;
+	dec_div = 0;
+	r[1] = 0x817ffffcu;
 	irq_line = false;
 }
 

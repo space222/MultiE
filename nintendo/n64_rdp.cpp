@@ -873,7 +873,7 @@ void n64_rdp::triangle()
 				if( RS.cmd & 4 ) RS.shade_color = dc(r>>16,g>>16,b>>16,a>>16);
 				if( RS.cmd & 2 ) 
 				{
-					s64 S = s; s64 T = t;
+					s64 S = s+0x7fff; s64 T = t+0x7fff;
 					PERSP
 					TX.tex_sample = tex_sample(TX.tile, S>>5, T>>5);
 				}

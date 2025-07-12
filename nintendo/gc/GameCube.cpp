@@ -7,8 +7,9 @@
 void GameCube::run_frame()
 {
 	vi.dpv = 1;
-	while( vi.dpv < 264 )
+	while( vi.dpv < 525 )
 	{
+		if( vi.dcr & 1 )
 		for(u32 i = 0; i < 4; ++i)
 		{
 			if( vi.di[i].b.e && vi.di[i].b.vpos == vi.dpv )
@@ -207,6 +208,7 @@ u32 GameCube::read(u32 addr, int size)
 	if( ((addr >> 24)&0xf) == 0x0c )
 	{
 		addr |= 0xc0000000u;
+		if( addr == 0xcc002002 || (addr == 0xcc002000 && size == 32) ) return vi.dcr;
 		if( addr == 0xCC00302c ) return 0x246500B1; // hw revision reg
 		if( addr == 0xcc00202c ) return vi.dpv;
 		if( addr == 0xcc006404 )
@@ -273,18 +275,17 @@ void GameCube::write(u32 addr, u32 v, int size)
 	if( ((addr >> 24)&0xf) == 0x0c )
 	{
 		addr |= 0xc0000000u;
+		if( addr == 0xcc002000 && size == 32 ) { vi.dcr = v&~2; return; }
+		if( addr == 0xcc002002 ) { vi.dcr = v&~2; return; }
 		if( addr == 0xcc003004 ) { pi.INTMR = v; return; }
 		if( addr >= 0xcc002030 && addr <= 0xcc00203c ) 
 		{
+			if( size == 16 && (addr&3)==0 ) v<<=16;
 			u32 direg = (addr>>2)&3;
 			vi.di[direg].v &= BIT(31);
 			vi.di[direg].v |= v&~BIT(31);
 			if( v & BIT(31) ) vi.di[direg].v &= ~BIT(31);
-			std::println("di{} = 0x{:X}", direg, v);
-			if( !(vi.di[0].b.i || vi.di[1].b.i || vi.di[2].b.i || vi.di[3].b.i) )
-			{
-				clearINTSR(INTSR_VI_BIT);
-			}
+			std::println("{}: di{} = 0x{:X}, e = {}", size, direg, v, (int)vi.di[direg].b.e);
 			return;
 		}
 		if( addr == 0xcc00201c ) { vi.fbaddr = v&0x1fffFFFFu; return; }

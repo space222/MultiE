@@ -343,7 +343,7 @@ void n64::run_frame()
 				cpu.step();
 				if( cpu.in_infinite_loop )
 				{
-					for(; cc < 250; cc+=2, i+=2)
+					/*for(; cc < 250; cc+=2, i+=2)
 					{
 						cpu.COUNT = (cpu.COUNT+1)&0xffffFFFFull;
 						if( u32(cpu.COUNT) == u32(cpu.COMPARE) )
@@ -351,7 +351,22 @@ void n64::run_frame()
 							cpu.CAUSE |= BIT(15);
 							break;
 						}
+					}*/
+					if( cpu.COMPARE < cpu.COUNT ) cpu.COMPARE |= 1ull<<32;
+					if( cpu.COUNT < cpu.COMPARE && cpu.COUNT + (250-cc)/2 >= cpu.COMPARE )
+					{
+						i += (cpu.COMPARE-cpu.COUNT)*2;
+						cc += (cpu.COMPARE-cpu.COUNT)*2;
+						cpu.CAUSE |= BIT(15);
+						cpu.COMPARE &= 0xffffFFFFu;
+						cpu.COUNT = cpu.COMPARE+1;
+					} else {
+						cpu.COUNT += (250-cc)/2;
+						i += 250-cc;
+						cc = 250;
 					}
+					cpu.COMPARE &= 0xffffFFFFu;
+					cpu.COUNT &= 0xffffFFFFu;
 					break;
 				}
 			}

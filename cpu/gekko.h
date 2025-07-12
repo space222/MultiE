@@ -16,7 +16,7 @@ union cond
 	u32 v;
 } __attribute__((packed));
 
-union mstrg
+union msr_t
 {
 	struct __attribute__((packed)) {
 		unsigned int LE : 1;
@@ -94,7 +94,7 @@ class gekko
 public:
 	void reset();
 	void step();
-	bool irq_line;
+	bool irq_line, dec_happened;
 
 	void crlog(u32 v)
 	{
@@ -132,9 +132,9 @@ public:
 	u32 pc, lr, ctr, srr0, l2cr;
 	u32 srr1;
 	u64 time_base;
-	u32 sprg0, sprg1, sprg2, sprg3;
+	u32 sprg0, sprg1, sprg2, sprg3, dec, dec_div;
 	cond cr;
-	mstrg msr;
+	msr_t msr;
 	intex xer;
 	hid0_t hid0;
 	hid1_t hid1;

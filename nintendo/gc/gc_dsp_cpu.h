@@ -17,6 +17,7 @@ public:
 	} io;
 
 	void step();
+	void reset();
 	u16 fetch(u16);
 	u16 read(u16);
 	void write(u16, u16);

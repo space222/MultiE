@@ -1,11 +1,10 @@
 #pragma once
+#include <functional>
 #include "itypes.h"
 
 class arm;
 enum class ARM_CYCLE {  X, I, N, S };
 
-typedef void (*armwrite)(u32, u32, int, ARM_CYCLE);
-typedef u32 (*armread)(u32, int, ARM_CYCLE);
 typedef void (*arm7_instr)(arm&, u32);
 
 #define ARM_MODE_USER 0x10
@@ -49,8 +48,8 @@ public:
 	ARM_CYCLE next_cycle_type;	
 	bool flushed;
 	
-	armwrite write;
-	armread read;
+	std::function<void(u32, u32, int, ARM_CYCLE)> write;
+	std::function<u32(u32, int, ARM_CYCLE)> read;
 	
 	virtual void switch_to_mode(u32);
 	virtual void swi();

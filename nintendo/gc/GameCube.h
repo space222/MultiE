@@ -18,10 +18,12 @@ public:
 	
 	void key_down(int) override
 	{
-		FILE* fp = fopen("bs2.bin", "wb");
-		fwrite(mem1+0x1300000, 2*1024*1024, 1, fp);
-		fclose(fp);
+		//FILE* fp = fopen("bs2.bin", "wb");
+		//fwrite(mem1+0x1300000, 2*1024*1024, 1, fp);
+		//fclose(fp);
 		std::println("pc = ${:X}", cpu.pc);
+		//pi.INTSR = 0x100;
+		//cpu.irq_line = true;
 	}
 
 	u32 fetch(u32);
@@ -46,7 +48,7 @@ public:
 	u32 exi_read(u32,int);
 	
 	struct {
-		u32 dpv, fbaddr;
+		u32 dpv, fbaddr, dcr;
 		union __attribute__((packed)) {
 			struct __attribute__((packed))
 			{
