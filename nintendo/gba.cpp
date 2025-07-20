@@ -194,7 +194,19 @@ void gba::draw_scanline()
 		{
 			fbuf[VCOUNT*240 + x] = *(u16*)&palette[vram[base + VCOUNT*240 + x]<<1];
 		}	
+		return;
 	}
+	
+	if( mode == 3 )
+	{
+		for(u32 x = 0; x < 240; ++x)
+		{
+			fbuf[VCOUNT*240 + x] = *(u16*)&vram[VCOUNT*480 + x*2];
+		}
+	}
+	
+	
+	
 
 }
 
