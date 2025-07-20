@@ -762,7 +762,7 @@ void arm7_ldst_imm(arm& cpu, u32 opc)
 void arm7_ldst_m(arm& cpu, u32 opc)
 {
 	const bool U = opc & BIT(23);
-	const bool Pre = ((opc>>24)&1) ^ ((opc>>23)&1);
+	const bool Pre = ((opc>>24)&1) ^ (((opc>>23)&1)^1);
 	const bool S = opc & BIT(22);
 	const bool W = opc & BIT(21);
 	const bool L = opc & BIT(20);
@@ -794,7 +794,7 @@ void arm7_ldst_m(arm& cpu, u32 opc)
 		if( L )
 		{
 			u32 val = cpu.read(base&~3, 32, ctype);
-			if( U )
+			if( S && i!=15 )
 			{
 				cpu.setUserReg(i, val);
 			} else {
@@ -807,7 +807,7 @@ void arm7_ldst_m(arm& cpu, u32 opc)
 				}
 			}
 		} else {
-			cpu.write(base&~3, (U ? cpu.getUserReg(i) : cpu.r[i]), 32, ctype);
+			cpu.write(base&~3, (S ? cpu.getUserReg(i) : cpu.r[i]), 32, ctype);
 		}
 		ctype = ARM_CYCLE::S;
 		if( !Pre ) base += 4;	
@@ -889,6 +889,7 @@ arm7_instr arm7tdmi::decode_arm(u32 cc)
 		};
 	}
 
+	std::println("Reached end of decode_arm()");
 	return undef_instr;
 }
 

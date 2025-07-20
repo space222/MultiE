@@ -590,7 +590,7 @@ void thumb16_bcc(arm& cpu, u32 opc)
 
 void thumb17_swi(arm& cpu, u32)
 {
-	cpu.r14_svc = cpu.r[15]+2;
+	cpu.r14_svc = cpu.r[15]-2;
 	cpu.spsr_svc = cpu.cpsr.v;
 	cpu.switch_to_mode(ARM_MODE_SUPER);
 	cpu.cpsr.b.M = ARM_MODE_SUPER;
@@ -778,10 +778,10 @@ void arm7tdmi::step()
 void arm7tdmi::reset()
 {
 	//todo: copied from my old emu, need to double check
-	cpsr.v = 0x80|ARM_MODE_SUPER;
 	r[13] = 0x03007F00;
 	r13_svc = 0x03007FE0; 
 	r13_irq =  0x03007FA0;
+	switch_to_mode(ARM_MODE_SUPER);
 	spsr_svc = 0x9f;
 	r[15] = 0x08000000u;
 	cpsr.b.T = 0;

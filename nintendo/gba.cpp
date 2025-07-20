@@ -95,7 +95,7 @@ u32 gba::read(u32 addr, int size, ARM_CYCLE ct)
 		if( addr == 0x04000004 ) return (VCOUNT >= 160 && VCOUNT != 227);
 		if( addr == 0x04000130 ) { return getKeys(); }
 		std::println("IO Read{} ${:X}", size, addr);
-		exit(1);
+		//exit(1);
 		return 0;
 	}
 	if( addr < 0x06000000 )
