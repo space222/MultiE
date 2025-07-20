@@ -145,7 +145,8 @@ Status: YM2612 uses the Nuken OPN library... Poorly? Fantastic Dizzy and UMK3 la
 
 GBA Todo List
 ----------------
-1. Everything
+1. Start ARM *again*
+2. Try to write some thumb tests
 
 
 

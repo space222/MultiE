@@ -31,6 +31,10 @@ public:
 	u8 vram[96*1024];
 	
 	u16 fbuf[240*160];
+	
+	void draw_scanline();
+	
+	u16 DISPSTAT, DISPCNT, VCOUNT;
 };
 
 

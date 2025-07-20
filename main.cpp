@@ -133,7 +133,7 @@ int main(int argc, char** args)
 	printf("Starting up\n");
 	m68k::init();
 	
-	ProgramOptions cli(argc, args, {"help", "a26", "a52", "c64", "dmg", "nes", "itv"});
+	//ProgramOptions cli(argc, args, {"help", "a26", "a52", "c64", "dmg", "nes", "itv"});
 	
 	SDL_Init(SDL_INIT_GAMECONTROLLER|SDL_INIT_VIDEO|SDL_INIT_AUDIO);
 	MainWindow = SDL_CreateWindow("Multie", 0, 80, 1000, 720, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
@@ -167,7 +167,7 @@ int main(int argc, char** args)
         	}
 	}
 	
-	cli_options = std::move(cli.options);
+	//cli_options = std::move(cli.options);
 	
 	SDL_Event e;
 	while( Running )
@@ -188,7 +188,7 @@ int main(int argc, char** args)
 				}
 				if( e.key.keysym.scancode == SDL_SCANCODE_F1 )
 				{
-					sys->reset();
+					if( sys ) sys->reset();
 				}
 				break;
 			case SDL_KEYUP:
@@ -224,12 +224,6 @@ int main(int argc, char** args)
 		SDL_RenderPresent(MainRender);
 	}
 	
-	
-	//FILE* fi = fopen("dump.data", "wb");
-	//fwrite(, 1, 1000, fi);
-	//fclose(fi);
-	
-	//printf("Ended at $%X\n", ((dmg*)sys)->cpu.PC);
 	delete sys;
 	
 	return 0;

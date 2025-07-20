@@ -1,736 +1,883 @@
-#include <cstdio>
 #include <cstdlib>
-#include <bit>
-#include <algorithm>
+#include <print>
 #include "arm7tdmi.h"
 
-// this file is step, reset, and thumb instructions.
-// see arm7tdmi_arm for arm instructions
+#define setNZ(a) cpu.cpsr.b.N = (((a)&BIT(31))?1:0); cpu.cpsr.b.Z = (((a)==0)?1:0)
 
-inline void setnz(arm& cpu, u32 v)
+void thumb1_lsl(arm& cpu, u32 opc)
 {
-	cpu.cpsr.b.Z = ((v==0)?1:0);
-	cpu.cpsr.b.N = ((v&BIT(31))?1:0);
-}
+	u32 S = cpu.r[(opc>>3)&7];
+	u32& D = cpu.r[opc&7];
 
-void thumb_1_lsl(arm& cpu, u32 opc)
-{
-	u32 amt = (opc>>6)&0x1f;
-	u64 Rs = cpu.r[(opc>>3)&7];
-	if( amt )
+	const u32 sh = (opc>>6)&0x1f;
+	if( sh == 0 )
 	{
-		Rs <<= amt;
-		cpu.cpsr.b.C = (Rs>>32);
+		D = S;
+		setNZ(D);
+		return;
 	}
-	u32& Rd = cpu.r[opc&7];
-	Rd = Rs;
-	setnz(cpu, Rd);
+	
+	S <<= sh-1;
+	cpu.cpsr.b.C = S>>31;
+	S <<= 1;
+	D = S;
+	setNZ(D);
 }
 
-void thumb_1_lsr(arm& cpu, u32 opc)
+void thumb1_lsr(arm& cpu, u32 opc)
 {
-	u32 amt = (opc>>6)&0x1f;
-	u32 Rs = cpu.r[(opc>>3)&7];
-	if( amt )
+	u32 S = cpu.r[(opc>>3)&7];
+	u32& D = cpu.r[opc&7];
+
+	const u32 sh = (opc>>6)&0x1f;
+	if( sh == 0 )
 	{
-		cpu.cpsr.b.C = (Rs>>(amt-1))&1;
-		Rs >>= amt;
-	} else {
-		cpu.cpsr.b.C = 0;
-		Rs = 0;
+		cpu.cpsr.b.C = S>>31; //?? or 0?
+		D = 0;
+		setNZ(D);
+		return;
 	}
-	u32& Rd = cpu.r[opc&7];
-	Rd = Rs;
-	setnz(cpu, Rd);
+	
+	S >>= sh-1;
+	cpu.cpsr.b.C = S&1;
+	S >>= 1;
+	D = S;
+	setNZ(D);
 }
 
-void thumb_1_asr(arm& cpu, u32 opc)
+void thumb1_asr(arm& cpu, u32 opc)
 {
-	u32 amt = (opc>>6)&0x1f;
-	u32 Rs = cpu.r[(opc>>3)&7];
-	if( amt )
+	u32 S = cpu.r[(opc>>3)&7];
+	u32& D = cpu.r[opc&7];
+
+	const u32 sh = (opc>>6)&0x1f;
+	if( sh == 0 )
 	{
-		cpu.cpsr.b.C = (Rs>>(amt-1))&1;
-		Rs = s32(Rs) >> 1;
-	} else {
-		cpu.cpsr.b.C = Rs>>31;
-		Rs = (cpu.cpsr.b.C ? 0xffffFFFFu : 0);
+		cpu.cpsr.b.C = S>>31;
+		D = (S>>31)?0xffffFFFFu:0;
+		setNZ(D);
+		return;
 	}
+	
+	S = s32(S) >> (sh-1);
+	cpu.cpsr.b.C = S&1;
+	S = s32(S) >> 1;
+	D = S;
+	setNZ(D);
+}
+
+void thumb2_addsub(arm& cpu, u32 opc)
+{
+	u32 Rn = (opc&BIT(10))? ((opc>>6)&7) : cpu.r[(opc>>6)&7];
+	if( opc&BIT(9) ) Rn = ~Rn;
+	const u32 Rs = cpu.r[(opc>>3)&7];
 	u32& Rd = cpu.r[opc&7];
-	Rd = Rs;
-	setnz(cpu, Rd);
+	u64 t = Rs;
+	t += Rn;
+	if( opc&BIT(9) ) t+=1;
+	cpu.cpsr.b.V = ((t^Rs)&(t^Rn)&BIT(31))>>31;
+	cpu.cpsr.b.C = (t>>32)&1;
+	Rd = t;
+	setNZ(Rd);
 }
 
-void thumb_2_add(arm& cpu, u32 opc)
+void thumb3_mov(arm& cpu, u32 opc)
 {
-	u32& Rd = cpu.r[opc&7];
-	u32 Rs = cpu.r[(opc>>3)&7];
-	u32 Rn = ( (opc&BIT(10)) ? ((opc>>6)&7) : cpu.r[(opc>>6)&7] );
-	u64 res = Rs;
-	res += Rn;
-	cpu.cpsr.b.C = res>>32;
-	cpu.cpsr.b.V = (((res^Rn)&(res^Rs)&BIT(31))?1:0);
-	Rd = res;
-	setnz(cpu,Rd);
+	const u32 reg = (opc>>8)&7;
+	cpu.r[reg] = opc&0xff;
+	setNZ(cpu.r[reg]);
 }
 
-void thumb_2_sub(arm& cpu, u32 opc)
+void thumb3_sub(arm& cpu, u32 opc)
 {
-	u32& Rd = cpu.r[opc&7];
-	u32 Rs = cpu.r[(opc>>3)&7];
-	u32 Rn = ~( (opc&BIT(10)) ? ((opc>>6)&7) : cpu.r[(opc>>6)&7] );
-	u64 res = Rs;
-	res += Rn;
-	res += 1;
-	cpu.cpsr.b.C = res>>32;
-	cpu.cpsr.b.V = (((res^Rn)&(res^Rs)&BIT(31))?1:0);
-	Rd = res;
-	setnz(cpu,Rd);
+	const u32 reg = (opc>>8)&7;
+	u64 t = cpu.r[reg];
+	u32 op2 = ~(opc&0xff);
+	t += op2;
+	t += 1;
+	cpu.cpsr.b.V = (((t^cpu.r[reg]) & (t^op2) & BIT(31))?1:0);
+	cpu.cpsr.b.C = (t>>32)&1;
+	cpu.r[reg] = t;
+	setNZ(u32(t));
 }
 
-void thumb_3_cmp(arm& cpu, u32 opc)
+void thumb3_cmp(arm& cpu, u32 opc)
 {
-	u32 Rd = cpu.r[(opc>>8)&7];
-	u32 Rn = ~( opc&0xff );
-	u64 res = Rd;
-	res += Rn;
-	res += 1;
-	cpu.cpsr.b.C = res>>32;
-	cpu.cpsr.b.V = (((res^Rn)&(res^Rd)&BIT(31))?1:0);
-	setnz(cpu,u32(res));
+	const u32 reg = (opc>>8)&7;
+	u64 t = cpu.r[reg];
+	u32 op2 = ~(opc&0xff);
+	t += op2;
+	t += 1;
+	cpu.cpsr.b.V = (((t^cpu.r[reg]) & (t^op2) & BIT(31))?1:0);
+	cpu.cpsr.b.C = (t>>32)&1;
+	setNZ(u32(t));
 }
 
-void thumb_3_mov(arm& cpu, u32 opc)
+void thumb3_add(arm& cpu, u32 opc)
 {
-	u32& Rd = cpu.r[(opc>>8)&7];
-	u32 Rn = ( opc&0xff );
-	Rd = Rn;
-	setnz(cpu,Rd);
+	const u32 reg = (opc>>8)&7;
+	u64 t = cpu.r[reg];
+	t += (opc&0xff);
+	cpu.cpsr.b.V = (((t^cpu.r[reg]) & (t^0) & BIT(31))?1:0);
+	cpu.cpsr.b.C = (t>>32)&1;
+	cpu.r[reg] = t;
+	setNZ(cpu.r[reg]);
 }
 
-void thumb_3_add(arm& cpu, u32 opc)
+void thumb4_and(arm& cpu, u32 opc)
 {
-	u32& Rd = cpu.r[(opc>>8)&7];
-	u32 Rn = ( opc&0xff );
-	u64 res = Rd;
-	res += Rn;
-	cpu.cpsr.b.C = res>>32;
-	cpu.cpsr.b.V = (((res^Rn)&(res^Rd)&BIT(31))?1:0);
-	Rd = res;
-	setnz(cpu,Rd);
+	const u32 s = cpu.r[(opc>>3)&7];
+	u32 &d = cpu.r[opc&7];
+	d &= s;
+	setNZ(d);
 }
 
-void thumb_3_sub(arm& cpu, u32 opc)
+void thumb4_eor(arm& cpu, u32 opc)
 {
-	u32& Rd = cpu.r[(opc>>8)&7];
-	u32 Rn = ~( opc&0xff );
-	u64 res = Rd;
-	res += Rn;
-	res += 1;
-	cpu.cpsr.b.C = res>>32;
-	cpu.cpsr.b.V = (((res^Rn)&(res^Rd)&BIT(31))?1:0);
-	Rd = res;
-	printf("thumb3 sub r%i, $%X. r%i = $%X\n", (opc>>8)&7, opc&0xff, (opc>>8)&7, Rd);
-	setnz(cpu,Rd);
+	const u32 s = cpu.r[(opc>>3)&7];
+	u32 &d = cpu.r[opc&7];
+	d ^= s;
+	setNZ(d);
 }
 
-void thumb_4_and(arm& cpu, u32 opc)
+void thumb4_lsl(arm& cpu, u32 opc)
 {
-	u32& Rd = cpu.r[opc&7];
-	u32 Rs = cpu.r[(opc>>3)&7];
-	Rd &= Rs;
-	setnz(cpu,Rd);	
-}
-
-void thumb_4_eor(arm& cpu, u32 opc)
-{
-	u32& Rd = cpu.r[opc&7];
-	u32 Rs = cpu.r[(opc>>3)&7];
-	Rd ^= Rs;
-	setnz(cpu,Rd);	
-}
-
-void thumb_4_lsl(arm& cpu, u32 opc)
-{
-	u32& Rd = cpu.r[opc&7];
-	u32 amt = cpu.r[(opc>>3)&7] & 0xff;
-	if( amt )
+	const u32 sh = cpu.r[(opc>>3)&7] & 0xff;
+	u32& d = cpu.r[opc&7];
+	if( sh == 0 ) { setNZ(d); return; }
+	if( sh >= 32 )
 	{
-		u64 v = Rd;
-		v <<= amt;
-		cpu.cpsr.b.C = v>>32;
-		Rd = v;	
+		cpu.cpsr.b.C = d&1; //todo: ??
+		d = 0;
+		setNZ(d);
+		return;
 	}
-	setnz(cpu, Rd);
+	d <<= sh-1;
+	cpu.cpsr.b.C = d>>31;
+	d <<= 1;
+	setNZ(d);
 }
 
-void thumb_4_lsr(arm& cpu, u32 opc)
+void thumb4_lsr(arm& cpu, u32 opc)
 {
-	u32& Rd = cpu.r[opc&7];
-	u32 amt = cpu.r[(opc>>3)&7] & 0xff;
-	if( amt )
+	const u32 sh = cpu.r[(opc>>3)&7] & 0xff;
+	u32& d = cpu.r[opc&7];
+	if( sh == 0 ) { setNZ(d); return; }
+	if( sh >= 32 )
 	{
-		Rd >>= amt-1;
-		cpu.cpsr.b.C = Rd&1;
-		Rd >>= 1;	
+		cpu.cpsr.b.C = d>>31; //todo: ??
+		d = 0;
+		setNZ(d);
+		return;
 	}
-	setnz(cpu, Rd);
+	d >>= sh-1;
+	cpu.cpsr.b.C = d&1;
+	d >>= 1;
+	setNZ(d);
 }
 
-void thumb_4_asr(arm& cpu, u32 opc)
+void thumb4_asr(arm& cpu, u32 opc)
 {
-	u32& Rd = cpu.r[opc&7];
-	u32 amt = cpu.r[(opc>>3)&7] & 0xff;
-	if( amt )
+	const u32 sh = cpu.r[(opc>>3)&7] & 0xff;
+	u32& d = cpu.r[opc&7];
+	if( sh == 0 ) { setNZ(d); return; }
+	if( sh >= 32 )
 	{
-		if( amt > 31 )
-		{
-			Rd = ((Rd&BIT(31))? 0xffffFFFFu : 0);
-			cpu.cpsr.b.C = Rd&1;
-		} else {
-			Rd = s32(Rd) >> (amt-1);
-			cpu.cpsr.b.C = Rd&1;
-			Rd = s32(Rd) >> 1;
-		}
+		cpu.cpsr.b.C = d>>31; //todo: ??
+		d = (d>>31)?0xffffFFFFu : 0;
+		setNZ(d);
+		return;
 	}
-	setnz(cpu, Rd);
+	d = s32(d) >> (sh-1);
+	cpu.cpsr.b.C = d&1;
+	d = s32(d) >> 1;
+	setNZ(d);
 }
 
-void thumb_4_adc(arm& cpu, u32 opc)
+void thumb4_adc(arm& cpu, u32 opc)
 {
-	u32& Rd = cpu.r[opc&7];
-	u32 Rn = ( cpu.r[(opc>>3)&7] );
-	u64 res = Rd;
-	res += Rn;
-	res += cpu.cpsr.b.C;
-	cpu.cpsr.b.C = res>>32;
-	cpu.cpsr.b.V = (((res^Rn)&(res^Rd)&BIT(31))?1:0);
-	Rd = res;
-	setnz(cpu,Rd);
+	const u32 s = cpu.r[(opc>>3)&7];
+	u32 &d = cpu.r[opc&7];
+	u64 t = d;
+	t += s;
+	t += cpu.cpsr.b.C;
+	cpu.cpsr.b.V = (((t^s)&(t^d)&BIT(31))?1:0);
+	cpu.cpsr.b.C = t>>32;
+	d = t;
+	setNZ(d);
 }
 
-void thumb_4_sbc(arm& cpu, u32 opc)
+void thumb4_sbc(arm& cpu, u32 opc)
 {
-	u32& Rd = cpu.r[opc&7];
-	u32 Rn = ~( cpu.r[(opc>>3)&7] );
-	u64 res = Rd;
-	res += Rn;
-	res += cpu.cpsr.b.C;
-	cpu.cpsr.b.C = res>>32;
-	cpu.cpsr.b.V = (((res^Rn)&(res^Rd)&BIT(31))?1:0);
-	Rd = res;
-	setnz(cpu,Rd);
+	const u32 s = ~cpu.r[(opc>>3)&7];
+	u32 &d = cpu.r[opc&7];
+	u64 t = d;
+	t += s;//^0xffffFFFFu;
+	t += cpu.cpsr.b.C;
+	cpu.cpsr.b.V = (((t^s)&(t^d)&BIT(31))?1:0);
+	cpu.cpsr.b.C = t>>32;
+	d = t;
+	setNZ(d);
 }
 
-void thumb_4_ror(arm& cpu, u32 opc)
+void thumb4_ror(arm& cpu, u32 opc)
 {
-	u32& Rd = cpu.r[opc&7];
-	u32 amt = cpu.r[(opc>>3)&7] & 0xff;
-	if( amt )
+	const u32 sh = cpu.r[(opc>>3)&7] & 0xff;
+	u32& d = cpu.r[opc&7];
+	if( sh == 0 ) { setNZ(d); return; }
+	d = std::rotr(d, sh);
+	cpu.cpsr.b.C = d>>31;
+	setNZ(d);
+}
+
+void thumb4_tst(arm& cpu, u32 opc)
+{
+	const u32 s = cpu.r[(opc>>3)&7];
+	const u32 d = s & cpu.r[opc&7];
+	setNZ(d);
+}
+
+void thumb4_neg(arm& cpu, u32 opc)
+{
+	const u32 s = ~cpu.r[(opc>>3)&7];
+	u32 &d = cpu.r[opc&7];
+	u64 t = 0;
+	t += s;//^0xffffFFFFu;
+	t += 1;
+	cpu.cpsr.b.V = (((t^s)&(t^0)&BIT(31))?1:0);
+	cpu.cpsr.b.C = t>>32;
+	d = t;
+	setNZ(d);
+}
+
+void thumb4_cmp(arm& cpu, u32 opc)
+{
+	const u32 s = ~cpu.r[(opc>>3)&7];
+	u32 &d = cpu.r[opc&7];
+	u64 t = d;
+	t += s;//^0xffffFFFFu;
+	t += 1;
+	cpu.cpsr.b.V = (((t^s)&(t^d)&BIT(31))?1:0);
+	cpu.cpsr.b.C = t>>32;
+	setNZ(u32(t));
+}
+
+void thumb4_cmn(arm& cpu, u32 opc)
+{
+	const u32 s = cpu.r[(opc>>3)&7];
+	u32 &d = cpu.r[opc&7];
+	u64 t = d;
+	t += s;
+	cpu.cpsr.b.V = (((t^s)&(t^d)&BIT(31))?1:0);
+	cpu.cpsr.b.C = t>>32;
+	setNZ(u32(t));
+}
+
+void thumb4_orr(arm& cpu, u32 opc)
+{
+	const u32 s = cpu.r[(opc>>3)&7];
+	u32 &d = cpu.r[opc&7];
+	d |= s;
+	setNZ(d);
+}
+
+void thumb4_mul(arm& cpu, u32 opc)
+{
+	const u32 s = cpu.r[(opc>>3)&7];
+	u32 &d = cpu.r[opc&7];
+	d *= s;
+	setNZ(d);
+}
+
+void thumb4_bic(arm& cpu, u32 opc)
+{
+	const u32 s = cpu.r[(opc>>3)&7];
+	u32 &d = cpu.r[opc&7];
+	d &= ~s;
+	setNZ(d);
+}
+
+void thumb4_mvn(arm& cpu, u32 opc)
+{
+	const u32 s = cpu.r[(opc>>3)&7];
+	u32 &d = cpu.r[opc&7];
+	d = ~s;
+	setNZ(d);
+}
+
+void thumb5_add(arm& cpu, u32 opc)
+{
+	const u32 s = cpu.r[(opc>>3)&15];
+	u32 RD = ((opc>>4)&8)|(opc&7);
+	cpu.r[RD] += s;
+	if( RD == 15 ) cpu.flushp();
+}
+
+void thumb5_cmp(arm& cpu, u32 opc)
+{
+	const u32 s = ~cpu.r[(opc>>3)&15];
+	const u32 d = cpu.r[((opc>>4)&8)|(opc&7)];
+	u64 t = d;
+	t += s;//^0xffffFFFFu;
+	t += 1;
+	cpu.cpsr.b.C = (t>>32)&1;
+	cpu.cpsr.b.V = (((t^s) & (t^d) & BIT(31))?1:0);
+	setNZ(u32(t));
+}
+
+void thumb5_mov(arm& cpu, u32 opc)
+{
+	const u32 s = cpu.r[(opc>>3)&15];
+	u32 RD = ((opc>>4)&8)|(opc&7);
+	cpu.r[RD] = s;
+	if( RD == 15 ) cpu.flushp();
+}
+
+void thumb5_bx(arm& cpu, u32 opc)
+{
+	const u32 s = cpu.r[(opc>>3)&15];
+	cpu.r[15] = s;
+	if( !(s&1) )
 	{
-		Rd = std::rotr(Rd, amt);
-		cpu.cpsr.b.C = Rd>>31;	
+		cpu.cpsr.b.T = 0;
+		cpu.r[15] &= ~2;
 	}
-	setnz(cpu, Rd);
-}
-
-void thumb_4_tst(arm& cpu, u32 opc)
-{
-	u32 Rd = cpu.r[opc&7];
-	u32 Rs = cpu.r[(opc>>3)&7];
-	Rd &= Rs;
-	setnz(cpu,Rd);	
-}
-
-void thumb_4_neg(arm& cpu, u32 opc)
-{
-	u32& Rd = cpu.r[opc&7];
-	u32 Rn = ~( cpu.r[(opc>>3)&7] );
-	u64 res = 0;
-	res += Rn;
-	res += 1;
-	cpu.cpsr.b.C = res>>32;
-	cpu.cpsr.b.V = (((res^Rn)&(res)&BIT(31))?1:0);
-	Rd = res;
-	setnz(cpu,Rd);
-}
-
-void thumb_4_mvn(arm& cpu, u32 opc)
-{
-	u32& Rd = cpu.r[opc&7];
-	u32 Rs = cpu.r[(opc>>3)&7];
-	Rd = ~Rs;
-	setnz(cpu,Rd);	
-}
-
-void thumb_4_mul(arm& cpu, u32 opc)
-{
-	u32& Rd = cpu.r[opc&7];
-	u32 Rs = cpu.r[(opc>>3)&7];
-	Rd *= Rs;
-	setnz(cpu,Rd);
-}
-
-void thumb_4_bic(arm& cpu, u32 opc)
-{
-	u32& Rd = cpu.r[opc&7];
-	u32 Rs = cpu.r[(opc>>3)&7];
-	Rd &= ~Rs;
-	setnz(cpu,Rd);	
-}
-
-void thumb_4_cmp(arm& cpu, u32 opc)
-{
-	u32 Rd = cpu.r[opc&7];
-	u32 Rn = ~cpu.r[(opc>>3)&7];
-	u64 res = Rd;
-	res += Rn;
-	res += 1;
-	cpu.cpsr.b.C = res>>32;
-	cpu.cpsr.b.V = (((res^Rn)&(res^Rd)&BIT(31))?1:0);
-	setnz(cpu,u32(res));
-}
-
-void thumb_4_cmn(arm& cpu, u32 opc)
-{
-	u32 Rd = cpu.r[opc&7];
-	u32 Rn = cpu.r[(opc>>3)&7];
-	u64 res = Rd;
-	res += Rn;
-	cpu.cpsr.b.C = res>>32;
-	cpu.cpsr.b.V = (((res^Rn)&(res^Rd)&BIT(31))?1:0);
-	setnz(cpu,u32(res));
-}
-
-void thumb_4_orr(arm& cpu, u32 opc)
-{
-	u32& Rd = cpu.r[opc&7];
-	u32 Rs = cpu.r[(opc>>3)&7];
-	Rd |= Rs;
-	setnz(cpu,Rd);	
-}
-
-void thumb_5_hireg_add(arm& cpu, u32 opc)
-{
-	u32 d = (opc&7)|((opc>>4)&8);
-	u32 s = (opc>>3)&15;
-	cpu.r[d] += cpu.r[s];
-	if( d == 15 ) cpu.flushp();
-}
-
-void thumb_5_hireg_cmp(arm& cpu, u32 opc)
-{
-	u32 rd = cpu.r[(opc&7)|((opc>>4)&8)];
-	u32 rs = ~cpu.r[(opc>>3)&15];
-	u64 res = rd;
-	res += rs;
-	res += 1;
-	cpu.cpsr.b.C = res>>32;
-	cpu.cpsr.b.V = (((res^rd)&(res^rs)&BIT(31))?1:0);
-	setnz(cpu, u32(res));
-}
-
-void thumb_5_hireg_mov(arm& cpu, u32 opc)
-{
-	u32 d = (opc&7)|((opc>>4)&8);
-	u32 s = (opc>>3)&15;
-	cpu.r[d] = cpu.r[s];
-	setnz(cpu, cpu.r[d]);
-	if( d == 15 ) cpu.flushp();
-}
-
-void thumb_5_hireg_bx(arm& cpu, u32 opc)
-{
-	u64 Rs = cpu.r[(opc>>3)&15];
-	cpu.cpsr.b.T = Rs&1;
-	cpu.r[15] = Rs&~(cpu.cpsr.b.T?1:3);
+	cpu.r[15] &= ~1;
 	cpu.flushp();
 }
 
-void thumb_6_pcrel_ld(arm& cpu, u32 opc)
+void thumb6_ldrpc(arm& cpu, u32 opc)
 {
-	cpu.icycles += 1;
-	u32 offset = (opc & 0xff)<<2;
-	cpu.r[(opc>>8)&7] = cpu.read((cpu.r[15]&~2) + offset, 32, ARM_CYCLE::N);
+	cpu.r[(opc>>8)&7] = cpu.read((cpu.r[15]&~3) + ((opc&0xff)<<2), 32, ARM_CYCLE::N);
 }
 
-void thumb_7_ldst_reg(arm& cpu, u32 opc)
+void thumb7_str(arm& cpu, u32 opc)
 {
-	u32& Rd = cpu.r[opc&7];
-	u32 addr = cpu.r[(opc>>3)&7] + cpu.r[(opc>>6)&7];
-	switch( (opc>>10)&3 )
-	{
-	case 0:	cpu.write(addr, Rd, 32, ARM_CYCLE::N); break;
-	case 1:	cpu.write(addr, Rd, 8, ARM_CYCLE::N); break;
-	case 2: Rd = cpu.read(addr, 32, ARM_CYCLE::N); cpu.icycles+=1; break;
-	case 3: Rd = cpu.read(addr, 8, ARM_CYCLE::N); cpu.icycles+=1; break;
-	}
+	const u32 Rb = cpu.r[(opc>>3)&7];
+	const u32 Ro = cpu.r[(opc>>6)&7];
+	const u32 ea = (Rb + Ro)&~3;
+	cpu.write(ea, cpu.r[opc&7], 32, ARM_CYCLE::N);
 }
 
-void thumb_8_ldst_se(arm& cpu, u32 opc)
+void thumb7_strb(arm& cpu, u32 opc)
 {
-	u32& Rd = cpu.r[opc&7];
-	u32 addr = cpu.r[(opc>>3)&7] + cpu.r[(opc>>6)&7];
-	switch( (opc>>10)&3 )
-	{
-	case 0:	cpu.write(addr, Rd, 16, ARM_CYCLE::N); break;
-	case 1: Rd = (s32)(s8)cpu.read(addr, 8, ARM_CYCLE::N); cpu.icycles+=1; break;
-	case 2: Rd = cpu.read(addr, 16, ARM_CYCLE::N); cpu.icycles+=1; break;
-	case 3: Rd = (s32)(s16)cpu.read(addr, 16, ARM_CYCLE::N); cpu.icycles+=1; break;
-	}
+	const u32 Rb = cpu.r[(opc>>3)&7];
+	const u32 Ro = cpu.r[(opc>>6)&7];
+	const u32 ea = (Rb + Ro);
+	cpu.write(ea, cpu.r[opc&7]&0xff, 8, ARM_CYCLE::N);
 }
 
-void thumb_9_ldst_word_imm(arm& cpu, u32 opc)
+void thumb7_ldr(arm& cpu, u32 opc)
 {
-	u32& Rd = cpu.r[opc&7];
-	u32 base = cpu.r[(opc>>3)&7];
-	u32 offset = (opc>>6)&0x1f;
+	const u32 Rb = cpu.r[(opc>>3)&7];
+	const u32 Ro = cpu.r[(opc>>6)&7];
+	const u32 ea = (Rb + Ro);
+	cpu.r[opc&7] = std::rotr(cpu.read(ea&~3, 32, ARM_CYCLE::N), (ea&3)*8);
+}
+
+void thumb7_ldrb(arm& cpu, u32 opc)
+{
+	const u32 Rb = cpu.r[(opc>>3)&7];
+	const u32 Ro = cpu.r[(opc>>6)&7];
+	const u32 ea = (Rb + Ro);
+	cpu.r[opc&7] = cpu.read(ea, 8, ARM_CYCLE::N);
+}
+
+void thumb8_strh(arm& cpu, u32 opc)
+{
+	const u32 Rb = cpu.r[(opc>>3)&7];
+	const u32 Ro = cpu.r[(opc>>6)&7];
+	const u32 ea = (Rb + Ro)&~1;
+	cpu.write(ea, cpu.r[opc&7]&0xffff, 16, ARM_CYCLE::N);
+}
+
+void thumb8_ldsb(arm& cpu, u32 opc)
+{
+	const u32 Rb = cpu.r[(opc>>3)&7];
+	const u32 Ro = cpu.r[(opc>>6)&7];
+	const u32 ea = (Rb + Ro);
+	cpu.r[opc&7] = (s8)cpu.read(ea, 8, ARM_CYCLE::N);
+}
+
+void thumb8_ldrh(arm& cpu, u32 opc)
+{
+	const u32 Rb = cpu.r[(opc>>3)&7];
+	const u32 Ro = cpu.r[(opc>>6)&7];
+	const u32 ea = (Rb + Ro);
+	cpu.r[opc&7] = cpu.read(ea&~1, 16, ARM_CYCLE::N);
+}
+
+void thumb8_ldsh(arm& cpu, u32 opc)
+{
+	const u32 Rb = cpu.r[(opc>>3)&7];
+	const u32 Ro = cpu.r[(opc>>6)&7];
+	const u32 ea = (Rb + Ro);
+	cpu.r[opc&7] = (s16)cpu.read(ea&~1, 16, ARM_CYCLE::N);
+}
+
+void thumb9_str(arm& cpu, u32 opc)
+{
+	const u32 nn = ((opc>>6)&0x1f)<<2;
+	const u32 ea = cpu.r[(opc>>3)&7] + nn;
+	cpu.write(ea&~3, cpu.r[opc&7], 32, ARM_CYCLE::N);
+}
+
+void thumb9_ldr(arm& cpu, u32 opc)
+{
+	const u32 nn = ((opc>>6)&0x1f)<<2;
+	const u32 ea = cpu.r[(opc>>3)&7] + nn;
+	cpu.r[opc&7] = std::rotr(cpu.read(ea&~3, 32, ARM_CYCLE::N), (ea&3)*8);	
+}
+
+void thumb9_strb(arm& cpu, u32 opc)
+{
+	const u32 nn = ((opc>>6)&0x1f);
+	const u32 ea = cpu.r[(opc>>3)&7] + nn;
+	cpu.write(ea, cpu.r[opc&7]&0xff, 8, ARM_CYCLE::N);
+}
+
+void thumb9_ldrb(arm& cpu, u32 opc)
+{
+	const u32 nn = ((opc>>6)&0x1f);
+	const u32 ea = cpu.r[(opc>>3)&7] + nn;
+	cpu.r[opc&7] = cpu.read(ea, 8, ARM_CYCLE::N);
+}
+
+void thumb10_ldrh(arm& cpu, u32 opc)
+{
+	const u32 nn = ((opc>>6)&0x1f)<<1;
+	const u32 ea = cpu.r[(opc>>3)&7] + nn;
+	cpu.r[opc&7] = cpu.read(ea&~1, 16, ARM_CYCLE::N);
+}
+
+void thumb10_strh(arm& cpu, u32 opc)
+{
+	const u32 nn = ((opc>>6)&0x1f)<<1;
+	const u32 ea = cpu.r[(opc>>3)&7] + nn;
+	cpu.write(ea&~1, cpu.r[opc&7]&0xffff, 16, ARM_CYCLE::N);
+}
+
+void thumb11_ldr(arm& cpu, u32 opc)
+{
+	const u32 ea = cpu.r[13] + ((opc&0xff)<<2);
+	cpu.r[opc&7] = std::rotr(cpu.read(ea&~3, 32, ARM_CYCLE::N), (ea&3)*8);
+}
+
+void thumb11_str(arm& cpu, u32 opc)
+{
+	const u32 ea = cpu.r[13] + ((opc&0xff)<<2);
+	cpu.write(ea&~3, cpu.r[opc&7], 32, ARM_CYCLE::N);
+}
+
+void thumb12_addsppc(arm& cpu, u32 opc)
+{
+	u32& d = cpu.r[(opc>>8)&7];
 	if( opc & BIT(11) )
 	{
-		Rd = cpu.read(base + (offset<<2), 32, ARM_CYCLE::N); cpu.icycles += 1;
+		d = cpu.r[13] + ((opc&0xff)<<2);
 	} else {
-		cpu.write(base + (offset<<2), Rd, 32, ARM_CYCLE::N);
+		d = (cpu.r[15]&~3) + ((opc&0xff)<<2);
 	}
 }
 
-void thumb_9_ldst_byte_imm(arm& cpu, u32 opc)
+void thumb13_addspnn(arm& cpu, u32 opc)
 {
-	u32& Rd = cpu.r[opc&7];
-	u32 base = cpu.r[(opc>>3)&7];
-	u32 offset = (opc>>6)&0x1f;
-	if( opc & BIT(11) )
-	{
-		Rd = cpu.read(base + offset, 8, ARM_CYCLE::N); cpu.icycles += 1;
-	} else {
-		cpu.write(base + offset, Rd, 8, ARM_CYCLE::N);
-	}
-}
-
-void thumb_10_ldst_half(arm& cpu, u32 opc)
-{
-	u32& Rd = cpu.r[opc&7];
-	u32 base = cpu.r[(opc>>3)&7];
-	u32 offset = ((opc>>6)&0x1f)<<1;
-	if( opc & BIT(11) )
-	{
-		Rd = cpu.read(base + offset, 16, ARM_CYCLE::N); cpu.icycles += 1;
-	} else {
-		cpu.write(base + offset, Rd, 16, ARM_CYCLE::N);
-	}
-}
-
-void thumb_11_sprel_ldst(arm& cpu, u32 opc)
-{
-	u32& Rd = cpu.r[(opc>>8)&7];
-	u32 offset = (opc&0xff)<<2;
-	if( opc & BIT(11) )
-	{
-		Rd = cpu.read(cpu.r[13] + offset, 32, ARM_CYCLE::N); cpu.icycles += 1;
-	} else {
-		cpu.write(cpu.r[13] + offset, Rd, 32, ARM_CYCLE::N);
-	}
-}
-
-void thumb_12_ldaddr(arm& cpu, u32 opc)
-{
-	u32 offset = (opc&0xff)<<2;
-	u32& Rd = cpu.r[(opc>>8)&7];
-	if( opc & BIT(11) )
-	{
-		Rd = cpu.r[13] + offset;
-	} else {
-		Rd = (cpu.r[15]&~2) + offset;
-	}
-}
-
-void thumb_13_addsp(arm& cpu, u32 opc)
-{
-	u32 offset = (opc&0x7f)<<2;
 	if( opc & BIT(7) )
 	{
-		cpu.r[13] = cpu.r[13] - offset;
+		cpu.r[13] -= (opc&0x7f)<<2;
 	} else {
-		cpu.r[13] = cpu.r[13] + offset;
+		cpu.r[13] += (opc&0x7f)<<2;
 	}
 }
 
-void thumb_14_pushpop(arm& cpu, u32 opc)
+void thumb14_pop(arm& cpu, u32 opc)
 {
-	ARM_CYCLE ct = ARM_CYCLE::N;
-	u32 SP = cpu.r[13];
-	if( opc & BIT(11) )
-	{  // pop
-		for(u32 i = 0; i < 8; ++i)
-		{
-			if( opc & BIT(i) )
-			{
-				cpu.r[i] = cpu.read(SP&~3, 32, ct);
-				ct = ARM_CYCLE::S;
-				SP += 4;
-			}
-		}
-		if( opc & BIT(8) )
-		{
-			cpu.r[15] = cpu.read(SP&~3, 32, ct) & ~1;
-			cpu.flushp();
-			SP += 4;
-		}
-	} else { // push
-		if( opc & BIT(8) )
-		{
-			SP -= 4;
-			cpu.write(SP&~3, cpu.r[14], 32, ct);
-			ct = ARM_CYCLE::S;
-		}
-		for(u32 i = 0; i < 8; ++i)
-		{
-			if( opc & BIT(7-i) )
-			{
-				SP -= 4;
-				cpu.write(SP&~3, cpu.r[7-i], 32, ct);
-			}		
-		}
-	}
-	cpu.r[13] = SP;
-}
-
-void thumb_15_multi_ldst(arm& cpu, u32 opc)
-{
-	ARM_CYCLE ct = ARM_CYCLE::N;
-	if( opc & BIT(11) )
-	{ // load
-		cpu.icycles += 1;
-		u32 base = cpu.r[(opc>>8)&7];
-		cpu.r[(opc>>8)&7] += 4*std::popcount(opc&0xff);
-		for(u32 i = 0; i < 8; ++i)
-		{
-			if( opc & BIT(i) )
-			{
-				cpu.r[i] = cpu.read(base, 32, ct);
-				printf("ldmia: r%i = $%X\n", i, cpu.r[i]);
-				base += 4;
-				ct = ARM_CYCLE::S;
-			}
-		}
-	} else {
-		u32& Rb = cpu.r[(opc>>8)&7];
-		for(u32 i = 0; i < 8; ++i)
-		{
-			if( opc & BIT(i) )
-			{
-				cpu.write(Rb, cpu.r[i], 32, ct);
-				Rb += 4;
-				ct = ARM_CYCLE::S;
-			}
-		}
-	}
-}
-
-void thumb_16_cond_branch(arm& cpu, u32 opc)
-{
-	if( cpu.isCond((opc>>8)&0xf) )
+	ARM_CYCLE type = ARM_CYCLE::N;
+	for(u32 i = 0; i < 8; ++i)
 	{
-		s32 offset = s8(opc&0xff);
-		offset <<= 1;
-		cpu.r[15] += offset;
+		if( opc & BIT(7-i) )
+		{
+			cpu.r[7-i] = cpu.read(cpu.r[13], 32, type);
+			cpu.r[13] += 4;
+			type = ARM_CYCLE::S;
+		}
+	}
+	if( opc & BIT(8) )
+	{
+		cpu.r[15] = cpu.read(cpu.r[13], 32, type);
+		cpu.r[13] += 4;
 		cpu.flushp();
 	}
 }
 
-void thumb_17_swi(arm& cpu, u32)
+void thumb14_push(arm& cpu, u32 opc)
 {
-	printf("Thumb swi\n");
-	exit(1);
+	ARM_CYCLE type = ARM_CYCLE::N;
+	if( opc & BIT(8) )
+	{
+		cpu.r[13] -= 4;
+		cpu.write(cpu.r[13], cpu.r[14], 32, type);
+		type = ARM_CYCLE::S;
+	}
+	for(u32 i = 0; i < 8; ++i)
+	{
+		if( opc & BIT(7-i) )
+		{
+			cpu.r[13] -= 4;
+			cpu.write(cpu.r[13], cpu.r[7-i], 32, type);
+			type = ARM_CYCLE::S;
+		}
+	}
 }
 
-void thumb_18_uncond_branch(arm& cpu, u32 opc)
+void thumb15_ldmia(arm& cpu, u32 opc)
 {
-	s16 offset = opc<<5;
+	u32 RB = (opc>>8)&7;
+	u32 base = cpu.r[(opc>>8)&7];
+	if( !(opc&0xff) )
+	{
+		cpu.r[15] = cpu.read(base&~3, 32, ARM_CYCLE::N);
+		cpu.flushp();
+		cpu.r[RB] += 0x40; //??
+		return;
+	}
+	ARM_CYCLE type = ARM_CYCLE::N;
+	for(u32 i = 0; i < 8; ++i)
+	{
+		if( opc & BIT(i) )
+		{
+			cpu.r[i] = cpu.read(base&~3, 32, type);
+			type = ARM_CYCLE::S;
+			base += 4;
+		}
+	}
+	if( opc & BIT(RB) ) return;
+	cpu.r[RB] = base;
+}
+
+void thumb15_stmia(arm& cpu, u32 opc)
+{
+	int RB = (opc>>8)&7;
+	u32 base = cpu.r[(opc>>8)&7];
+	u32 start = base;
+	if( !(opc&0xff) )
+	{
+		cpu.write(base&~3, cpu.r[15], 32, ARM_CYCLE::N);
+		cpu.r[RB] += 0x40; //??
+		return;
+	}
+	ARM_CYCLE type = ARM_CYCLE::N;
+	for(u32 i = 0; i < 8; ++i)
+	{
+		if( opc & BIT(i) )
+		{
+			cpu.write(base&~3, cpu.r[i], 32, type);
+			type = ARM_CYCLE::S;
+			base += 4;
+		}
+	}
+	if( (opc & BIT(RB)) && std::countr_zero(opc) == RB ) 
+	{
+		cpu.r[RB] = start;
+	} else {
+		cpu.r[RB] = base;
+	}
+}
+
+void thumb16_bcc(arm& cpu, u32 opc)
+{
+	if( cpu.isCond((opc>>8)&15) )
+	{
+		cpu.r[15] += s8(opc)<<1;
+		cpu.flushp();
+	}
+}
+
+void thumb17_swi(arm& cpu, u32)
+{
+	cpu.r14_svc = cpu.r[15]+2;
+	cpu.spsr_svc = cpu.cpsr.v;
+	cpu.switch_to_mode(ARM_MODE_SUPER);
+	cpu.cpsr.b.M = ARM_MODE_SUPER;
+	cpu.cpsr.b.I = 1;
+	cpu.cpsr.b.T = 0;
+	cpu.r[15] = 8;
+	cpu.flushp();
+}
+
+void thumb18_b(arm& cpu, u32 opc)
+{
+	s16 offset = (opc<<5);
 	offset >>= 4;
 	cpu.r[15] += offset;
 	cpu.flushp();
 }
 
-void thumb_19_long_branch(arm& cpu, u32 opc)
+void thumb19_bl(arm& cpu, u32 opc)
 {
 	if( opc & BIT(11) )
 	{
-		u32 temp = cpu.r[15] - 2;
+		u32 temp = (cpu.r[15]-2)|1;
 		cpu.r[15] = cpu.r[14] + ((opc&0x7ff)<<1);
-		printf("thumb long br to $%X\n", cpu.r[15]);
-		if( cpu.r[15] < 0x0800'0000 ) exit(1);
+		//std::println("thumb bl to ${:X}", cpu.r[15]);
+		cpu.r[15] |= 1;
+		cpu.r[14] = temp;
 		cpu.flushp();
-		cpu.r[14] = temp|1;
 	} else {
-		u32 offs = (opc&0x7ff)<<12;
-		if( offs & 0x400000 ) { offs |= 0xFF800000; }
-		cpu.r[14] = cpu.r[15] + offs;
+		cpu.r[14] = cpu.r[15] + ((opc&0x7ff)<<12) + ((opc&0x400)?0xff800000u:0);
 	}
 }
 
 arm7_instr arm7tdmi::decode_thumb(u16 opc)
 {
-	u32 top = (opc>>13);
-	if( top == 0 )
+	switch( opc>>13 )
 	{
-		switch( ((opc>>11)&3) )
+	case 0:
+		switch( opc>>11 )
 		{
-		case 0: return thumb_1_lsl;
-		case 1: return thumb_1_lsr;
-		case 2: return thumb_1_asr;
-		default: return (opc&BIT(9)) ? thumb_2_sub : thumb_2_add;
+		case 0: return thumb1_lsl;
+		case 1: return thumb1_lsr;
+		case 2: return thumb1_asr;
+		default: break;
 		}
-	}
-	
-	if( top == 1 )
-	{
-		switch( ((opc>>11)&3) )
+		return thumb2_addsub;
+	case 1:
+		switch( (opc>>11)&3 )
 		{
-		case 0: return thumb_3_mov;
-		case 1: return thumb_3_cmp;
-		case 2: return thumb_3_add;
-		default: return thumb_3_sub;
-		}		
-	}
-
-
-	switch( opc >> 12 )
-	{
-	case 4: 
-		if( opc&BIT(11) ) return thumb_6_pcrel_ld;
-		if( opc&BIT(10) ) 
+		case 0: return thumb3_mov;
+		case 1: return thumb3_cmp;
+		case 2: return thumb3_add;
+		default: break;
+		}	
+		return thumb3_sub;
+	case 2:
+		if( ((opc>>10)&7) == 0 )
+		{
+			switch((opc>>6)&15)
+			{
+			case 0: return thumb4_and;
+			case 1: return thumb4_eor;
+			case 2: return thumb4_lsl;
+			case 3: return thumb4_lsr;
+			case 4: return thumb4_asr;
+			case 5: return thumb4_adc;
+			case 6: return thumb4_sbc;
+			case 7: return thumb4_ror;
+			case 8: return thumb4_tst;
+			case 9: return thumb4_neg;
+			case 0xA: return thumb4_cmp;
+			case 0xB: return thumb4_cmn;
+			case 0xC: return thumb4_orr;
+			case 0xD: return thumb4_mul;
+			case 0xE: return thumb4_bic;
+			default: break;
+			}
+			return thumb4_mvn;
+		}
+		if( ((opc>>10)&7) == 1 )
 		{
 			switch( (opc>>8)&3 )
 			{
-			case 0: return thumb_5_hireg_add;
-			case 1: return thumb_5_hireg_cmp;
-			case 2: return thumb_5_hireg_mov;
-			default: return thumb_5_hireg_bx;
-			}		
+			case 0: return thumb5_add;
+			case 1: return thumb5_cmp;
+			case 2: return thumb5_mov;
+			default: break;
+			}
+			return thumb5_bx;	
 		}
-		switch( (opc>>6) & 15 )
+		if( opc & BIT(11) ) return thumb6_ldrpc;
+		if( opc & BIT(9) )
 		{
-		case 0: return thumb_4_and;
-		case 1: return thumb_4_eor;
-		case 2: return thumb_4_lsl;
-		case 3: return thumb_4_lsr;
-		case 4: return thumb_4_asr;
-		case 5: return thumb_4_adc;
-		case 6: return thumb_4_sbc;
-		case 7: return thumb_4_ror;
-		case 8: return thumb_4_tst;
-		case 9: return thumb_4_neg;
-		case 10:return thumb_4_cmp;
-		case 11:return thumb_4_cmn;
-		case 12:return thumb_4_orr;
-		case 13:return thumb_4_mul;
-		case 14:return thumb_4_bic;		
-		default: return thumb_4_mvn;
-		}		
-	case 5: return (opc&BIT(9)) ? thumb_8_ldst_se  : thumb_7_ldst_reg;
-	case 6: return thumb_9_ldst_word_imm;
-	case 7: return thumb_9_ldst_byte_imm;
-	case 8: return thumb_10_ldst_half;
-	case 9: return thumb_11_sprel_ldst;
-	case 10: return thumb_12_ldaddr;
-	case 11: return ( opc & BIT(10)  ) ? thumb_14_pushpop : thumb_13_addsp;
-	case 12: return thumb_15_multi_ldst;
-	case 13: return ( ((opc>>8)&15) == 15 ) ? thumb_17_swi : thumb_16_cond_branch;
-	case 14: return thumb_18_uncond_branch;
-	case 15: return thumb_19_long_branch;
+			switch( (opc>>10) & 3 )
+			{
+			case 0: return thumb8_strh;
+			case 1: return thumb8_ldsb;
+			case 2: return thumb8_ldrh;
+			default: break;
+			}
+			return thumb8_ldsh;
+		}
+		switch( (opc>>10)&3 )
+		{
+		case 0: return thumb7_str;
+		case 1: return thumb7_strb;
+		case 2: return thumb7_ldr;		
+		default: break;
+		}
+		return thumb7_ldrb;
+	case 3:
+		switch( (opc>>11) & 3 )
+		{
+		case 0: return thumb9_str;
+		case 1: return thumb9_ldr;
+		case 2: return thumb9_strb;
+		default: break;
+		}
+		return thumb9_ldrb;
+	case 4:
+		if( opc & BIT(12) )
+		{
+			return (opc&BIT(11)) ? thumb11_ldr : thumb11_str;
+		}
+		return (opc&BIT(11)) ? thumb10_ldrh : thumb10_strh;		
+	case 5:
+		if( !(opc&BIT(12)) ) return thumb12_addsppc;
+		if( !((opc>>8)&15) ) return thumb13_addspnn;
+		if( opc & BIT(11) ) return thumb14_pop;
+		return thumb14_push;
+	case 6: 
+		if( opc & BIT(12) ) 
+		{
+			if( ((opc>>8)&15) == 15 ) return thumb17_swi;
+			return thumb16_bcc;
+		}
+		return (opc&BIT(11)) ? thumb15_ldmia : thumb15_stmia;
+	case 7:
+		if( opc&BIT(12) ) return thumb19_bl;
+		return thumb18_b;
+	default: break;
 	}
+	std::println("thumb_decode error");
+	exit(1);
 	return nullptr;
 }
 
-u64 arm7tdmi::step()
+void arm7tdmi::flushp() 
 {
-	icycles = 0;
-	
-	exec = decode;
-	decode = fetch;
-	r[15] += cpsr.b.T ? 2 : 4;
-	
-	//todo: check for IRQs here	
-	arm7_instr instr = nullptr;
 	if( cpsr.b.T )
 	{
-		printf("$%X: thumb opc = $%04X, r5 = $%X\n", r[15]-4, exec, r[5]);
-		if( r[15]-4 < 0x0800'0000u ) exit(1);
-		instr = decode_thumb(exec);
-		if( ! instr )
-		{
-			printf("ARM7:$%X: thumb unimpl. opc = $%04X\n", r[15]-4, exec);
-			exit(1);		
-		}
-		instr(*this, exec);
+		r[15] &= ~1;
+		decode = read(r[15], 16, ARM_CYCLE::N);
+		r[15] += 2;
+		fetch = read(r[15], 16, ARM_CYCLE::S);	
 	} else {
-		printf("arm7:$%X: about to decode $%X\n", r[15]-8, exec);
-		instr = decode_arm(exec);
-		if( ! instr )
-		{
-			printf("ARM7:$%X: arm unimpl. opc = $%08X\n", r[15]-8, exec);
-			exit(1);		
-		}
-		if( isCond(exec>>28) ) instr(*this, exec);
+		r[15] &= ~3;
+		decode = read(r[15], 32, ARM_CYCLE::N);
+		r[15] += 4;
+		fetch = read(r[15], 32, ARM_CYCLE::S);
 	}
-	
-	fetch = read(r[15]&~(cpsr.b.T?1:3), cpsr.b.T?16:32, next_cycle_type);
-		
-	return icycles;
 }
 
-
-bool arm7tdmi::isCond(u8 cc)
+void arm7tdmi::step()
 {
-	switch( cc & 0xf )
+	execute = decode;
+	decode = fetch;
+	r[15] += (cpsr.b.T ? 2 : 4);
+	fetch = read(r[15]&(cpsr.b.T?~1:~3), (cpsr.b.T ? 16 : 32), ARM_CYCLE::S);
+	u32 opc = execute;
+	
+	std::println("${:X}: op ${:X}", (r[15]&(cpsr.b.T?~1:~3)) - (cpsr.b.T?4:8), opc);
+
+	if( cpsr.b.T )
 	{
-	case 0x0: return cpsr.b.Z;
-	case 0x1: return !cpsr.b.Z;
-	case 0x2: return cpsr.b.C;
-	case 0x3: return !cpsr.b.C;
-	case 0x4: return cpsr.b.N;
-	case 0x5: return !cpsr.b.N;
-	case 0x6: return cpsr.b.V;
-	case 0x7: return !cpsr.b.V;
-	case 0x8: return cpsr.b.C && !cpsr.b.Z;
-	case 0x9: return cpsr.b.Z || !cpsr.b.C;
-	case 0xA: return cpsr.b.N == cpsr.b.V;
-	case 0xB: return cpsr.b.N != cpsr.b.V;
-	case 0xC: return !cpsr.b.Z && (cpsr.b.V == cpsr.b.N);
-	case 0xD: return cpsr.b.Z || (cpsr.b.V != cpsr.b.N);	
-	case 0xE: return true;
-	case 0xF: printf("Unimpl isCond case $%X\n", cc); dump_regs(); exit(1);
+		decode_thumb(opc)(*this, opc);
+	} else {
+		if( isCond(opc>>28) ) 
+		{
+ 			decode_arm(((opc>>16)&0xff0) | ((opc>>4)&15))(*this, opc);
+		}
 	}
-	printf("arm7::isCond, shouldn't get here\n");
-	exit(1);
-	return true;
+	stamp+=1;	
 }
 
 void arm7tdmi::reset()
 {
-	r[15] = 0x0800'0000u;
-	cpsr.v = 0x80|ARM_MODE_SUPER;
-	r[13] = 0x03007F00;
-	r13_svc = 0x03007FE0; 
-	r13_irq =  0x03007FA0;
-	spsr_svc = 0x9f;
+	r[15] = 0x08000000u;
+	cpsr.b.T = 0;
+	flushp();
+}
+
+bool arm7tdmi::isCond(u8 cc)
+{
+	switch(cc)
+	{
+	case 0: return cpsr.b.Z==1;
+	case 1: return cpsr.b.Z==0;
+	case 2: return cpsr.b.C==1;
+	case 3: return cpsr.b.C==0;
+	case 4: return cpsr.b.N==1;
+	case 5: return cpsr.b.N==0;
+	case 6: return cpsr.b.V==1;
+	case 7: return cpsr.b.V==0;
+	case 8: return cpsr.b.C==1 && cpsr.b.Z==0;
+	case 9: return cpsr.b.C==0 || cpsr.b.Z==1;
+	case 10: return cpsr.b.N==cpsr.b.V;
+	case 11: return cpsr.b.N!=cpsr.b.V;
+	case 12: return cpsr.b.Z==0 && cpsr.b.N==cpsr.b.V;
+	case 13: return cpsr.b.Z==1 || cpsr.b.N!=cpsr.b.V; 
+	case 14: return true;
+	default: break;
+	}
+	return false; 
+}
+
+void arm7tdmi::switch_to_mode(u32 mode) 
+{
+	mode &= 0x1f;
+	mode |= 0x10; // ?? check
+	switch( cpsr.b.M )
+	{
+	case ARM_MODE_IRQ:
+		std::swap(r[14], r14_irq);
+		std::swap(r[13], r13_irq);
+		break;
+	case ARM_MODE_ABORT:
+		std::swap(r[14], r14_abt);
+		std::swap(r[13], r13_abt);
+		break;
+	case ARM_MODE_SUPER:
+		std::swap(r[14], r14_svc);
+		std::swap(r[13], r13_svc);
+		break;
+	case ARM_MODE_UNDEF:
+		std::swap(r[14], r14_und);
+		std::swap(r[13], r13_und);
+		break;
+	case ARM_MODE_FIQ:
+		for(u32 i = 8; i < 15; ++i) std::swap(fiq[i], r[i]);
+		break;
+	default: break;
+	}
 	
-	decode = read(r[15], 32, ARM_CYCLE::S);
-	fetch = read(r[15]+4, 32, ARM_CYCLE::S);
-	r[15] += 4;
+	switch( mode )
+	{
+	case ARM_MODE_IRQ:
+		std::swap(r[14], r14_irq);
+		std::swap(r[13], r13_irq);
+		break;
+	case ARM_MODE_ABORT:
+		std::swap(r[14], r14_abt);
+		std::swap(r[13], r13_abt);
+		break;
+	case ARM_MODE_SUPER:
+		std::swap(r[14], r14_svc);
+		std::swap(r[13], r13_svc);
+		break;
+	case ARM_MODE_UNDEF:
+		std::swap(r[14], r14_und);
+		std::swap(r[13], r13_und);
+		break;
+	case ARM_MODE_FIQ:
+		for(u32 i = 8; i < 15; ++i) std::swap(fiq[i], r[i]);
+		break;
+	default: break;
+	}
+	
+	cpsr.b.M = mode;
 }
 
-void arm7tdmi::flushp()
-{
-	decode = read(r[15], (cpsr.b.T ? 16 : 32), ARM_CYCLE::N);
-	r[15] += (cpsr.b.T ? 2 : 4);
-}
+void arm7tdmi::swi() { }
 
-void arm::switch_to_mode(u32)
-{
-}
 
-void arm::swi()
-{
-}
+
+
+
+
+
+
+
+
+
+
+
 
