@@ -206,6 +206,7 @@ void arm7_msr_imm(arm& cpu, u32 opc)
 
 u32 dataproc_op2(arm& cpu, u32 opc)
 {
+	cpu.RbyR = 0;
 	if( opc & BIT(25) )
 	{
 		u32 rot = ((opc>>8)&15)<<1;
@@ -222,6 +223,8 @@ u32 dataproc_op2(arm& cpu, u32 opc)
 	const bool imm = !(opc&BIT(4));
 	const u32 Rs = ( !imm ? ((opc>>8)&15):((opc>>7)&0x1f));
 	const u32 type = ((opc>>5)&3);
+	
+	cpu.RbyR = ((!imm && ((opc>>16)&15)==15) ? 4 : 0);
 
 	u32 val = cpu.r[Rm] + ((Rm==15 && !imm) ? 4 : 0);
 	if( !imm && !(cpu.r[Rs]&0xff) ) return val; // reg shifts by zero just return val
@@ -382,9 +385,11 @@ void arm7_rsb(arm& cpu, u32 opc)
 
 void arm7_add(arm& cpu, u32 opc)
 {
+	cpu.RbyR = 0;
 	u32 op2 = dataproc_op2(cpu, opc);
 	const u32 Rd = (opc>>12)&15;
-	u32 op1 = cpu.r[(opc>>16)&15];
+	u32 op1 = (cpu.r[(opc>>16)&15]+cpu.RbyR);
+	if( cpu.RbyR ) std::println("${:X} RbyR = {:X}", op1, cpu.RbyR);
 	u64 res = op1;
 	res += op2;
 	if( SBIT )
@@ -668,6 +673,7 @@ u32 arm7_ldst_shift(arm& cpu, u32 opc)
 	{ // rrx#1
 		u32 C = cpu.cpsr.b.C;
 		//ldr/str barrel shifter doesn't update C
+		//std::println("rrx = ${:X}", (C<<31)|(val>>1));
 		return (C<<31)|(val>>1);
 	}
 	return std::rotr(val, sh);
@@ -685,7 +691,7 @@ void arm7_ldst_reg(arm& cpu, u32 opc)
 	const u32 Rn = (opc>>16)&15;
 	u32 base = cpu.r[Rn];
 	const u32 Rd = (opc>>12)&15;
-	
+
 	if( pre )
 	{
 		base += up ? offs : -offs;
@@ -702,7 +708,7 @@ void arm7_ldst_reg(arm& cpu, u32 opc)
 		}
 		if( Rd == 15 ) cpu.flushp();
 	} else {
-		cpu.write(base&(byte?~0:~3), ((Rd==15)?4:0) + (user?cpu.getUserReg(Rd):cpu.r[Rd]), byte?8:32, ARM_CYCLE::N);
+		cpu.write(base&(byte?~0:~3), (user?cpu.getUserReg(Rd):cpu.r[Rd]) + ((Rd==15)?4:0), byte?8:32, ARM_CYCLE::N);
 	}
 	
 	if( !pre )
@@ -780,9 +786,9 @@ void arm7_ldst_m(arm& cpu, u32 opc)
 			cpu.r[15] = cpu.read(base&~3, 32, ARM_CYCLE::N);
 			cpu.flushp();
 		} else {
-			cpu.write(base&~3, cpu.r[15], 32, ARM_CYCLE::N);
+			cpu.write(base&~3, cpu.r[15]+4, 32, ARM_CYCLE::N);
 		}
-		cpu.r[Rn] += (U ? 0x40 : -0x40);
+		cpu.r[Rn] += 0x40;//(U ? 0x40 : -0x40);
 		return;
 	}
 	
@@ -807,7 +813,7 @@ void arm7_ldst_m(arm& cpu, u32 opc)
 				}
 			}
 		} else {
-			cpu.write(base&~3, (S ? cpu.getUserReg(i) : cpu.r[i]), 32, ctype);
+			cpu.write(base&~3, (S ? cpu.getUserReg(i) : cpu.r[i]) + (i==15 ? 4:0), 32, ctype);
 		}
 		ctype = ARM_CYCLE::S;
 		if( !Pre ) base += 4;	
@@ -880,10 +886,11 @@ arm7_instr arm7tdmi::decode_arm(u32 cc)
 	if( (cc&0xf00) == 0xf00 )
 	{   // SWI
 		return [](arm& cpu, u32) {
-			cpu.r14_svc = cpu.r[15];
 			cpu.spsr_svc = cpu.cpsr.v;
 			cpu.switch_to_mode(ARM_MODE_SUPER);
+			cpu.cpsr.b.M = ARM_MODE_SUPER;
 			cpu.cpsr.b.I = 1;
+			cpu.r[14] = cpu.r[15]-4;
 			cpu.r[15] = 8;
 			cpu.flushp();
 		};

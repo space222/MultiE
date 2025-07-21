@@ -147,7 +147,7 @@ void thumb4_lsl(arm& cpu, u32 opc)
 	if( sh == 0 ) { setNZ(d); return; }
 	if( sh >= 32 )
 	{
-		cpu.cpsr.b.C = d&1; //todo: ??
+		cpu.cpsr.b.C = ((sh==32) ? (d&1) : 0); //todo: ??
 		d = 0;
 		setNZ(d);
 		return;
@@ -165,7 +165,7 @@ void thumb4_lsr(arm& cpu, u32 opc)
 	if( sh == 0 ) { setNZ(d); return; }
 	if( sh >= 32 )
 	{
-		cpu.cpsr.b.C = d>>31; //todo: ??
+		cpu.cpsr.b.C = ((sh == 32) ? (d>>31) : 0);
 		d = 0;
 		setNZ(d);
 		return;
@@ -412,7 +412,12 @@ void thumb8_ldsh(arm& cpu, u32 opc)
 	const u32 Rb = cpu.r[(opc>>3)&7];
 	const u32 Ro = cpu.r[(opc>>6)&7];
 	const u32 ea = (Rb + Ro);
-	cpu.r[opc&7] = (s16)cpu.read(ea&~1, 16, ARM_CYCLE::N);
+	if( ea & 1 )
+	{
+		cpu.r[opc&7] = (s8)cpu.read(ea, 8, ARM_CYCLE::N);
+	} else {
+		cpu.r[opc&7] = (s16)cpu.read(ea&~1, 16, ARM_CYCLE::N);
+	}
 }
 
 void thumb9_str(arm& cpu, u32 opc)
@@ -562,7 +567,7 @@ void thumb15_stmia(arm& cpu, u32 opc)
 	u32 start = base;
 	if( !(opc&0xff) )
 	{
-		cpu.write(base&~3, cpu.r[15], 32, ARM_CYCLE::N);
+		cpu.write(base&~3, cpu.r[15]+2, 32, ARM_CYCLE::N);
 		cpu.r[RB] += 0x40; //??
 		return;
 	}
@@ -590,14 +595,15 @@ void thumb16_bcc(arm& cpu, u32 opc)
 
 void thumb17_swi(arm& cpu, u32)
 {
-	cpu.r14_svc = cpu.r[15]-2;
 	cpu.spsr_svc = cpu.cpsr.v;
 	cpu.switch_to_mode(ARM_MODE_SUPER);
 	cpu.cpsr.b.M = ARM_MODE_SUPER;
 	cpu.cpsr.b.I = 1;
 	cpu.cpsr.b.T = 0;
+	cpu.r[14] = cpu.r[15]-2;
 	cpu.r[15] = 8;
 	cpu.flushp();
+	//std::println("Thumb SWI");
 }
 
 void thumb18_b(arm& cpu, u32 opc)
@@ -761,8 +767,17 @@ void arm7tdmi::step()
 	fetch = read(r[15]&(cpsr.b.T?~1:~3), (cpsr.b.T ? 16 : 32), ARM_CYCLE::S);
 	u32 opc = execute;
 	
-	//std::println("${:X}: op ${:X}", (r[15]&(cpsr.b.T?~1:~3)) - (cpsr.b.T?4:8), opc);
-
+	if( r[15] >= 0x10000000u )
+	{
+		std::println("${:X} too big, halting", (r[15]&(cpsr.b.T?~1:~3)) - (cpsr.b.T?4:8));
+		exit(1);
+	}
+	if( 0 ) // r[15] < 0x4000 )
+	{
+		std::println("${:X}: op ${:X}", (r[15]&(cpsr.b.T?~1:~3)) - (cpsr.b.T?4:8), opc);
+		dump_regs();
+	}
+	
 	if( cpsr.b.T )
 	{
 		decode_thumb(opc)(*this, opc);
@@ -778,6 +793,7 @@ void arm7tdmi::step()
 void arm7tdmi::reset()
 {
 	//todo: copied from my old emu, need to double check
+	cpsr.b.M = ARM_MODE_USER;
 	r[13] = 0x03007F00;
 	r13_svc = 0x03007FE0; 
 	r13_irq =  0x03007FA0;
@@ -869,7 +885,15 @@ void arm7tdmi::switch_to_mode(u32 mode)
 
 void arm7tdmi::swi() { }
 
-
+void arm::dump_regs()
+{
+	for(u32 i = 0; i < 16; ++i)
+	{
+		std::print("r{}=${:X} ", i, r[i]);
+		if( i%4 == 0 && i ) std::println();
+	}
+	std::println();
+}
 
 
 

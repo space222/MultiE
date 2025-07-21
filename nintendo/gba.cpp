@@ -38,7 +38,7 @@ void gba::write(u32 addr, u32 v, int size, ARM_CYCLE ct)
 	}
 	if( addr < 0x05000000 )
 	{  // I/O writes
-		if( addr == 0x04000000 ) { DISPCNT = v; return; }
+		if( addr == 0x04000000 ) { DISPCNT = v; std::println("Mode = {:X}", DISPCNT&7); return; }
 		if( addr == 0x04000004 ) { DISPSTAT &= ~0x38; DISPSTAT |= v&0x38; return; }
 		std::println("IO Write{} ${:X} = ${:X}", size, addr, v);
 		return;
@@ -69,7 +69,7 @@ u32 gba::read(u32 addr, int size, ARM_CYCLE ct)
 		if( addr >= ROM.size() )
 		{
 			std::println("${:X}:{} Read from beyond rom at ${:X}", cpu.r[15]-4, (u32)cpu.cpsr.b.T, addr);
-			exit(1);
+			//exit(1);
 			return 0;
 		}
 		return sized_read(ROM.data(), addr, size);
@@ -93,6 +93,7 @@ u32 gba::read(u32 addr, int size, ARM_CYCLE ct)
 	if( addr < 0x05000000 )
 	{  // I/O
 		if( addr == 0x04000004 ) return (VCOUNT >= 160 && VCOUNT != 227);
+		if( addr == 0x04000006 ) return VCOUNT;
 		if( addr == 0x04000130 ) { return getKeys(); }
 		std::println("IO Read{} ${:X}", size, addr);
 		//exit(1);
@@ -119,6 +120,8 @@ void gba::reset()
 	cpu.read = [&](u32 a, int s, ARM_CYCLE c) -> u32 { return read(a,s,c); };
 	cpu.write= [&](u32 a, u32 v, int s, ARM_CYCLE c) { write(a,v,s,c); };
 	cpu.reset();
+	
+	memset(vram, 0, 96*1024);
 }
 
 void gba::run_frame()
@@ -205,7 +208,11 @@ void gba::draw_scanline()
 		}
 	}
 	
-	
+	if( mode == 5 )
+	{
+		std::println("Mode 5!");
+		exit(1);
+	}
 	
 
 }

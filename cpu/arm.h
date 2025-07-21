@@ -78,6 +78,7 @@ public:
 		return 0;
 	}
 	
+	u32 RbyR; // dataproc adds this, set by the shifter if PC gets used in r shift by r situation
 	ARM_CYCLE next_cycle_type;	
 	//bool flushed;
 	
