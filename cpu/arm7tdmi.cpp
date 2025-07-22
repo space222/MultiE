@@ -761,6 +761,17 @@ void arm7tdmi::flushp()
 
 void arm7tdmi::step()
 {
+	if( irq_line && cpsr.b.I==0 )
+	{
+		spsr_irq = cpsr.v;
+		switch_to_mode(ARM_MODE_IRQ);
+		cpsr.b.I = 1;
+		r[14] = r[15] - (cpsr.b.T?2:0);
+		cpsr.b.T = 0;
+		r[15] = 0x18;
+		flushp();
+	}
+
 	execute = decode;
 	decode = fetch;
 	r[15] += (cpsr.b.T ? 2 : 4);
@@ -787,7 +798,7 @@ void arm7tdmi::step()
  			decode_arm(((opc>>16)&0xff0) | ((opc>>4)&15))(*this, opc);
 		}
 	}
-	stamp+=1;	
+	stamp+=1;
 }
 
 void arm7tdmi::reset()
@@ -802,6 +813,7 @@ void arm7tdmi::reset()
 	r[15] = 0x08000000u;
 	cpsr.b.T = 0;
 	flushp();
+	irq_line = false;
 }
 
 bool arm7tdmi::isCond(u8 cc)

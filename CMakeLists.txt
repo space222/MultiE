@@ -26,6 +26,7 @@ cpu/VR4300.cpp nintendo/n64.cpp nintendo/n64_vi.cpp nintendo/n64_pi.cpp nintendo
 cpu/VR4300_fpu.cpp nintendo/n64_rdp.cpp nintendo/n64_dp.cpp nintendo/n64_sp.cpp cpu/n64_rsp.cpp cpu/n64_rsp_vu.cpp
 neogeo/aes.cpp other/bally_astrocade.cpp atari/Lynx.cpp other/SuperVision.cpp other/rca_studio_ii.cpp cpu/rca1802.cpp
 cpu/gekko.cpp nintendo/gc/GameCube.cpp nintendo/gc/gc_exi.cpp nintendo/gc/gc_dsp_io.cpp nintendo/gc/gc_dsp_cpu.cpp
+nintendo/gba_io.cpp nintendo/gba_lcd.cpp nintendo/gba_dma.cpp nintendo/LCDEngine.cpp
 )
 
 add_library(ym3438 SHARED sega/ym3438.cpp)

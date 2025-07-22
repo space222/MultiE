@@ -5,6 +5,8 @@
 #include <cstdlib>
 #include "gba.h"
 
+#define DISPSTAT lcd.regs[2]
+#define VCOUNT lcd.regs[3]
 const u32 cycles_per_frame = 280896;
 
 static void sized_write(u8* data, u32 addr, u32 v, int size)
@@ -38,9 +40,8 @@ void gba::write(u32 addr, u32 v, int size, ARM_CYCLE ct)
 	}
 	if( addr < 0x05000000 )
 	{  // I/O writes
-		if( addr == 0x04000000 ) { DISPCNT = v; std::println("Mode = {:X}", DISPCNT&7); return; }
-		if( addr == 0x04000004 ) { DISPSTAT &= ~0x38; DISPSTAT |= v&0x38; return; }
-		std::println("IO Write{} ${:X} = ${:X}", size, addr, v);
+		write_io(addr, v, size);
+		//std::println("IO Write{} ${:X} = ${:X}", size, addr, v);
 		return;
 	}
 	if( addr < 0x06000000 )
@@ -92,17 +93,13 @@ u32 gba::read(u32 addr, int size, ARM_CYCLE ct)
 	}
 	if( addr < 0x05000000 )
 	{  // I/O
-		if( addr == 0x04000004 ) return (VCOUNT >= 160 && VCOUNT != 227);
-		if( addr == 0x04000006 ) return VCOUNT;
 		if( addr == 0x04000130 ) { return getKeys(); }
-		std::println("IO Read{} ${:X}", size, addr);
-		//exit(1);
-		return 0;
+		return read_io(addr, size);
 	}
 	if( addr < 0x06000000 )
 	{
 		addr &= 0x3ff;
-		return 0;
+		return sized_read(palette, addr, size);
 	}
 	if( addr < 0x07000000 )
 	{ // VRAM todo
@@ -124,17 +121,42 @@ void gba::reset()
 	memset(vram, 0, 96*1024);
 }
 
+gba::gba() : lcd(vram, palette)
+{
+
+}
+
 void gba::run_frame()
 {
 	VCOUNT = 0;
 	while( VCOUNT < 228 )
 	{
+		DISPSTAT &= ~1;
+		DISPSTAT |= (VCOUNT >= 160 && VCOUNT != 228);
+		if( VCOUNT == 160 && (DISPSTAT & BIT(3)) )
+		{
+			ISTAT |= 1;
+			check_irqs();
+		}
+		if( VCOUNT == (DISPSTAT>>8) )
+		{
+			DISPSTAT |= 4;
+			if( DISPSTAT & BIT(5) )
+			{
+				ISTAT |= 2;
+				check_irqs();
+			}
+		} else {
+			DISPSTAT &= ~4;
+		}
+		
+		
 		for(u32 i = 0; i < (16000000/60/228); ++i)
 		{
 			cpu.step();
 		}
 		
-		if( VCOUNT < 160 ) draw_scanline();		
+		if( VCOUNT < 160 ) lcd.draw_scanline(VCOUNT);
 		VCOUNT += 1;
 	}
 		
@@ -186,34 +208,8 @@ u16 gba::getKeys()
 	return val;
 }
 
-void gba::draw_scanline()
+void gba::check_irqs()
 {
-	u32 mode = DISPCNT & 7;
-	
-	if( mode == 4 )
-	{
-		u32 base = (DISPCNT&BIT(4)) ? 0xA000 : 0;
-		for(u32 x = 0; x < 240; ++x)
-		{
-			fbuf[VCOUNT*240 + x] = *(u16*)&palette[vram[base + VCOUNT*240 + x]<<1];
-		}	
-		return;
-	}
-	
-	if( mode == 3 )
-	{
-		for(u32 x = 0; x < 240; ++x)
-		{
-			fbuf[VCOUNT*240 + x] = *(u16*)&vram[VCOUNT*480 + x*2];
-		}
-	}
-	
-	if( mode == 5 )
-	{
-		std::println("Mode 5!");
-		exit(1);
-	}
-	
-
+	cpu.irq_line = IME && (ISTAT & IMASK & 0x3fff);
 }
 
