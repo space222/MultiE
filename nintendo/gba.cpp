@@ -47,29 +47,44 @@ void gba::write(u32 addr, u32 v, int size, ARM_CYCLE ct)
 	if( addr < 0x06000000 )
 	{
 		addr &= 0x3ff;
-		if( size == 8 ) { size = 16; v = (v&0xff)*0x101; }
+		if( size == 8 ) { size = 16; v = (v&0xff)*0x101; addr &= ~1; }
 		sized_write(palette, addr, v, size);
 		return;
 	}
 	if( addr < 0x07000000 )
-	{ // VRAM todo
+	{ // VRAM todo mirroring
+	
+		if( size == 8 )
+		{
+			size = 16;
+			addr &= ~1;
+			v &= 0xff;
+			v |= v<<8;
+		}
+		addr &= 0x1ffff;
+		if( addr & 0x10000 ) addr &= ~0x8000;
 		sized_write(vram, addr&0x7ffff, v, size);
 		return;
 	}
 	if( addr < 0x08000000 )
-	{ // OAM todo
+	{ // OAM
+		sized_write(oam, addr&0x3ff, v, size);
 		return;
-	}	
+	}
+	std::println("${:X} = ${:X}", addr, v);
 } //end of write
 
 u32 gba::read(u32 addr, int size, ARM_CYCLE ct)
 {
 	if( addr >= 0x08000000 ) 
 	{
+		if( addr >= 0x0d000000 && addr  < 0x0e000000 ) return 1; 
+		//^stubs some kind of save hw, yoinked from older emu to get vrally3 going
+	
 		addr -= 0x08000000u;
 		if( addr >= ROM.size() )
 		{
-			std::println("${:X}:{} Read from beyond rom at ${:X}", cpu.r[15]-4, (u32)cpu.cpsr.b.T, addr);
+			//std::println("${:X}:{} Read from beyond rom at ${:X}", cpu.r[15]-4, (u32)cpu.cpsr.b.T, addr);
 			//exit(1);
 			return 0;
 		}
@@ -103,11 +118,13 @@ u32 gba::read(u32 addr, int size, ARM_CYCLE ct)
 	}
 	if( addr < 0x07000000 )
 	{ // VRAM todo
-		return 0;
+		addr &= 0x1ffff;
+		if( addr & 0x10000 ) addr &= ~0x8000;
+		return sized_read(vram, addr, size);
 	}
 	if( addr < 0x08000000 )
 	{ // OAM todo
-		return 0;
+		return sized_read(oam, addr&0x3ff, size);
 	}
 	return 0;
 }
@@ -117,13 +134,13 @@ void gba::reset()
 	cpu.read = [&](u32 a, int s, ARM_CYCLE c) -> u32 { return read(a,s,c); };
 	cpu.write= [&](u32 a, u32 v, int s, ARM_CYCLE c) { write(a,v,s,c); };
 	cpu.reset();
-	
+	target_stamp = 0;
+		
 	memset(vram, 0, 96*1024);
 }
 
 gba::gba() : lcd(vram, palette)
 {
-
 }
 
 void gba::run_frame()
@@ -150,11 +167,11 @@ void gba::run_frame()
 			DISPSTAT &= ~4;
 		}
 		
-		
-		for(u32 i = 0; i < (16000000/60/228); ++i)
+		while( cpu.stamp < target_stamp )
 		{
 			cpu.step();
 		}
+		target_stamp += 1232;
 		
 		if( VCOUNT < 160 ) lcd.draw_scanline(VCOUNT);
 		VCOUNT += 1;

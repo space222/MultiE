@@ -783,11 +783,6 @@ void arm7tdmi::step()
 		std::println("${:X} too big, halting", (r[15]&(cpsr.b.T?~1:~3)) - (cpsr.b.T?4:8));
 		exit(1);
 	}
-	if( 0 ) // r[15] < 0x4000 )
-	{
-		std::println("${:X}: op ${:X}", (r[15]&(cpsr.b.T?~1:~3)) - (cpsr.b.T?4:8), opc);
-		dump_regs();
-	}
 	
 	if( cpsr.b.T )
 	{
@@ -812,6 +807,8 @@ void arm7tdmi::reset()
 	spsr_svc = 0x9f;
 	r[15] = 0x08000000u;
 	cpsr.b.T = 0;
+	cpsr.b.I = 0;
+	stamp = 0;
 	flushp();
 	irq_line = false;
 }

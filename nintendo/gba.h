@@ -25,7 +25,7 @@ public:
 	u32 read_io(u32, int);
 	
 	u16 getKeys();
-	u64 stamp = 0;
+	u64 target_stamp;
 	
 	std::vector<u8> ROM;
 	u8 bios[16*1024];

@@ -29,17 +29,20 @@ void LCDEngine::draw_scanline(u32 L)
 
 void LCDEngine::draw_mode_0(u32 Y)
 {
-
+	u32 backdrop = c16to32(*(u16*)&palette[0]);
+	for(u32 x = 0; x < 240; ++x) fbuf[Y*240+x] = backdrop;
 }
 
 void LCDEngine::draw_mode_1(u32 Y)
 {
-
+	u32 backdrop = c16to32(*(u16*)&palette[0]);
+	for(u32 x = 0; x < 240; ++x) fbuf[Y*240+x] = backdrop;
 }
 
 void LCDEngine::draw_mode_2(u32 Y)
 {
-
+	u32 backdrop = c16to32(*(u16*)&palette[0]);
+	for(u32 x = 0; x < 240; ++x) fbuf[Y*240+x] = backdrop;
 }
 
 void LCDEngine::draw_mode_3(u32 Y)
