@@ -26,6 +26,7 @@ public:
 	
 	u16 getKeys();
 	u64 target_stamp;
+	bool halted;
 	
 	std::vector<u8> ROM;
 	u8 bios[16*1024];

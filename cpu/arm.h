@@ -32,6 +32,15 @@ union arm7flags
 class arm
 {
 public:
+	arm() 
+	{ 
+		cpsr.v = ARM_MODE_USER; 
+		for(u32 i = 0; i < 16; ++i) 
+		{ 
+			r[i] = fiq[i] = 0; 
+		}
+		irq_line = false;
+	}
 	arm7flags cpsr;	
 	u32 r[16];
 	u32 fiq[16]; // only (8, 14) switch, but matching r for ease of use

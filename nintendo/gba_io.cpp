@@ -7,11 +7,11 @@ void gba::write_io(u32 addr, u32 v, int size)
 		if( addr == 0x04000202 )
 		{
 			ISTAT &= ~(v&0xff);
-			cpu.irq_line = IME && (ISTAT & IMASK & 0x3fff);
+			check_irqs();
 			return;
 		} else if( addr == 0x04000203 ) {
 			ISTAT &= ~((v<<8)&0xff00);
-			cpu.irq_line = IME && (ISTAT & IMASK & 0x3fff);
+			check_irqs();
 			return;
 		}
 		u16 c = read_io(addr&~1, 16);
@@ -34,11 +34,20 @@ void gba::write_io(u32 addr, u32 v, int size)
 	if( addr < 0x04000130 ) { write_comm_io(addr, v); return; }
 	if( addr < 0x04000134 ) { write_pad_io(addr, v); return; }
 	if( addr < 0x04000200 ) { write_comm_io(addr, v); return; }
-	if( addr < 0x04000800 ) { write_sys_io(addr, v); return; }
+	if( addr < 0x04000800 ) 
+	{
+		if( addr == 0x04000301 )
+		{
+			halted = true;
+			if( cpu.stamp < target_stamp ) cpu.stamp = target_stamp;
+		}
+		write_sys_io(addr, v); 
+		return; 
+	}
 	if( (addr & 0xFFFC) == 0x0800 ) { write_memctrl_io(addr, v); return; }
 	
 	std::println("write_io{} error: ${:X} = ${:X}", size, addr, v);
-	exit(1);
+	//exit(1);
 	return;
 }
 
@@ -47,7 +56,7 @@ u32 gba::read_io(u32 addr, int size)
 	if( size == 8 )
 	{
 		u16 v = read_io(addr&~1, 16);
-		return v>>((addr&1)*8);
+		return (v>>((addr&1)*8)) & 0xff;
 	}
 	if( size == 32 )
 	{
@@ -67,7 +76,7 @@ u32 gba::read_io(u32 addr, int size)
 	if( (addr & 0xFFFC) == 0x0800 ) return read_memctrl_io(addr);
 	
 	std::println("read_io error: addr = ${:X}", addr);
-	exit(1);
+	//exit(1);
 	return 0; //todo: this should work, but return garbage like prefetch or open bus
 }
 

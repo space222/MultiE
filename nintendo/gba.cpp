@@ -117,13 +117,13 @@ u32 gba::read(u32 addr, int size, ARM_CYCLE ct)
 		return sized_read(palette, addr, size);
 	}
 	if( addr < 0x07000000 )
-	{ // VRAM todo
+	{ // VRAM
 		addr &= 0x1ffff;
 		if( addr & 0x10000 ) addr &= ~0x8000;
 		return sized_read(vram, addr, size);
 	}
 	if( addr < 0x08000000 )
-	{ // OAM todo
+	{ // OAM
 		return sized_read(oam, addr&0x3ff, size);
 	}
 	return 0;
@@ -135,11 +135,15 @@ void gba::reset()
 	cpu.write= [&](u32 a, u32 v, int s, ARM_CYCLE c) { write(a,v,s,c); };
 	cpu.reset();
 	target_stamp = 0;
+	halted = false;
+	
+	lcd.regs[0] = lcd.regs[2] = 0;
+	ISTAT = IMASK = IME = 0;
 		
 	memset(vram, 0, 96*1024);
 }
 
-gba::gba() : lcd(vram, palette)
+gba::gba() : lcd(vram, palette, oam)
 {
 }
 
@@ -152,7 +156,7 @@ void gba::run_frame()
 		DISPSTAT |= (VCOUNT >= 160 && VCOUNT != 228);
 		if( VCOUNT == 160 && (DISPSTAT & BIT(3)) )
 		{
-			ISTAT |= 1;
+			ISTAT |= BIT(0);
 			check_irqs();
 		}
 		if( VCOUNT == (DISPSTAT>>8) )
@@ -160,13 +164,22 @@ void gba::run_frame()
 			DISPSTAT |= 4;
 			if( DISPSTAT & BIT(5) )
 			{
-				ISTAT |= 2;
+				ISTAT |= BIT(2);
 				check_irqs();
 			}
 		} else {
 			DISPSTAT &= ~4;
 		}
+		if( DISPSTAT & BIT(4) )
+		{
+			ISTAT |= BIT(1);
+			check_irqs();
+		}
 		
+		if( halted )
+		{
+			cpu.stamp = target_stamp;
+		}
 		while( cpu.stamp < target_stamp )
 		{
 			cpu.step();
@@ -228,5 +241,6 @@ u16 gba::getKeys()
 void gba::check_irqs()
 {
 	cpu.irq_line = IME && (ISTAT & IMASK & 0x3fff);
+	if( halted ) halted = !(ISTAT & IMASK & 0x3fff);
 }
 
