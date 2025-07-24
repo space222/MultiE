@@ -3,7 +3,7 @@
 #include <functional>
 #include "itypes.h"
 
-enum class ARM_CYCLE {  X, I, N, S };
+enum class ARM_CYCLE { X, I, N, S };
 
 #define ARM_MODE_USER 0x10
 #define ARM_MODE_FIQ  0x11

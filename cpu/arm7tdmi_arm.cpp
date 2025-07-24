@@ -687,7 +687,7 @@ void arm7_ldst_reg(arm& cpu, u32 opc)
 	const bool byte = opc & BIT(22);
 	const bool user = !pre && (opc&BIT(21));
 	const bool load = opc & BIT(20);
-	u32 offs = arm7_ldst_shift(cpu, opc);
+	int offs = arm7_ldst_shift(cpu, opc);
 	const u32 Rn = (opc>>16)&15;
 	u32 base = cpu.r[Rn];
 	const u32 Rd = (opc>>12)&15;
@@ -730,7 +730,7 @@ void arm7_ldst_imm(arm& cpu, u32 opc)
 	const bool byte = opc & BIT(22);
 	const bool user = !pre && (opc&BIT(21));
 	const bool load = opc & BIT(20);
-	u32 offs = opc & 0xfff;
+	int offs = opc & 0xfff;
 	const u32 Rn = (opc>>16)&15;
 	u32 base = cpu.r[Rn];
 	const u32 Rd = (opc>>12)&15;

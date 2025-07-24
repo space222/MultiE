@@ -8,7 +8,7 @@ class Scheduler
 public:
 	Scheduler(console* c) : cons(c) 
 	{
-		add_event(0xffffFFFFffffFFFFull, 0);
+		reset();
 	}
 	
 	struct event
@@ -19,6 +19,13 @@ public:
 	};
 	
 	std::vector<event> events;
+	
+	void reset()
+	{
+		events.clear();
+		add_event(0xffffFFFFffffFFFFull, 0);
+	}
+	
 	void add_event(u64 stamp, u32 code);
 	void filter_out_event(u32 code);
 	u64 next_stamp();

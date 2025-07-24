@@ -1,6 +1,8 @@
 #pragma once
 #include <vector>
+#include <deque>
 #include "console.h"
+#include "Scheduler.h"
 #include "arm7tdmi.h"
 #include "LCDEngine.h"
 
@@ -20,6 +22,11 @@ public:
 	u32 read(u32, int, ARM_CYCLE);
 	void write(u32, u32, int, ARM_CYCLE);
 	arm7tdmi cpu;
+	Scheduler sched;
+	void event(u64, u32) override;
+	
+	std::deque<s8> snd_fifo_a, snd_fifo_b;
+	float sample;
 	
 	void write_io(u32, u32, int);
 	u32 read_io(u32, int);
@@ -37,11 +44,12 @@ public:
 	u8 vram[96*1024];
 	
 	LCDEngine lcd;
+	bool frame_complete;
 	
 	u32 read_lcd_io(u32);
 	u32 read_snd_io(u32) {return 0; }
 	u32 read_dma_io(u32);
-	u32 read_tmr_io(u32) {return 0; }
+	u32 read_tmr_io(u32);
 	u32 read_comm_io(u32) {return 0; }
 	u32 read_pad_io(u32) {return 0; }
 	u32 read_sys_io(u32);
@@ -50,17 +58,30 @@ public:
 	void write_lcd_io(u32, u32);
 	void write_snd_io(u32, u32) {return; }
 	void write_dma_io(u32, u32);
-	void write_tmr_io(u32, u32) {return; }
+	void write_tmr_io(u32, u32);
 	void write_comm_io(u32, u32) {return; }
 	void write_pad_io(u32, u32) {return; }
 	void write_sys_io(u32, u32);
 	void write_memctrl_io(u32, u32) {return; }
 	
 	u16 dmaregs[32];
-
+	void exec_dma(int);
+	
 	u16 ISTAT, IMASK, IME;
 	
 	void check_irqs();
 };
+
+#define EVENT_SND_FIFO 1
+#define EVENT_SND_OUT  2
+#define EVENT_SCANLINE_START 3
+#define EVENT_SCANLINE_RENDER 4
+#define EVENT_FRAME_COMPLETE 5
+#define EVENT_TMR0_CHECK 6
+#define EVENT_TMR1_CHECK 7
+#define EVENT_TMR2_CHECK 8
+#define EVENT_TMR3_CHECK 9
+
+
 
 

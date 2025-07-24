@@ -4,13 +4,14 @@ void gba::write_io(u32 addr, u32 v, int size)
 {
 	if( size == 8 )
 	{
+		v &= 0xff;
 		if( addr == 0x04000202 )
 		{
 			ISTAT &= ~(v&0xff);
 			check_irqs();
 			return;
 		} else if( addr == 0x04000203 ) {
-			ISTAT &= ~((v<<8)&0xff00);
+			ISTAT &= ~(v<<8);
 			check_irqs();
 			return;
 		}
@@ -22,15 +23,44 @@ void gba::write_io(u32 addr, u32 v, int size)
 	}
 	if( size == 32 )
 	{
-		write_io(addr, v, 16);
-		write_io(addr+2, v>>16, 16);
+		write_io(addr, v&0xffff, 16);
+		write_io(addr+2, (v>>16)&0xffff, 16);
 		return;
 	}
 
 	if( addr < 0x04000060 ) { write_lcd_io(addr, v); return; }
-	if( addr < 0x040000B0 ) { write_snd_io(addr, v); return; }
+	if( addr < 0x040000B0 ) 
+	{
+		if( addr == 0x040000A0 || addr == 0x040000A2 )
+		{
+			snd_fifo_a.push_front(v);
+			snd_fifo_a.push_front(v>>8);
+			return;
+		}
+		if( addr == 0x040000A4 || addr == 0x040000A6 )
+		{
+			snd_fifo_b.push_front(v);
+			snd_fifo_b.push_front(v>>8);
+			return;
+		}		 
+		write_snd_io(addr, v); return; 
+	}
 	if( addr < 0x04000100 ) { write_dma_io(addr, v); return; }
-	if( addr < 0x04000120 ) { write_tmr_io(addr, v); return; }
+	if( addr < 0x04000120 ) 
+	{ 
+		if( addr == 0x4000100 )
+		{
+			std::println("TMR0 val = ${:X}", v);
+			return;
+		}
+		if( addr == 0x4000104 )
+		{
+			std::println("TMR1 val = ${:X}", v);
+			return;
+		}
+		write_tmr_io(addr, v); 
+		return; 
+	}
 	if( addr < 0x04000130 ) { write_comm_io(addr, v); return; }
 	if( addr < 0x04000134 ) { write_pad_io(addr, v); return; }
 	if( addr < 0x04000200 ) { write_comm_io(addr, v); return; }

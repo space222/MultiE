@@ -23,9 +23,11 @@ static u32 sized_read(u8* data, u32 addr, int size)
 	else return *(u32*)&data[addr];
 }
 
-void gba::write(u32 addr, u32 v, int size, ARM_CYCLE ct)
+void gba::write(u32 addr, u32 v, int size, ARM_CYCLE /*ct*/)
 {
 	if( addr < 0x02000000 ) { return; } // write to BIOS ignored
+	if( size == 8 ) v &= 0xff;
+	else if( size == 16 ) v &= 0xffff;
 	if( addr < 0x03000000 )
 	{
 		addr &= 0x3FFFF;
@@ -74,7 +76,7 @@ void gba::write(u32 addr, u32 v, int size, ARM_CYCLE ct)
 	std::println("${:X} = ${:X}", addr, v);
 } //end of write
 
-u32 gba::read(u32 addr, int size, ARM_CYCLE ct)
+u32 gba::read(u32 addr, int size, ARM_CYCLE /*ct*/)
 {
 	if( addr >= 0x08000000 ) 
 	{
@@ -130,11 +132,17 @@ u32 gba::read(u32 addr, int size, ARM_CYCLE ct)
 
 void gba::reset()
 {
+	sched.reset();
 	cpu.read = [&](u32 a, int s, ARM_CYCLE c) -> u32 { return read(a,s,c); };
 	cpu.write= [&](u32 a, u32 v, int s, ARM_CYCLE c) { write(a,v,s,c); };
 	cpu.reset();
 	target_stamp = 0;
 	halted = false;
+	
+	//sched.add_event((16*1024*1024)/32768, EVENT_SND_FIFO);
+	//sched.add_event((16*1024*1024)/44100, EVENT_SND_OUT);
+	VCOUNT = 0xff;
+	sched.add_event(0, EVENT_SCANLINE_START);
 	
 	lcd.regs[0] = lcd.regs[2] = 0;
 	ISTAT = IMASK = IME = 0;
@@ -143,48 +151,22 @@ void gba::reset()
 	memset(vram, 0, 96*1024);
 }
 
-gba::gba() : lcd(vram, palette, oam)
+gba::gba() : sched(this), snd_fifo_a(33), snd_fifo_b(33), lcd(vram, palette, oam)
 {
+	//setVsync(false);
 }
 
 void gba::run_frame()
 {
-	VCOUNT = 0;
-	while( VCOUNT < 228 )
+	frame_complete = false;
+	while( !frame_complete )
 	{
-		DISPSTAT &= ~5;
-		DISPSTAT |= (VCOUNT >= 160 && VCOUNT != 228) ? 1 : 0;
-		DISPSTAT |= (VCOUNT == (DISPSTAT>>8)) ? BIT(2) : 0;
-		if( VCOUNT == 160 && (DISPSTAT & BIT(3)) )
+		cpu.step();
+		while( cpu.stamp >= sched.next_stamp() )
 		{
-			ISTAT |= BIT(0);
-			check_irqs();
+			sched.run_event();
 		}
-		if( VCOUNT == (DISPSTAT>>8) && DISPSTAT & BIT(5) )
-		{
-			ISTAT |= BIT(2);
-			check_irqs();
-		}
-		if( DISPSTAT & BIT(4) )
-		{
-			ISTAT |= BIT(1);
-			check_irqs();
-		}
-		
-		if( halted )
-		{
-			cpu.stamp = target_stamp;
-		}
-		while( cpu.stamp < target_stamp )
-		{
-			cpu.step();
-		}
-		target_stamp += 1232;
-		
-		if( VCOUNT < 160 ) lcd.draw_scanline(VCOUNT);
-		VCOUNT += 1;
 	}
-		
 }
 
 bool gba::loadROM(const std::string fname)
@@ -237,5 +219,93 @@ void gba::check_irqs()
 {
 	cpu.irq_line = IME && (ISTAT & IMASK & 0x3fff);
 	if( halted ) halted = !(ISTAT & IMASK & 0x3fff);
+}
+
+void gba::event(u64 old_stamp, u32 evc)
+{
+	if( evc == EVENT_TMR0_CHECK )
+	{
+	
+		return;
+	}
+	if( evc == EVENT_TMR1_CHECK )
+	{
+	
+		return;
+	}
+	if( evc == EVENT_TMR2_CHECK )
+	{
+	
+		return;
+	}
+	if( evc == EVENT_TMR3_CHECK )
+	{
+	
+		return;
+	}
+	
+	if( evc == EVENT_SCANLINE_START )
+	{
+		VCOUNT = (VCOUNT+1)&0xff;
+		
+		DISPSTAT &= ~5;
+		DISPSTAT |= (VCOUNT >= 160 && VCOUNT != 228) ? 1 : 0;
+		DISPSTAT |= (VCOUNT == (DISPSTAT>>8)) ? BIT(2) : 0;
+		if( VCOUNT == 160 && (DISPSTAT & BIT(3)) )
+		{
+			ISTAT |= BIT(0);
+			check_irqs();
+		}
+		if( VCOUNT == (DISPSTAT>>8) && DISPSTAT & BIT(5) )
+		{
+			ISTAT |= BIT(2);
+			check_irqs();
+		}
+		if( DISPSTAT & BIT(4) )
+		{
+			ISTAT |= BIT(1);
+			check_irqs();
+		}
+		if( VCOUNT < 160 ) sched.add_event(old_stamp + 280, EVENT_SCANLINE_RENDER);
+		sched.add_event(old_stamp + 1232, (VCOUNT==227) ? EVENT_FRAME_COMPLETE : EVENT_SCANLINE_START);
+		return;
+	}
+	
+	if( evc == EVENT_SCANLINE_RENDER )
+	{
+		lcd.draw_scanline(VCOUNT);
+		return;
+	}
+	
+	if( evc == EVENT_FRAME_COMPLETE )
+	{
+		frame_complete = true;
+		VCOUNT = 0xff;
+		event(old_stamp, EVENT_SCANLINE_START);
+		return;
+	}
+	
+	if( evc == EVENT_SND_FIFO )
+	{
+		sched.add_event(old_stamp+((16*1024*1024)/32768), evc);
+		if( snd_fifo_a.empty() )
+		{
+			sample = 0;
+			return;
+		}
+		float A = snd_fifo_a.back()/128.f; snd_fifo_a.pop_back();
+		float B = snd_fifo_b.back()/128.f; snd_fifo_b.pop_back();
+		A += B;
+		A /= 2;
+		sample = A;
+		return;
+	}
+
+	if( evc == EVENT_SND_OUT )
+	{
+		sched.add_event(old_stamp+((16*1024*1024)/44100), evc);
+		audio_add(sample, sample);
+		return;
+	}
 }
 
