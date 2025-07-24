@@ -1,8 +1,12 @@
+#include <print>
 #include <cstring>
 #include "LCDEngine.h"
 
 #define DISPCNT regs[0]
+#define BG0CNT regs[4]
+#define BG1CNT regs[5]
 #define BG2CNT regs[6]
+#define BG3CNT regs[7]
 
 inline u32 c16to32(u16 c)
 {
@@ -30,6 +34,11 @@ void LCDEngine::draw_scanline(u32 L)
 		}
 	}	
 	memset(fbuf+L*240, 0, 240*4);
+}
+
+void LCDEngine::clear_bg(int ind)
+{
+	memset(&bg[ind][0], 0, 256);
 }
 
 
@@ -99,15 +108,77 @@ void LCDEngine::render_sprites(int Y)
 	}
 }
 
+void LCDEngine::render_text_bg(u32 Y, u32 bgind)
+{
+	const u16 bgctrl = regs[4+bgind];
+	u32 mapbase = ((bgctrl>>8)&0x1f)*0x800;
+	u32 charbase = ((bgctrl>>2)&3)*0x4000;
+	u32 tilesize = (bgctrl&BIT(7)) ? 64 : 32;
+	
+	const u32 scrollx = regs[8 + (bgind*2)] & 0x1ff;
+	const u32 scrolly = regs[9 + (bgind*2)] & 0x1ff;
+	const int W = (bgctrl&BIT(14)) ? 512 : 256;
+	const int H = (bgctrl&BIT(15)) ? 512 : 256;
+	Y += scrolly;
+	Y &= (H-1);
+	mapbase += (Y > 255) ? 0x800*2 : 0;
+	Y &= 255;
+	
+	for(u32 x = 0; x < 240; ++x)
+	{
+		u32 mX = (x + scrollx) & (W-1);
+		u32 mXoffs = ((mX > 255) ? 0x800 : 0);
+		mX &= 255;	
+		
+		u16 entry = *(u16*)&VRAM[mapbase + mXoffs + ((Y/8)*32 + (mX/8))*2];
+		u32 toffs = (entry&0x3ff)*tilesize;
+		
+		u8 tY = (Y&7) ^ ((entry&BIT(11)) ? 7 : 0);
+		u8 tX = (mX&7) ^ ((entry&BIT(10)) ? 7 : 0);
+			
+		u8 p = 0;
+		if( tilesize == 64 )
+		{
+			p = VRAM[charbase + toffs + (tY&7)*8 + (tX&7)];
+		} else {
+			p = VRAM[charbase + toffs + (tY&7)*4 + ((tX&7)>>1)];
+			p = (p>>((tX&1)*4))&15;
+			if( p ) p |= (entry>>8)&0xf0;
+		}
+		bg[bgind][x] = p;	
+	}
+}
+
 void LCDEngine::draw_mode_0(u32 Y)
 {
-	u32 backdrop = c16to32(*(u16*)&palette[0]);
+	const u32 backdrop = c16to32(*(u16*)&palette[0]);
 	for(u32 x = 0; x < 240; ++x) fbuf[Y*240+x] = backdrop;
 	
 	render_sprites(Y);
+			
+	if( DISPCNT & BIT(8) )  render_text_bg(Y, 0); else clear_bg(0);
+	if( DISPCNT & BIT(9) ) 	render_text_bg(Y, 1); else clear_bg(1);
+	if( DISPCNT & BIT(10) ) render_text_bg(Y, 2); else clear_bg(2);
+	if( DISPCNT & BIT(11) ) render_text_bg(Y, 3); else clear_bg(3);
+		
 	for(u32 x = 0; x < 240; ++x)
-		if( spr[x] )
-			fbuf[240*Y + x] = c16to32(*(u16*)&palette[512 + (spr[x]<<1)]);
+	{
+		u16 pris[10] = {0};
+		pris[(spr_pri[x]+1)<<1] = spr[x] ? (512 + (spr[x]<<1)) : 0;
+		if( bg[3][x] ) pris[(((BG3CNT&3)+1)<<1)|1] = bg[3][x]<<1;
+		if( bg[2][x] ) pris[(((BG2CNT&3)+1)<<1)|1] = bg[2][x]<<1;
+		if( bg[1][x] ) pris[(((BG1CNT&3)+1)<<1)|1] = bg[1][x]<<1;
+		if( bg[0][x] ) pris[(((BG0CNT&3)+1)<<1)|1] = bg[0][x]<<1;
+		
+		for(u32 i = 2; i < 10; ++i)
+		{
+			if( pris[i] )
+			{
+				fbuf[240*Y + x] = c16to32(*(u16*)&palette[pris[i]]);
+				break;
+			}
+		}
+	}
 }
 
 void LCDEngine::draw_mode_1(u32 Y)
@@ -116,9 +187,28 @@ void LCDEngine::draw_mode_1(u32 Y)
 	for(u32 x = 0; x < 240; ++x) fbuf[Y*240+x] = backdrop;
 
 	render_sprites(Y);
+			
+	if( DISPCNT & BIT(8) )  render_text_bg(Y, 0);
+	if( DISPCNT & BIT(9) ) 	render_text_bg(Y, 1);
+	//if( DISPCNT & BIT(10) ) render_affine_bg(Y, 2);
+		
 	for(u32 x = 0; x < 240; ++x)
-		if( spr[x] )
-			fbuf[240*Y + x] = c16to32(*(u16*)&palette[512 + (spr[x]<<1)]);
+	{
+		u16 pris[10] = {0};
+		pris[(spr_pri[x]+1)<<1] = spr[x] ? (512 + (spr[x]<<1)) : 0;
+		//pris[(((BG2CNT&3)+1)<<1)|1] = bg[2][x]<<1;
+		pris[(((BG1CNT&3)+1)<<1)|1] = bg[1][x]<<1;
+		pris[(((BG0CNT&3)+1)<<1)|1] = bg[0][x]<<1;
+		
+		for(u32 i = 2; i < 10; ++i)
+		{
+			if( pris[i] )
+			{
+				fbuf[240*Y + x] = c16to32(*(u16*)&palette[pris[i]]);
+				break;
+			}
+		}
+	}
 }
 
 void LCDEngine::draw_mode_2(u32 Y)
@@ -144,7 +234,7 @@ void LCDEngine::draw_mode_3(u32 Y)
 		{
 			fbuf[240*Y + x] = c16to32(*(u16*)&palette[512 + (spr[x]<<1)]);
 		} else {
-			fbuf[240*Y + x] = c16to32(*(u16*)&VRAM[240*Y + x]);
+			fbuf[240*Y + x] = c16to32(*(u16*)&VRAM[(240*Y + x)*2]);
 		}
 	}
 }

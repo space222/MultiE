@@ -55,6 +55,8 @@ public:
 	void write_pad_io(u32, u32) {return; }
 	void write_sys_io(u32, u32);
 	void write_memctrl_io(u32, u32) {return; }
+	
+	u16 dmaregs[32];
 
 	u16 ISTAT, IMASK, IME;
 	

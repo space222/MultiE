@@ -40,9 +40,10 @@ void gba::write_io(u32 addr, u32 v, int size)
 		{
 			halted = true;
 			if( cpu.stamp < target_stamp ) cpu.stamp = target_stamp;
+			return;
 		}
 		write_sys_io(addr, v); 
-		return; 
+		return;
 	}
 	if( (addr & 0xFFFC) == 0x0800 ) { write_memctrl_io(addr, v); return; }
 	
@@ -64,6 +65,8 @@ u32 gba::read_io(u32 addr, int size)
 		v |= read_io(addr+2, 16)<<16;
 		return v;
 	}
+
+	if( addr == 0x04000130 ) { return getKeys(); }
 
 	if( addr < 0x04000060 ) return read_lcd_io(addr);
 	if( addr < 0x040000B0 ) return read_snd_io(addr);

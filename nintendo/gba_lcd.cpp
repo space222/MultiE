@@ -2,6 +2,13 @@
 
 void gba::write_lcd_io(u32 addr, u32 v)
 {
+	if( addr == 0x04000004 )
+	{
+		v &= 0xff38;
+		lcd.regs[2] &= ~0xff38;
+		lcd.regs[2] |= v;
+		return;
+	}
 	lcd.regs[(addr&0x7f)>>1] = v;
 }
 

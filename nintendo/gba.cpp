@@ -108,7 +108,6 @@ u32 gba::read(u32 addr, int size, ARM_CYCLE ct)
 	}
 	if( addr < 0x05000000 )
 	{  // I/O
-		if( addr == 0x04000130 ) { return getKeys(); }
 		return read_io(addr, size);
 	}
 	if( addr < 0x06000000 )
@@ -139,7 +138,8 @@ void gba::reset()
 	
 	lcd.regs[0] = lcd.regs[2] = 0;
 	ISTAT = IMASK = IME = 0;
-		
+	
+	memset(dmaregs, 0, 2*32);
 	memset(vram, 0, 96*1024);
 }
 
@@ -152,23 +152,18 @@ void gba::run_frame()
 	VCOUNT = 0;
 	while( VCOUNT < 228 )
 	{
-		DISPSTAT &= ~1;
-		DISPSTAT |= (VCOUNT >= 160 && VCOUNT != 228);
+		DISPSTAT &= ~5;
+		DISPSTAT |= (VCOUNT >= 160 && VCOUNT != 228) ? 1 : 0;
+		DISPSTAT |= (VCOUNT == (DISPSTAT>>8)) ? BIT(2) : 0;
 		if( VCOUNT == 160 && (DISPSTAT & BIT(3)) )
 		{
 			ISTAT |= BIT(0);
 			check_irqs();
 		}
-		if( VCOUNT == (DISPSTAT>>8) )
+		if( VCOUNT == (DISPSTAT>>8) && DISPSTAT & BIT(5) )
 		{
-			DISPSTAT |= 4;
-			if( DISPSTAT & BIT(5) )
-			{
-				ISTAT |= BIT(2);
-				check_irqs();
-			}
-		} else {
-			DISPSTAT &= ~4;
+			ISTAT |= BIT(2);
+			check_irqs();
 		}
 		if( DISPSTAT & BIT(4) )
 		{

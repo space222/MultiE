@@ -6,7 +6,10 @@ class LCDEngine
 public:
 	LCDEngine(u8* v, u8* p, u8* o) : VRAM(v), palette(p), oam(o) {}
 	
-	void render_sprites(int);
+	void render_sprites(int Y);
+	void render_text_bg(u32 Y, u32 bgind);
+	void clear_bg(int);
+	
 	void draw_scanline(u32);
 	void draw_mode_0(u32);
 	void draw_mode_1(u32);
@@ -19,10 +22,11 @@ public:
 	u8* palette;
 	u8* oam;
 	u16 regs[48];
-	u32 fbuf[256*192];
+	
 	u8 objwin[256];
 	u8 spr[256];
 	u8 spr_pri[256];
-	u8 bg[4];
+	u8 bg[4][256];
+	u32 fbuf[256*192];
 };
 
