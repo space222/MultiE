@@ -6,6 +6,7 @@
 #include <vector>
 #include <string>
 #include <algorithm>
+#include <atomic>
 #include <array>
 #include <thread>
 #include <SDL.h>
@@ -49,6 +50,8 @@
 #include "rca_studio_ii.h"
 #include "gc/GameCube.h"
 void try_kirq();
+void gdb_start();
+extern std::atomic<int> gdb_active;
 
 namespace fs = std::filesystem;
 std::unordered_map<std::string, std::string> cli_options;
@@ -424,7 +427,22 @@ void imgui_run()
 			
 			if( ImGui::BeginMenu("Beta") ) 
 			{
-				
+				if( ImGui::MenuItem("Nintendo GBA") )
+				{
+					std::string f = getOpenFile("GBA");
+					if( !f.empty() )
+					{
+						delete sys;
+						sys = new gba;
+						if( ! sys->loadROM(f) ) 
+						{
+							printf("unable to load ROM\n");
+							exit(1);
+						}
+						else newinstance = true;
+						crt_scale = 3;
+					}				
+				}				
 				if( ImGui::MenuItem("Apple IIe") )
 				{
 					std::string f = getOpenFile("Apple IIe");
@@ -635,22 +653,6 @@ void imgui_run()
 						crt_scale = 3;
 					}				
 				}
-				if( ImGui::MenuItem("Nintendo GBA") )
-				{
-					std::string f = getOpenFile("GBA");
-					if( !f.empty() )
-					{
-						delete sys;
-						sys = new gba;
-						if( ! sys->loadROM(f) ) 
-						{
-							printf("unable to load ROM\n");
-							exit(1);
-						}
-						else newinstance = true;
-						crt_scale = 3;
-					}				
-				}
 				if( ImGui::MenuItem("Apple Mac Plus") )
 				{
 					std::string f = getOpenFile("Mac plus");
@@ -792,7 +794,22 @@ void imgui_run()
 		
 			ImGui::EndMenu();
 		}*/
-
+		if( ImGui::BeginMenu("Debug") )
+		{
+			if( gdb_active.load() )
+			{
+				ImGui::BeginDisabled();
+				ImGui::MenuItem("GDB Stub Active");
+				ImGui::EndDisabled();
+			} else {
+				if( ImGui::MenuItem("Start GDB Stub") )
+				{
+					gdb_start();			
+				}
+			}
+			ImGui::EndMenu();
+		}
+		
 	ImGui::EndMainMenuBar();
 	
 	if( !dialog_msg.empty() )

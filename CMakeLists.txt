@@ -26,13 +26,17 @@ cpu/VR4300.cpp nintendo/n64.cpp nintendo/n64_vi.cpp nintendo/n64_pi.cpp nintendo
 cpu/VR4300_fpu.cpp nintendo/n64_rdp.cpp nintendo/n64_dp.cpp nintendo/n64_sp.cpp cpu/n64_rsp.cpp cpu/n64_rsp_vu.cpp
 neogeo/aes.cpp other/bally_astrocade.cpp atari/Lynx.cpp other/SuperVision.cpp other/rca_studio_ii.cpp cpu/rca1802.cpp
 cpu/gekko.cpp nintendo/gc/GameCube.cpp nintendo/gc/gc_exi.cpp nintendo/gc/gc_dsp_io.cpp nintendo/gc/gc_dsp_cpu.cpp
-nintendo/gba_io.cpp nintendo/gba_lcd.cpp nintendo/gba_dma.cpp nintendo/LCDEngine.cpp
+nintendo/gba_io.cpp nintendo/gba_lcd.cpp nintendo/gba_dma.cpp nintendo/LCDEngine.cpp stub/gdb_stub.cpp
 )
 
 add_library(ym3438 SHARED sega/ym3438.cpp)
 
+set(SOCKPP_BUILD_STATIC ON)
+set(SOCKPP_BUILD_SHARED OFF)
+add_subdirectory(./libs/sockpp)
+
 target_include_directories(test PUBLIC . ./imgui ./include ./sony ./other ./coleco
-	./cpu ./atari ./commodore ./sega ./ibm ./nintendo ./mattel ./neogeo ${SDL2_INCLUDE_DIRS} )
-target_link_libraries(test PRIVATE ym3438 dl GL GLEW ${SDL2_LIBRARIES})
+	./cpu ./atari ./commodore ./sega ./ibm ./nintendo ./mattel ./neogeo ./libs/sockpp/include ${SDL2_INCLUDE_DIRS} )
+target_link_libraries(test PRIVATE ym3438 dl GL GLEW ${CMAKE_SOURCE_DIR}/libs/sockpp/src/libsockpp.a ${SDL2_LIBRARIES})
 #${CMAKE_SOURCE_DIR}/libfmt.a 
 
