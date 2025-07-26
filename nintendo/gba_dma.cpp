@@ -40,19 +40,21 @@ void gba::exec_dma(int chan)
 
 void gba::write_dma_io(u32 addr, u32 v)
 {
+	if( addr >= 0x040000E0 ) return;
 	//std::println("DMA ${:X} = ${:X}", addr, v);
 	u16 oldval = dmaregs[(addr - 0x040000B0u)>>1];
 	dmaregs[(addr - 0x040000B0u)>>1] = v;
-	
-	if( addr == 0x40000BA && (v & 0xB000) == 0x8000 ) { exec_dma(0); }
-	else if( addr == 0x40000C6 && (v & 0xB000) == 0x8000 ) { exec_dma(1); }
-	else if( addr == 0x40000D2 && (v & 0xB000) == 0x8000 ) { exec_dma(2); }
-	else if( addr == 0x40000DE && (v & 0xB000) == 0x8000 ) { exec_dma(3); }
+	u32 reg = (addr - 0x040000B0u)>>1;
+	if( addr == 0x40000BA && (v & 0xB000) == 0x8000 ) { exec_dma(0); dmaregs[reg] &=~BIT(15); }
+	else if( addr == 0x40000C6 && (v & 0xB000) == 0x8000 ) { exec_dma(1); dmaregs[reg] &=~BIT(15); }
+	else if( addr == 0x40000D2 && (v & 0xB000) == 0x8000 ) { exec_dma(2); dmaregs[reg] &=~BIT(15); }
+	else if( addr == 0x40000DE && (v & 0xB000) == 0x8000 ) { exec_dma(3); dmaregs[reg] &=~BIT(15); }
 	//std::println("DMA ${:X} = ${:X}", addr, v);
 }
 
 u32 gba::read_dma_io(u32 addr)
 {
+	if( addr >= 0x040000E0 ) return 0;
 	addr -= 0x040000B0u;
 	return dmaregs[addr>>1];
 }

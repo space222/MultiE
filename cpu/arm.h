@@ -126,7 +126,8 @@ public:
 		case ARM_MODE_UNDEF: spsr_und = v; return;
 		default: break;
 		}
-		std::println("${:X}: write to spsr in user||system mode", r[15]-4);
+		std::println("${:X}: write to spsr in user||system mode", r[15]-8);
+		//exit(1);
 		return;		
 	}
 	

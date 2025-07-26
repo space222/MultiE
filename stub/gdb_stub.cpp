@@ -8,7 +8,16 @@ extern console* sys;
 std::atomic<int> gdb_active = 0;
 extern bool Paused;
 
-static std::vector<u32> breakpoints;
+static std::vector<u64> breakpoints;
+
+bool console::gdb_isBreakpoint(u64 addr)
+{
+	for(u64 a : breakpoints)
+	{
+		if( a == addr ) return true;
+	}
+	return false;
+}
 
 u32 str2int(const std::string_view& s, u8 v)
 {
@@ -42,6 +51,14 @@ void gdb_exec(sockpp::tcp_socket& sock, std::string msg)
 	std::string_view cmd(msg.begin() + msg.find('$') + 1, msg.begin() + msg.find_first_of(":#"));
 	std::println("cmd: <{}>", cmd);
 	
+	if( cmd == "c" )
+	{
+		std::string res = "+$OK";
+		append_checksum(res);
+		sock.write_n(res.data(), res.size());
+		sys->gdb_continue();
+		return;
+	}
 	if( cmd[0] == 'H' )
 	{
 		std::string res = "+$";
@@ -56,16 +73,11 @@ void gdb_exec(sockpp::tcp_socket& sock, std::string msg)
 		sock.write_n(res.data(), res.size());
 		return;		
 	}
-	if( cmd == "p19" )
-	{
-		std::string res = "+$00000000";
-		append_checksum(res);
-		sock.write_n(res.data(), res.size());
-		return;		
-	}
 	if( cmd.starts_with('p') )
 	{
-		std::string res = (cmd[1]=='f' ? "+$00000008":"+$00000000");
+		std::string res = "+$";
+		res += std::format("{:08X}", sys->gdb_getReg(std::stoi(cmd.begin()+1, nullptr, 16)));
+		std::println("sending <{}>", res);
 		append_checksum(res);
 		sock.write_n(res.data(), res.size());
 		return;		

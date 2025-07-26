@@ -32,7 +32,6 @@ public:
 	u32 read_io(u32, int);
 	
 	u16 getKeys();
-	u64 target_stamp;
 	bool halted;
 	
 	std::vector<u8> ROM;

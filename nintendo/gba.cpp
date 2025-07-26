@@ -23,7 +23,7 @@ static u32 sized_read(u8* data, u32 addr, int size)
 	else return *(u32*)&data[addr];
 }
 
-void gba::write(u32 addr, u32 v, int size, ARM_CYCLE /*ct*/)
+void gba::write(u32 addr, u32 v, int size, ARM_CYCLE ct)
 {
 	if( addr < 0x02000000 ) { return; } // write to BIOS ignored
 	if( size == 8 ) v &= 0xff;
@@ -42,6 +42,7 @@ void gba::write(u32 addr, u32 v, int size, ARM_CYCLE /*ct*/)
 	}
 	if( addr < 0x05000000 )
 	{  // I/O writes
+		//if( ct == ARM_CYCLE::X && addr >= 0x040000B0 && addr <= 0x040000E0 ) return;
 		write_io(addr, v, size);
 		//std::println("IO Write{} ${:X} = ${:X}", size, addr, v);
 		return;
@@ -76,7 +77,7 @@ void gba::write(u32 addr, u32 v, int size, ARM_CYCLE /*ct*/)
 	std::println("${:X} = ${:X}", addr, v);
 } //end of write
 
-u32 gba::read(u32 addr, int size, ARM_CYCLE /*ct*/)
+u32 gba::read(u32 addr, int size, ARM_CYCLE ct)
 {
 	if( addr >= 0x08000000 ) 
 	{
@@ -94,7 +95,7 @@ u32 gba::read(u32 addr, int size, ARM_CYCLE /*ct*/)
 	}
 	if( addr < 0x02000000 ) 
 	{ 
-		if( cpu.r[15]-4 < 0x4000 ) 
+		if( cpu.r[15] < 0x4000 ) 
 			return sized_read(bios, addr&0x3fff, size);
 		return cpu.fetch; 
 	}
@@ -110,6 +111,7 @@ u32 gba::read(u32 addr, int size, ARM_CYCLE /*ct*/)
 	}
 	if( addr < 0x05000000 )
 	{  // I/O
+		//std::println("${:X}: read{} ${:X}", cpu.r[15], size, addr);
 		return read_io(addr, size);
 	}
 	if( addr < 0x06000000 )
@@ -135,8 +137,13 @@ void gba::reset()
 	sched.reset();
 	cpu.read = [&](u32 a, int s, ARM_CYCLE c) -> u32 { return read(a,s,c); };
 	cpu.write= [&](u32 a, u32 v, int s, ARM_CYCLE c) { write(a,v,s,c); };
+	for(int i = 0; i < 16; ++i) cpu.r[i] = 0;
 	cpu.reset();
-	target_stamp = 0;
+	//for(int i = 0; i < 16; ++i) cpu.r[i] = 0;
+	//cpu.r[15] = 0;
+	//cpu.cpsr.b.I = 1;
+	//cpu.cpsr.b.T = 0;
+	//cpu.flushp();
 	halted = false;
 	
 	//sched.add_event((16*1024*1024)/32768, EVENT_SND_FIFO);
@@ -161,7 +168,17 @@ void gba::run_frame()
 	frame_complete = false;
 	while( !frame_complete )
 	{
-		cpu.step();
+		if( !halted )
+		{
+			cpu.step();
+		} else {
+			if( sched.next_stamp() == -1u )
+			{
+				std::println("CPU Halted with no future events");
+				exit(1);
+			}
+			cpu.stamp = sched.next_stamp();
+		}
 		while( cpu.stamp >= sched.next_stamp() )
 		{
 			sched.run_event();

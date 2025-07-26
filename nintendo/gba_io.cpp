@@ -46,21 +46,7 @@ void gba::write_io(u32 addr, u32 v, int size)
 		write_snd_io(addr, v); return; 
 	}
 	if( addr < 0x04000100 ) { write_dma_io(addr, v); return; }
-	if( addr < 0x04000120 ) 
-	{ 
-		if( addr == 0x4000100 )
-		{
-			std::println("TMR0 val = ${:X}", v);
-			return;
-		}
-		if( addr == 0x4000104 )
-		{
-			std::println("TMR1 val = ${:X}", v);
-			return;
-		}
-		write_tmr_io(addr, v); 
-		return; 
-	}
+	if( addr < 0x04000120 ) { write_tmr_io(addr, v); return; }
 	if( addr < 0x04000130 ) { write_comm_io(addr, v); return; }
 	if( addr < 0x04000134 ) { write_pad_io(addr, v); return; }
 	if( addr < 0x04000200 ) { write_comm_io(addr, v); return; }
@@ -69,7 +55,6 @@ void gba::write_io(u32 addr, u32 v, int size)
 		if( addr == 0x04000301 )
 		{
 			halted = true;
-			if( cpu.stamp < target_stamp ) cpu.stamp = target_stamp;
 			return;
 		}
 		write_sys_io(addr, v); 

@@ -41,6 +41,10 @@ public:
 	}
 	
 	//static void setDialogMsg(const std::string);
+	virtual u64 gdb_getReg(u32 /*ind*/) { return 0; }
+	virtual u64 gdb_getMem(u64 /*addr*/, int /*size*/) { return 0; }
+	virtual void gdb_continue() {}
+	bool gdb_isBreakpoint(u64 pc); // implemented in gdb_stub.cpp
 };
 
 void audio_add(float, float);

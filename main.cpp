@@ -794,7 +794,7 @@ void imgui_run()
 		
 			ImGui::EndMenu();
 		}*/
-		if( ImGui::BeginMenu("Debug") )
+		/*if( ImGui::BeginMenu("Debug") )
 		{
 			if( gdb_active.load() )
 			{
@@ -808,7 +808,7 @@ void imgui_run()
 				}
 			}
 			ImGui::EndMenu();
-		}
+		}*/
 		
 	ImGui::EndMainMenuBar();
 	

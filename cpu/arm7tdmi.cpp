@@ -748,14 +748,14 @@ void arm7tdmi::flushp()
 	if( cpsr.b.T )
 	{
 		r[15] &= ~1;
-		decode = read(r[15], 16, ARM_CYCLE::N);
+		decode = read(r[15], 16, ARM_CYCLE::X);
 		r[15] += 2;
-		fetch = read(r[15], 16, ARM_CYCLE::S);	
+		fetch = read(r[15], 16, ARM_CYCLE::X);	
 	} else {
 		r[15] &= ~3;
-		decode = read(r[15], 32, ARM_CYCLE::N);
+		decode = read(r[15], 32, ARM_CYCLE::X);
 		r[15] += 4;
-		fetch = read(r[15], 32, ARM_CYCLE::S);
+		fetch = read(r[15], 32, ARM_CYCLE::X);
 	}
 }
 
@@ -775,8 +775,10 @@ void arm7tdmi::step()
 	execute = decode;
 	decode = fetch;
 	r[15] += (cpsr.b.T ? 2 : 4);
-	fetch = read(r[15]&(cpsr.b.T?~1:~3), (cpsr.b.T ? 16 : 32), ARM_CYCLE::S);
+	fetch = read(r[15]&(cpsr.b.T?~1:~3), (cpsr.b.T ? 16 : 32), ARM_CYCLE::X);
 	u32 opc = execute;
+	
+	//if( r[15] > 0x08000740 ) std::println("${:X}:{:X}: opc = ${:X}", r[15] - (cpsr.b.T?4:8), u32(cpsr.b.T), opc);
 	
 	if( r[15] >= 0x10000000u )
 	{
