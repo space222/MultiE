@@ -1,5 +1,7 @@
 #include "gba.h"
 
+static u16 snd88 = 0;
+
 void gba::write_io(u32 addr, u32 v, int size)
 {
 	if( size == 8 )
@@ -27,6 +29,8 @@ void gba::write_io(u32 addr, u32 v, int size)
 		write_io(addr+2, (v>>16)&0xffff, 16);
 		return;
 	}
+	
+	if( addr == 0x04000088 ) { snd88 = v; return; }
 
 	if( addr < 0x04000060 ) { write_lcd_io(addr, v); return; }
 	if( addr < 0x040000B0 ) 
@@ -80,13 +84,14 @@ u32 gba::read_io(u32 addr, int size)
 		v |= read_io(addr+2, 16)<<16;
 		return v;
 	}
-
+	
+	if( addr == 0x04000088 ) { return snd88; }
 	if( addr == 0x04000130 ) { return getKeys(); }
 
 	if( addr < 0x04000060 ) return read_lcd_io(addr);
 	if( addr < 0x040000B0 ) return read_snd_io(addr);
 	if( addr < 0x04000100 ) return read_dma_io(addr);
-	if( addr < 0x04000120 ) return read_tmr_io(addr);
+	if( addr < 0x04000120 ) return 0xffff;//read_tmr_io(addr);
 	if( addr < 0x04000130 ) return read_comm_io(addr);
 	if( addr < 0x04000134 ) return read_pad_io(addr);
 	if( addr < 0x04000200 ) return read_comm_io(addr);

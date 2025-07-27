@@ -58,6 +58,7 @@ void LCDEngine::render_sprites(int Y)
 		if( !(attr0 & BIT(8)) && (attr0 & BIT(9)) ) continue;
 		if( (attr2&0x3ff)<=512 && (DISPCNT&7)>=3 ) continue;
 		int sY = attr0 & 0xff;
+		if( sY > 159 ) sY = (s8)(attr0 & 0xff);
 		int H = sprh[((attr0>>14)&3)*4 + ((attr1>>14)&3)];
 		//if( H == 0 ) continue;
 		int sLine = Y - sY;
@@ -80,12 +81,12 @@ void LCDEngine::render_sprites(int Y)
 			if( DISPCNT & BIT(6) )
 			{
 				charbase += (((sLine/8)*(W/8))*tilesize);
-				charbase += (uX/8)*tilesize;
+				//charbase += (uX/8)*tilesize;
 			} else {
 				charbase += ((sLine/8)*1024);
-				charbase += (uX/8)*32;
+				//charbase += (uX/8)*tilesize;
 			}
-			//charbase += (uX/8)*tilesize;
+			charbase += (uX/8)*tilesize;
 		
 			u8 p = 0;
 			

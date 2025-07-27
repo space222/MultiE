@@ -502,14 +502,14 @@ void thumb14_pop(arm& cpu, u32 opc)
 	{
 		if( opc & BIT(i) )
 		{
-			cpu.r[i] = cpu.read(cpu.r[13], 32, type);
+			cpu.r[i] = cpu.read(cpu.r[13]&~3, 32, type);
 			cpu.r[13] += 4;
 			type = ARM_CYCLE::S;
 		}
 	}
 	if( opc & BIT(8) )
 	{
-		cpu.r[15] = cpu.read(cpu.r[13], 32, type);
+		cpu.r[15] = cpu.read(cpu.r[13]&~3, 32, type);
 		cpu.r[13] += 4;
 		cpu.flushp();
 	}
@@ -521,7 +521,7 @@ void thumb14_push(arm& cpu, u32 opc)
 	if( opc & BIT(8) )
 	{
 		cpu.r[13] -= 4;
-		cpu.write(cpu.r[13], cpu.r[14], 32, type);
+		cpu.write(cpu.r[13]&~3, cpu.r[14], 32, type);
 		type = ARM_CYCLE::S;
 	}
 	for(u32 i = 0; i < 8; ++i)
@@ -529,7 +529,7 @@ void thumb14_push(arm& cpu, u32 opc)
 		if( opc & BIT(7-i) )
 		{
 			cpu.r[13] -= 4;
-			cpu.write(cpu.r[13], cpu.r[7-i], 32, type);
+			cpu.write(cpu.r[13]&~3, cpu.r[7-i], 32, type);
 			type = ARM_CYCLE::S;
 		}
 	}
@@ -807,7 +807,7 @@ void arm7tdmi::reset()
 	r13_irq =  0x03007FA0;
 	switch_to_mode(ARM_MODE_SUPER);
 	spsr_svc = 0x9f;
-	r[15] = 0x08000000u;
+	r[15] = 0;//0x08000000u;
 	cpsr.b.T = 0;
 	cpsr.b.I = 0;
 	stamp = 0;

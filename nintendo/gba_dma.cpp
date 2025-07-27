@@ -15,8 +15,9 @@ void gba::exec_dma(int chan)
 	//std::println("DMA{} from ${:X} to ${:X}, {} units", chan, srcaddr, dstaddr, len);
 	
 	const bool B32 = ctrl & BIT(10);
-	int src_inc = B32?4:2;
-	int dst_inc = B32?4:2;
+	if( B32 ) len *= 2;
+	int src_inc = 2;
+	int dst_inc = 2;
 	if( ((ctrl>>7)&3) == 1 ) src_inc = -src_inc;
 	else if( ((ctrl>>7)&3) == 2 ) src_inc = 0;
 	if( ((ctrl>>5)&3) == 1 ) dst_inc = -dst_inc;
@@ -24,8 +25,8 @@ void gba::exec_dma(int chan)
 	
 	for(u32 i = 0; i < len; ++i)
 	{
-		u32 val = read(srcaddr, B32?32:16, ARM_CYCLE::X);
-		write(dstaddr, val&(B32?0xffffFFFFu:0xffffu), B32?32:16, ARM_CYCLE::X);
+		u32 val = read(srcaddr, 16, ARM_CYCLE::X);
+		write(dstaddr, val&0xffff, 16, ARM_CYCLE::X);
 		
 		dstaddr += dst_inc;
 		srcaddr += src_inc;
