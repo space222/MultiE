@@ -33,22 +33,7 @@ void gba::write_io(u32 addr, u32 v, int size)
 	if( addr == 0x04000088 ) { snd88 = v; return; }
 
 	if( addr < 0x04000060 ) { write_lcd_io(addr, v); return; }
-	if( addr < 0x040000B0 ) 
-	{
-		if( addr == 0x040000A0 || addr == 0x040000A2 )
-		{
-			snd_fifo_a.push_front(v);
-			snd_fifo_a.push_front(v>>8);
-			return;
-		}
-		if( addr == 0x040000A4 || addr == 0x040000A6 )
-		{
-			snd_fifo_b.push_front(v);
-			snd_fifo_b.push_front(v>>8);
-			return;
-		}		 
-		write_snd_io(addr, v); return; 
-	}
+	if( addr < 0x040000B0 ) { write_snd_io(addr, v); return; }
 	if( addr < 0x04000100 ) { write_dma_io(addr, v); return; }
 	if( addr < 0x04000120 ) { write_tmr_io(addr, v); return; }
 	if( addr < 0x04000130 ) { write_comm_io(addr, v); return; }
@@ -59,6 +44,7 @@ void gba::write_io(u32 addr, u32 v, int size)
 		if( addr == 0x04000301 )
 		{
 			halted = true;
+			if( !IME ) { std::println("Halted with IME=0"); }
 			return;
 		}
 		write_sys_io(addr, v); 
@@ -91,7 +77,7 @@ u32 gba::read_io(u32 addr, int size)
 	if( addr < 0x04000060 ) return read_lcd_io(addr);
 	if( addr < 0x040000B0 ) return read_snd_io(addr);
 	if( addr < 0x04000100 ) return read_dma_io(addr);
-	if( addr < 0x04000120 ) return 0xffff;//read_tmr_io(addr);
+	if( addr < 0x04000120 ) { std::println("read timr reg ${:X}!", addr); return read_tmr_io(addr); }
 	if( addr < 0x04000130 ) return read_comm_io(addr);
 	if( addr < 0x04000134 ) return read_pad_io(addr);
 	if( addr < 0x04000200 ) return read_comm_io(addr);

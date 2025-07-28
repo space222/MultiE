@@ -37,6 +37,7 @@ void gba::exec_dma(int chan)
 		ISTAT |= BIT(8 + chan);
 		check_irqs();
 	}
+	dmaregs[base + 5] &= ~BIT(15);
 }
 
 void gba::write_dma_io(u32 addr, u32 v)

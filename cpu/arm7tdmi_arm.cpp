@@ -38,8 +38,8 @@ void arm7_mul_long(arm& cpu, u32 opc)
 			val |= cpu.r[RdLo];
 			temp += val;
 		}
-		cpu.r[RdHi] = temp>>32;
 		cpu.r[RdLo] = temp;
+		cpu.r[RdHi] = temp>>32;
 		if( SBIT )
 		{
 			cpu.cpsr.b.N = temp>>63;
@@ -50,13 +50,13 @@ void arm7_mul_long(arm& cpu, u32 opc)
 		temp *= s32(M);
 		if( A )
 		{
-			u64 val = cpu.r[RdHi];
+			s64 val = cpu.r[RdHi];
 			val <<= 32;
 			val |= cpu.r[RdLo];
 			temp += val;
 		}
-		cpu.r[RdHi] = temp>>32;
 		cpu.r[RdLo] = temp;
+		cpu.r[RdHi] = temp>>32;
 		if( SBIT )
 		{
 			cpu.cpsr.b.N = (temp>>63)&1;

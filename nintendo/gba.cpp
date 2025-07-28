@@ -82,15 +82,20 @@ u32 gba::read(u32 addr, int size, ARM_CYCLE ct)
 {
 	if( addr >= 0x08000000 ) 
 	{
+		if( addr >= 0x09000000 ) std::println("read ${:X}", addr);
 		if( addr >= 0x0d000000 && addr < 0x0e000000 ) return 1; 
 		//^stubs some kind of save hw, yoinked from older emu to get vrally3 going
+	
+		if( addr == 0x0E000000 ) return 0x62;
+		if( addr == 0x0E000001 ) return 0x13;
 	
 		addr -= 0x08000000u;
 		if( addr >= ROM.size() )
 		{
 			//std::println("${:X}:{} Read from beyond rom at ${:X}", cpu.r[15]-4, (u32)cpu.cpsr.b.T, addr);
 			//exit(1);
-			return 0xffffFFFFu;
+			//return 0;//0xffffFFFFu;
+			addr %= ROM.size();
 		}
 		return sized_read(ROM.data(), addr, size);
 	}
@@ -112,7 +117,7 @@ u32 gba::read(u32 addr, int size, ARM_CYCLE ct)
 	}
 	if( addr < 0x05000000 )
 	{  // I/O
-		std::println("${:X}: read{} ${:X}, IE = ${:X}", cpu.r[15], size, addr, IMASK);
+		//std::println("${:X}: read{} ${:X}, IE = ${:X}", cpu.r[15], size, addr, IMASK);
 		return read_io(addr, size);
 	}
 	if( addr < 0x06000000 )
@@ -188,8 +193,8 @@ void gba::run_frame()
 			sched.run_event();
 		}
 	}
-	ISTAT |= (IMASK & 0x78);
-	check_irqs();
+	//ISTAT |= (IMASK & 0x78);
+	//check_irqs();
 }
 
 bool gba::loadROM(const std::string fname)
@@ -269,7 +274,19 @@ void gba::event(u64 old_stamp, u32 evc)
 	
 	if( evc == EVENT_SCANLINE_START )
 	{
-		VCOUNT = (VCOUNT+1)&0xff;		
+		VCOUNT = (VCOUNT+1)&0xff;
+		
+		if( (dmaregs[5]&0xB000)   == 0xA000 ) { exec_dma(0); }
+		if( (dmaregs[6+5]&0xB000) == 0xA000 ) { exec_dma(1); }
+		if( (dmaregs[12+5]&0xB000)== 0xA000 ) { exec_dma(2); }
+		if( (dmaregs[18+5]&0xB000)== 0xA000 ) { exec_dma(3); }
+		if( VCOUNT == 160 )
+		{
+			if( (dmaregs[5]&0xB000)   == 0x9000 ) { exec_dma(0); }
+			if( (dmaregs[6+5]&0xB000) == 0x9000 ) { exec_dma(1); }
+			if( (dmaregs[12+5]&0xB000)== 0x9000 ) { exec_dma(2); }
+			if( (dmaregs[18+5]&0xB000)== 0x9000 ) { exec_dma(3); }		
+		}
 
 		DISPSTAT &= ~7;
 		DISPSTAT |= (VCOUNT >= 160 && VCOUNT != 228) ? 1 : 0;
@@ -304,6 +321,7 @@ void gba::event(u64 old_stamp, u32 evc)
 	
 	if( evc == EVENT_FRAME_COMPLETE )
 	{
+		//std::println("mode {}", lcd.regs[0]&7);
 		frame_complete = true;
 		VCOUNT = 0xff;
 		event(old_stamp, EVENT_SCANLINE_START);

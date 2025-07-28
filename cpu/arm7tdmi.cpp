@@ -765,8 +765,9 @@ void arm7tdmi::step()
 	{
 		spsr_irq = cpsr.v;
 		switch_to_mode(ARM_MODE_IRQ);
+		cpsr.b.M = ARM_MODE_IRQ;
 		cpsr.b.I = 1;
-		r[14] = r[15] - (cpsr.b.T?2:0);
+		r[14] = r[15] + (cpsr.b.T?2:0);
 		cpsr.b.T = 0;
 		r[15] = 0x18;
 		flushp();
