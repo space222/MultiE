@@ -313,6 +313,22 @@ void imgui_run()
 						crt_scale = 3;
 					}
 				}
+				if( ImGui::MenuItem("Gameboy Advance") )
+				{
+					std::string f = getOpenFile("GBA");
+					if( !f.empty() )
+					{
+						delete sys;
+						sys = new gba;
+						if( ! sys->loadROM(f) ) 
+						{
+							printf("unable to load ROM\n");
+							exit(1);
+						}
+						else newinstance = true;
+						crt_scale = 2;
+					}				
+				}
 				if( ImGui::MenuItem("NES") )
 				{
 					std::string f = getOpenFile("NES");
@@ -426,23 +442,7 @@ void imgui_run()
 			ImGui::Separator();
 			
 			if( ImGui::BeginMenu("Beta") ) 
-			{
-				if( ImGui::MenuItem("Nintendo GBA") )
-				{
-					std::string f = getOpenFile("GBA");
-					if( !f.empty() )
-					{
-						delete sys;
-						sys = new gba;
-						if( ! sys->loadROM(f) ) 
-						{
-							printf("unable to load ROM\n");
-							exit(1);
-						}
-						else newinstance = true;
-						crt_scale = 3;
-					}				
-				}				
+			{				
 				if( ImGui::MenuItem("Apple IIe") )
 				{
 					std::string f = getOpenFile("Apple IIe");
