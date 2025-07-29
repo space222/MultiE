@@ -7,18 +7,26 @@ void gba::write_io(u32 addr, u32 v, int size)
 	if( size == 8 )
 	{
 		v &= 0xff;
+		if( addr == 0x04000301 )
+		{
+			halted = true;
+			if( !IME ) { std::println("Halted with IME=0"); exit(1); }
+			return;
+		}
 		if( addr == 0x04000202 )
 		{
-			ISTAT &= ~(v&0xff);
+			ISTAT = (ISTAT&0xff00) | (ISTAT & ~v);
 			check_irqs();
 			return;
-		} else if( addr == 0x04000203 ) {
-			ISTAT &= ~(v<<8);
+		}
+		if( addr == 0x04000203 ) 
+		{
+			ISTAT = (ISTAT&0x00ff) | (ISTAT & ~(v<<8));
 			check_irqs();
 			return;
 		}
 		u16 c = read_io(addr&~1, 16);
-		c &= 0xff<<(((addr&1)^1)*8);
+		c &= 0xff00>>((addr&1)*8);
 		c |= v<<((addr&1)*8);
 		write_io(addr&~1, c, 16);
 		return;
@@ -41,12 +49,7 @@ void gba::write_io(u32 addr, u32 v, int size)
 	if( addr < 0x04000200 ) { write_comm_io(addr, v); return; }
 	if( addr < 0x04000800 ) 
 	{
-		if( addr == 0x04000301 )
-		{
-			halted = true;
-			if( !IME ) { std::println("Halted with IME=0"); }
-			return;
-		}
+		
 		write_sys_io(addr, v); 
 		return;
 	}

@@ -15,6 +15,14 @@ void gba::exec_dma(int chan)
 	//std::println("DMA{} from ${:X} to ${:X}, {} units", chan, srcaddr, dstaddr, len);
 	
 	const bool B32 = ctrl & BIT(10);
+	if( B32 )
+	{
+		srcaddr &= ~3;
+		dstaddr &= ~3;	
+	} else {
+		srcaddr &= ~1;
+		dstaddr &= ~1;	
+	}
 	if( B32 ) len *= 2;
 	int src_inc = 2;
 	int dst_inc = 2;

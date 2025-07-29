@@ -145,10 +145,13 @@ Status: YM2612 uses the Nuken OPN library... Poorly? Fantastic Dizzy and UMK3 la
 
 GBA Todo List
 ----------------
-1. Double check thumb load/stores, including address masking
-2. Try to start from the BIOS
-3. double check arm single xfer, possibly removing user reg access temporarily
-4. Finish the tests. 
+1. Run the single step tests against the current cpu
+2. timers and timer scheduling
+3. Affine backgrounds & modes 1+2
+4. Affine sprites
+5. sound
+6. save hardware
+7. blending
 
 
 

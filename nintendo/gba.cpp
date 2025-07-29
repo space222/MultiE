@@ -10,11 +10,17 @@
 #define VCOUNT lcd.regs[3]
 const u32 cycles_per_frame = 280896;
 
+u8 SRAM[0x30000];
+u8 flash_cmd = 0;
+u8 flash_bank = 0;
+u8 flash_state = 0;
+static u8 lastval = 0;
+
 static void sized_write(u8* data, u32 addr, u32 v, int size)
 {
 	if( size == 8 ) data[addr] = v; 
-	else if( size == 16 ) *(u16*)&data[addr] = v;
-	else *(u32*)&data[addr] = v;
+	else if( size == 16 ) memcpy(data+(addr&~1), &v, 2);
+	else memcpy(data+(addr&~3), &v, 4);
 }
 
 static u32 sized_read(u8* data, u32 addr, int size)
@@ -24,118 +30,90 @@ static u32 sized_read(u8* data, u32 addr, int size)
 	else return *(u32*)&data[addr];
 }
 
+static bool rtc_active = false;
+
 void gba::write(u32 addr, u32 v, int size, ARM_CYCLE ct)
 {
-	if( addr < 0x02000000 ) { return; } // write to BIOS ignored
+	cpu.stamp += 1;
 	if( size == 8 ) v &= 0xff;
 	else if( size == 16 ) v &= 0xffff;
-	if( addr < 0x03000000 )
-	{
-		addr &= 0x3FFFF;
-		sized_write(ewram, addr, v, size);
-		return;
-	}
-	if( addr < 0x04000000 )
-	{
-		addr &= 0x7fff;
-		sized_write(iwram, addr, v, size);
-		return;
-	}
-	if( addr < 0x05000000 )
-	{  // I/O writes
-		//if( ct == ARM_CYCLE::X && addr >= 0x040000B0 && addr <= 0x040000E0 ) return;
-		write_io(addr, v, size);
-		//std::println("IO Write{} ${:X} = ${:X}", size, addr, v);
-		return;
-	}
+	if( addr < 0x02000000 ) { return; } // write to BIOS ignored	
+	if( addr < 0x03000000 ) { sized_write(ewram, addr&0x3FFFF, v, size); return; }
+	if( addr < 0x04000000 ) { sized_write(iwram, addr&0x7fff, v, size);  return; }
+	if( addr < 0x05000000 ) { write_io(addr, v, size); /*std::println("IO Write{} ${:X} = ${:X}", size, addr, v);*/ return;	}
 	if( addr < 0x06000000 )
 	{
-		addr &= 0x3ff;
 		if( size == 8 ) { size = 16; v = (v&0xff)*0x101; addr &= ~1; }
-		sized_write(palette, addr, v, size);
+		sized_write(palette, addr&0x3ff, v, size);
 		return;
 	}
 	if( addr < 0x07000000 )
 	{ // VRAM todo mirroring
-	
-		if( size == 8 )
-		{
-			size = 16;
-			addr &= ~1;
-			v &= 0xff;
-			v |= v<<8;
-		}
+		if( size == 8 ) { size = 16; addr &= ~1; v = (v&0xff)*0x101; }
 		addr &= 0x1ffff;
 		if( addr & 0x10000 ) addr &= ~0x8000;
 		sized_write(vram, addr, v, size);
 		return;
 	}
-	if( addr < 0x08000000 )
-	{ // OAM
-		sized_write(oam, addr&0x3ff, v, size);
-		return;
-	}
+	if( addr < 0x08000000 ) { sized_write(oam, addr&0x3ff, v, size); return; }
 	std::println("${:X} = ${:X}", addr, v);
 } //end of write
 
 u32 gba::read(u32 addr, int size, ARM_CYCLE ct)
 {
-	if( addr >= 0x08000000 ) 
-	{
-		if( addr >= 0x09000000 ) std::println("read ${:X}", addr);
-		if( addr >= 0x0d000000 && addr < 0x0e000000 ) return 1; 
-		//^stubs some kind of save hw, yoinked from older emu to get vrally3 going
+	cpu.stamp += 1;
 	
-		if( addr == 0x0E000000 ) return 0x62;
-		if( addr == 0x0E000001 ) return 0x13;
-	
-		addr -= 0x08000000u;
-		if( addr >= ROM.size() )
-		{
-			//std::println("${:X}:{} Read from beyond rom at ${:X}", cpu.r[15]-4, (u32)cpu.cpsr.b.T, addr);
-			//exit(1);
-			//return 0;//0xffffFFFFu;
-			addr %= ROM.size();
-		}
-		return sized_read(ROM.data(), addr, size);
+	if( addr < 0x02000000ul )
+	{ // BIOS
+		if( cpu.r[15] < 0x4000 ) return sized_read(bios, addr&0x3fff, size);
+		return 0;//cpu.fetch;
 	}
-	if( addr < 0x02000000 ) 
-	{ 
-		if( cpu.r[15] < 0x4000 ) 
-			return sized_read(bios, addr&0x3fff, size);
-		return cpu.fetch; 
+	if( addr < 0x03000000ul )
+	{ // WRAM_lo
+		return sized_read(ewram, addr&0x3ffff, size);	
 	}
-	if( addr < 0x03000000 )
-	{
-		addr &= 0x3FFFF;
-		return sized_read(ewram, addr, size);
+	if( addr < 0x04000000ul )
+	{ // WRAM_hi
+		return sized_read(iwram, addr&0x7fff, size);
 	}
-	if( addr < 0x04000000 )
-	{
-		addr &= 0x7fff;
-		return sized_read(iwram, addr, size);
-	}
-	if( addr < 0x05000000 )
-	{  // I/O
-		//std::println("${:X}: read{} ${:X}, IE = ${:X}", cpu.r[15], size, addr, IMASK);
+	if( addr < 0x05000000ul )
+	{ // IO
+		if( size == 8 ) std::println("read8 ${:X}", addr);
 		return read_io(addr, size);
 	}
-	if( addr < 0x06000000 )
-	{
-		addr &= 0x3ff;
-		return sized_read(palette, addr, size);
+	if( addr < 0x06000000ul )
+	{ // palette
+		return sized_read(palette, addr&0x3ff, size);
 	}
-	if( addr < 0x07000000 )
+	if( addr < 0x07000000ul )
 	{ // VRAM
-		addr &= 0x1ffff;
 		if( addr & 0x10000 ) addr &= ~0x8000;
-		return sized_read(vram, addr, size);
+		return sized_read(vram, addr&0x1ffff, size);
 	}
-	if( addr < 0x08000000 )
+	if( addr < 0x08000000ul )
 	{ // OAM
 		return sized_read(oam, addr&0x3ff, size);
 	}
-	return 0;
+	if( addr < 0x10000000ul )
+	{  // either ROM or various types of SaveRAM that isn't supported yet
+		if( addr >= 0x0d000000 && addr  < 0x0e000000 ) return 1;
+		if( addr >= 0x0e000000 && addr <= 0x0e00FFFF )
+		{
+			if( /*flash_cmd == 0x90 &&*/ addr == 0x0E000000 ) return 0x62;
+			if( /*flash_cmd == 0x90 &&*/ addr == 0x0E000001 ) return 0x13;
+			//return SRAM[flash_bank | (addr&0xffff)];
+		}
+		addr &= 0x01ffFFFf;
+		if( addr > ROM.size() )
+		{
+			addr %= ROM.size();
+		}
+		//printf("ROM Read8 %X\n", addr);
+		return sized_read(ROM.data(), addr, size);
+	}
+	
+	//printf("read8 %X\n", addr);
+	return 0;//cpu.fetch;	
 }
 
 void gba::reset()
@@ -193,8 +171,54 @@ void gba::run_frame()
 			sched.run_event();
 		}
 	}
-	//ISTAT |= (IMASK & 0x78);
-	//check_irqs();
+	/*for(int scanline = 0; scanline < 228; ++scanline)
+	{
+		if( scanline == 0 )
+		{
+			lcd.regs[2] &= ~1;
+		} else if( scanline == 160 ) {
+			lcd.regs[2] |= 1;
+			if( (lcd.regs[2] & 8) )
+			{
+				//printf("VBlank IRQ!\n");
+				ISTAT |= 1;
+				check_irqs();
+			}
+		}
+		lcd.regs[3] = scanline;
+		if( scanline == (lcd.regs[2]>>8) )
+		{
+			lcd.regs[2] |= 4;
+			if( (lcd.regs[2] & 0x20) )
+			{
+				//printf("VCount IRQ!\n");
+				ISTAT |= 4;
+				check_irqs();
+			}
+		} else {
+			lcd.regs[2] &= ~4;
+		}
+		
+		if( halted && (ISTAT&IMASK) )
+		{
+			halted = false;
+			//printf("System out of halt mode, PC=%X\n", cpu.regs[15]);
+		}
+		for(int i = 0; i < 1232 && !halted; i+=2)  // a guess at an average number of cycles
+		{
+			cpu.step();
+			//if( cpu.regs[15] >= 0x08000000u ) exit(1);
+			//timer_cycles(3);
+			if( i == 900 )
+			{
+				lcd.regs[2] |= 2;
+				if( (lcd.regs[2] & 0x10) ) {  ISTAT |= 2; check_irqs(); }
+			} else if( i == 0 ) {
+				lcd.regs[2] &= ~2;
+			}
+		}
+		if( scanline < 160 ) lcd.draw_scanline(scanline);
+	}*/
 }
 
 bool gba::loadROM(const std::string fname)
