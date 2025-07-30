@@ -124,9 +124,11 @@ void LCDEngine::render_affine_sprite(int Y, int S)
 	s32 sprx = (PB*(sLine - (dH/2)));
 	s32 spry = (PD*(sLine - (dH/2)));
 	
+	u32 sprite_mode = ((attr0>>10)&3);
+	
 	for(int x = 0; x < dW; ++x)
 	{
-		if( x+sX < 0 || spr[x+sX] ) continue;
+		if( x+sX < 0 || (sprite_mode<2 && spr[x+sX]) ) continue;
 		if( x+sX >= 240 ) break;
 		
 		s32 tx = (sprx + PA*(x-(dW/2)))>>8;
@@ -154,14 +156,15 @@ void LCDEngine::render_affine_sprite(int Y, int S)
 			p &= 15;
 			if( p ) p |= (attr2>>8)&0xf0;
 		}
-		if( ((attr0>>10)&3) >= 2 )
+		if( sprite_mode >= 2 )
 		{
 			objwin[sX+x] |= (p?1:0);
 			continue;
 		}
 		spr[sX+x] = p;
 		spr_pri[sX+x] = (attr2>>10)&3;
-	}	
+	}
+	//std::putchar('\n');
 }
 
 void LCDEngine::render_sprites(int Y)
@@ -198,10 +201,11 @@ void LCDEngine::render_sprites(int Y)
 		if( attr1 & 0x100 ) sX |= ~0x1ff;
 		
 		int tilesize = ((attr0&BIT(13))?64:32);
+		u32 sprite_mode = ((attr0>>10)&3);
 		
 		for(int x = 0; x < W; ++x)
 		{
-			if( sX+x < 0 || spr[sX+x] ) continue;
+			if( sX+x < 0 || (sprite_mode<2 && spr[x+sX]) ) continue;
 			if( sX+x >= 240 ) break;
 			int uX = (attr1 & BIT(12)) ? W-x-1 : x;
 			u32 charbase = 0x10000 + ((attr2&0x3ff)*32);
@@ -223,7 +227,7 @@ void LCDEngine::render_sprites(int Y)
 				p &= 15;
 				if( p ) p |= (attr2>>8)&0xf0;
 			}
-			if( ((attr0>>10)&3) >= 2 )
+			if( sprite_mode >= 2 )
 			{
 				objwin[sX+x] |= (p?1:0);
 				continue;
