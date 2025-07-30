@@ -65,8 +65,9 @@ u32 gba::read(u32 addr, int size, ARM_CYCLE ct)
 	
 	if( addr < 0x02000000ul )
 	{ // BIOS
-		if( cpu.r[15] < 0x4000 ) return sized_read(bios, addr&0x3fff, size);
-		return 0;//cpu.fetch;
+		if( cpu.r[15] < 0x4000 ) return bios_open_bus = sized_read(bios, addr&0x3fff, size);
+		//std::println("BIOS read with PC = ${:X}", cpu.r[15]);
+		return bios_open_bus;
 	}
 	if( addr < 0x03000000ul )
 	{ // WRAM_lo
@@ -78,7 +79,6 @@ u32 gba::read(u32 addr, int size, ARM_CYCLE ct)
 	}
 	if( addr < 0x05000000ul )
 	{ // IO
-		if( size == 8 ) std::println("read8 ${:X}", addr);
 		return read_io(addr, size);
 	}
 	if( addr < 0x06000000ul )
@@ -112,8 +112,8 @@ u32 gba::read(u32 addr, int size, ARM_CYCLE ct)
 		return sized_read(ROM.data(), addr, size);
 	}
 	
-	//printf("read8 %X\n", addr);
-	return 0;//cpu.fetch;	
+	//std::println("Garbage read{} ${:X}", size, addr);
+	return 0;	
 }
 
 void gba::reset()

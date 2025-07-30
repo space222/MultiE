@@ -92,6 +92,78 @@ void LCDEngine::clear_bg(int ind)
 static const int sprw[] = { 8,16,32,64 , 16,32,32,64 , 8,8,16,32 , 0,0,0,0 };
 static const int sprh[] = { 8,16,32,64 , 8,8,16,32 ,  16,32,32,64, 0,0,0,0 };
 
+void LCDEngine::render_affine_sprite(int Y, int S)
+{
+	u16 attr0 = *(u16*)&oam[S*8];
+	u16 attr1 = *(u16*)&oam[S*8 + 2];
+	u16 attr2 = *(u16*)&oam[S*8 + 4];
+	u16 param_index = (attr1>>9)&0x1f;
+	
+	int sY = attr0 & 0xff;
+	if( sY > 159 ) sY = (s8)(attr0 & 0xff);
+	int H = sprh[((attr0>>14)&3)*4 + ((attr1>>14)&3)];
+	if( H == 0 ) return;
+	int dH = H * ((attr0&BIT(9)) ? 2: 1);
+	int sLine = Y - sY;
+	if( sLine < 0 || sLine >= dH ) return;
+	
+	int W = sprw[((attr0>>14)&3)*4 + ((attr1>>14)&3)];
+	if( W == 0 ) return;
+	int dW = W * ((attr0&BIT(9)) ? 2: 1);
+	
+	int sX = (attr1 & 0x1ff);
+	if( attr1 & 0x100 ) sX |= ~0x1ff;
+		
+	int tilesize = ((attr0&BIT(13))?64:32);
+	
+	s32 PA = *(s16*)&oam[6 + param_index*32 + 0];
+	s32 PB = *(s16*)&oam[6 + param_index*32 + 8];
+	s32 PC = *(s16*)&oam[6 + param_index*32 + 16];
+	s32 PD = *(s16*)&oam[6 + param_index*32 + 24];
+	
+	s32 sprx = (PB*(sLine - (dH/2)));
+	s32 spry = (PD*(sLine - (dH/2)));
+	
+	for(int x = 0; x < dW; ++x)
+	{
+		if( x+sX < 0 || spr[x+sX] ) continue;
+		if( x+sX >= 240 ) break;
+		
+		s32 tx = (sprx + PA*(x-(dW/2)))>>8;
+		s32 ty = (spry + PC*(x-(dW/2)))>>8;
+		tx += W/2;
+		ty += H/2;
+		if(tx < 0 || ty < 0 || tx >= W || ty >= H ) continue;
+		
+		u32 charbase = 0x10000 + ((attr2&0x3ff)*32);
+		if( DISPCNT & BIT(6) )
+		{
+			charbase += (((ty/8)*(W/8))*tilesize);
+		} else {
+			charbase += ((ty/8)*1024);
+		}
+		charbase += (tx/8)*tilesize;
+	
+		u8 p = 0;
+		
+		if( (attr0&BIT(13)) )
+		{
+			p = VRAM[charbase + (ty&7)*8 + (tx&7)];
+		} else {
+			p = VRAM[charbase + (ty&7)*4 + ((tx&7)>>1)] >> (4*(tx&1));
+			p &= 15;
+			if( p ) p |= (attr2>>8)&0xf0;
+		}
+		if( ((attr0>>10)&3) >= 2 )
+		{
+			objwin[sX+x] |= (p?1:0);
+			continue;
+		}
+		spr[sX+x] = p;
+		spr_pri[sX+x] = (attr2>>10)&3;
+	}	
+}
+
 void LCDEngine::render_sprites(int Y)
 {
 	if( !(DISPCNT & BIT(12)) ) return;
@@ -104,6 +176,13 @@ void LCDEngine::render_sprites(int Y)
 		u16 attr2 = *(u16*)&oam[S*8 + 4];
 		if( !(attr0 & BIT(8)) && (attr0 & BIT(9)) ) continue;
 		if( (attr2&0x3ff)<=512 && (DISPCNT&7)>=3 ) continue;
+		
+		if( attr0 & BIT(8) )
+		{
+			render_affine_sprite(Y, S);
+			continue;
+		}		
+		
 		int sY = attr0 & 0xff;
 		if( sY > 159 ) sY = (s8)(attr0 & 0xff);
 		int H = sprh[((attr0>>14)&3)*4 + ((attr1>>14)&3)];
@@ -144,9 +223,9 @@ void LCDEngine::render_sprites(int Y)
 				p &= 15;
 				if( p ) p |= (attr2>>8)&0xf0;
 			}
-			if( ((attr0>>10)&3) == 2 )
+			if( ((attr0>>10)&3) >= 2 )
 			{
-				objwin[x] |= (p?1:0);
+				objwin[sX+x] |= (p?1:0);
 				continue;
 			}
 			spr[sX+x] = p;
@@ -196,7 +275,7 @@ void LCDEngine::render_text_bg(u32 Y, u32 bgind)
 	}
 }
 
-void LCDEngine::render_affine_bg(u32 line, u32 bgind)
+void LCDEngine::render_affine_bg(u32, u32 bgind)
 {
 	const u16 bgctrl = regs[4+bgind];
 	u32 mapbase = ((bgctrl>>8)&0x1f)*0x800;

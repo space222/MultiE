@@ -147,11 +147,10 @@ GBA Todo List
 ----------------
 1. Run the single step tests against the current cpu
 2. timers and timer scheduling
-3. Affine backgrounds & modes 1+2
-4. Affine sprites
-5. sound
-6. save hardware
-7. blending
+3. Affine sprites
+4. sound
+5. save hardware
+6. blending
 
 
 

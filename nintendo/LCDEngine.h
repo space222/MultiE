@@ -6,6 +6,7 @@ class LCDEngine
 public:
 	LCDEngine(u8* v, u8* p, u8* o) : VRAM(v), palette(p), oam(o) {}
 	
+	void render_affine_sprite(int Y, int sprind);
 	void render_sprites(int Y);
 	void render_text_bg(u32 Y, u32 bgind);
 	void render_affine_bg(u32 Y, u32 bgind);
