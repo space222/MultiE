@@ -168,7 +168,7 @@ void LCDEngine::render_text_bg(u32 Y, u32 bgind)
 	const int H = (bgctrl&BIT(15)) ? 512 : 256;
 	Y += scrolly;
 	Y &= (H-1);
-	mapbase += (Y > 255) ? 0x800*2 : 0;
+	mapbase += (Y > 255) ? (0x800*(W==512?2:1)) : 0;
 	Y &= 255;
 	
 	for(u32 x = 0; x < 240; ++x)
@@ -196,6 +196,46 @@ void LCDEngine::render_text_bg(u32 Y, u32 bgind)
 	}
 }
 
+void LCDEngine::render_affine_bg(u32 line, u32 bgind)
+{
+	const u16 bgctrl = regs[4+bgind];
+	u32 mapbase = ((bgctrl>>8)&0x1f)*0x800;
+	u32 charbase = ((bgctrl>>2)&3)*0x4000;
+	u32 tilesize = 64;
+	
+	int size = 0;
+	switch( bgctrl>>14 )
+	{
+	case 0: size = 128; break;
+	case 1: size = 256; break;
+	case 2: size = 512; break;
+	case 3: size = 1024; break;
+	}
+	
+	s32 Y = ((bgind == 2) ? bg2y : bg3y);
+	s32 X = ((bgind == 2) ? bg2x : bg3x);
+	
+	s16 deltaX = ((bgind == 2) ? regs[0x10] : regs[0x18]);
+	s16 deltaY = ((bgind == 2) ? regs[0x12] : regs[0x20]);
+	
+	for(u32 x = 0; x < 240; ++x, X+=deltaX, Y+=deltaY)
+	{
+		bg[bgind][x] = 0;
+		
+		if( !(bgctrl & BIT(13)) && ((Y<0)||(X<0)||(Y>=size*256)||(X>=size*256)) ) continue;
+		
+		u32 mX = (X>>8) & (size-1);
+		u32 mY = (Y>>8) & (size-1);
+		
+		u8 entry = VRAM[mapbase + (mY/8)*(size/8) + (mX/8)];
+		
+		u8 tY = (mY&7);
+		u8 tX = (mX&7);
+			
+		bg[bgind][x] = VRAM[charbase + entry*tilesize + (tY&7)*8 + (tX&7)];	
+	}
+}
+
 void LCDEngine::draw_mode_0(u32 Y)
 {
 	const u32 backdrop = c16to32(*(u16*)&palette[0]);
@@ -213,14 +253,13 @@ void LCDEngine::draw_mode_1(u32 Y)
 {
 	const u32 backdrop = c16to32(*(u16*)&palette[0]);
 	for(u32 x = 0; x < 240; ++x) fbuf[Y*240+x] = backdrop;
-
+	
 	render_sprites(Y);
 			
 	if( DISPCNT & BIT(8) )  render_text_bg(Y, 0); else clear_bg(0);
 	if( DISPCNT & BIT(9) ) 	render_text_bg(Y, 1); else clear_bg(1);
-	clear_bg(2);
+	if( DISPCNT & BIT(10) ) render_affine_bg(Y, 2); else clear_bg(2);
 	clear_bg(3);
-	//if( DISPCNT & BIT(10) ) render_affine_bg(Y, 2); else clear_bg(2);
 }
 
 void LCDEngine::draw_mode_2(u32 Y)
@@ -231,8 +270,8 @@ void LCDEngine::draw_mode_2(u32 Y)
 	render_sprites(Y);
 	clear_bg(0);
 	clear_bg(1);
-	clear_bg(2);
-	clear_bg(3);
+	if( DISPCNT & BIT(10) ) render_affine_bg(Y, 2); else clear_bg(2);
+	if( DISPCNT & BIT(11) ) render_affine_bg(Y, 3); else clear_bg(3);
 }
 
 void LCDEngine::draw_mode_3(u32 Y)

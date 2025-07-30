@@ -8,6 +8,7 @@ public:
 	
 	void render_sprites(int Y);
 	void render_text_bg(u32 Y, u32 bgind);
+	void render_affine_bg(u32 Y, u32 bgind);
 	void clear_bg(int);
 	
 	void draw_scanline(u32);
@@ -17,6 +18,9 @@ public:
 	void draw_mode_3(u32);
 	void draw_mode_4(u32);
 	void draw_mode_5(u32);
+	
+	s32 bg2x, bg2y;
+	s32 bg3x, bg3y;
 	
 	u8* VRAM;
 	u8* palette;

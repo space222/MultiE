@@ -123,11 +123,6 @@ void gba::reset()
 	cpu.write= [&](u32 a, u32 v, int s, ARM_CYCLE c) { write(a,v,s,c); };
 	for(int i = 0; i < 16; ++i) cpu.r[i] = 0;
 	cpu.reset();
-	//for(int i = 0; i < 16; ++i) cpu.r[i] = 0;
-	//cpu.r[15] = 0;
-	//cpu.cpsr.b.I = 1;
-	//cpu.cpsr.b.T = 0;
-	//cpu.flushp();
 	halted = false;
 	
 	//sched.add_event((16*1024*1024)/32768, EVENT_SND_FIFO);
@@ -340,6 +335,10 @@ void gba::event(u64 old_stamp, u32 evc)
 	{
 		DISPSTAT &= ~2;
 		lcd.draw_scanline(VCOUNT);
+		lcd.bg2x += (s16)lcd.regs[0x11];
+		lcd.bg2y += (s16)lcd.regs[0x13];
+		lcd.bg3x += (s16)lcd.regs[0x19];
+		lcd.bg3y += (s16)lcd.regs[0x21];
 		return;
 	}
 	
@@ -348,6 +347,10 @@ void gba::event(u64 old_stamp, u32 evc)
 		//std::println("mode {}", lcd.regs[0]&7);
 		frame_complete = true;
 		VCOUNT = 0xff;
+		memcpy(&lcd.bg2x, &lcd.regs[0x14], 4); lcd.bg2x = (lcd.bg2x<<4)>>4;
+		memcpy(&lcd.bg2y, &lcd.regs[0x16], 4); lcd.bg2y = (lcd.bg2y<<4)>>4;
+		memcpy(&lcd.bg3x, &lcd.regs[0x1C], 4); lcd.bg3x = (lcd.bg3x<<4)>>4;
+		memcpy(&lcd.bg3y, &lcd.regs[0x1E], 4); lcd.bg3y = (lcd.bg3y<<4)>>4;
 		event(old_stamp, EVENT_SCANLINE_START);
 		return;
 	}
