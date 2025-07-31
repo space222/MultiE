@@ -166,54 +166,6 @@ void gba::run_frame()
 			sched.run_event();
 		}
 	}
-	/*for(int scanline = 0; scanline < 228; ++scanline)
-	{
-		if( scanline == 0 )
-		{
-			lcd.regs[2] &= ~1;
-		} else if( scanline == 160 ) {
-			lcd.regs[2] |= 1;
-			if( (lcd.regs[2] & 8) )
-			{
-				//printf("VBlank IRQ!\n");
-				ISTAT |= 1;
-				check_irqs();
-			}
-		}
-		lcd.regs[3] = scanline;
-		if( scanline == (lcd.regs[2]>>8) )
-		{
-			lcd.regs[2] |= 4;
-			if( (lcd.regs[2] & 0x20) )
-			{
-				//printf("VCount IRQ!\n");
-				ISTAT |= 4;
-				check_irqs();
-			}
-		} else {
-			lcd.regs[2] &= ~4;
-		}
-		
-		if( halted && (ISTAT&IMASK) )
-		{
-			halted = false;
-			//printf("System out of halt mode, PC=%X\n", cpu.regs[15]);
-		}
-		for(int i = 0; i < 1232 && !halted; i+=2)  // a guess at an average number of cycles
-		{
-			cpu.step();
-			//if( cpu.regs[15] >= 0x08000000u ) exit(1);
-			//timer_cycles(3);
-			if( i == 900 )
-			{
-				lcd.regs[2] |= 2;
-				if( (lcd.regs[2] & 0x10) ) {  ISTAT |= 2; check_irqs(); }
-			} else if( i == 0 ) {
-				lcd.regs[2] &= ~2;
-			}
-		}
-		if( scanline < 160 ) lcd.draw_scanline(scanline);
-	}*/
 }
 
 bool gba::loadROM(const std::string fname)

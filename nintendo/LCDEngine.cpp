@@ -50,33 +50,111 @@ void LCDEngine::draw_scanline(u32 L)
 			u32 win1_x1 = regs[0x21]>>8;
 			if( win0_x2 > 240 || win0_x1 > win0_x2 ) win0_x2 = 240;
 			if( win1_x2 > 240 || win1_x1 > win1_x2 ) win1_x2 = 240;
+			bool do_blend = true;
 			
 			if( (DISPCNT&BIT(13)) && (Y >= win0_y1) && (Y < win0_y2) && (x >= win0_x1) && (x < win0_x2) )
 			{
 				layer_active &= regs[0x24];
+				do_blend = regs[0x24] & 0x20;
 			} else if( (DISPCNT&BIT(14)) && (Y >= win1_y1) && (Y < win1_y2) && (x >= win1_x1) && (x < win1_x2) ) {
-				layer_active &= regs[0x24]>>8;		
+				layer_active &= regs[0x24]>>8;
+				do_blend = (regs[0x24]>>8)&0x20;	
 			} else if( (DISPCNT&BIT(15)) && objwin[x] ) {
 				layer_active &= regs[0x25]>>8;
+				do_blend = (regs[0x25]>>8)&0x20;	
 			} else if( (DISPCNT&0xe000) ) {
 				layer_active &= regs[0x25];
+				do_blend = regs[0x25]&0x20;	
 			}
 		
-			u16 pris[10] = {0};
-			if( layer_active&0x10 ) pris[(spr_pri[x])<<1] = (spr[x] ? (512 + (spr[x]<<1)) : 0);
-			if( (layer_active&8) && bg[3][x] ) pris[(((BG3CNT&3))<<1)|1] = bg[3][x]<<1;
-			if( (layer_active&4) && bg[2][x] ) pris[(((BG2CNT&3))<<1)|1] = bg[2][x]<<1;
-			if( (layer_active&2) && bg[1][x] ) pris[(((BG1CNT&3))<<1)|1] = bg[1][x]<<1;
-			if( (layer_active&1) && bg[0][x] ) pris[(((BG0CNT&3))<<1)|1] = bg[0][x]<<1;
+			u16 pris[10] = {0,0,0,0,0,0,0,0,0,0};
+			u16 ln[10] = {5,5,5,5,5,5,5,5,5,5};
+			if( layer_active&0x10 ) { pris[(spr_pri[x])<<1] = (spr[x] ? (512 + (spr[x]<<1)) : 0); ln[(spr_pri[x])<<1] = 4; }
+			if( (layer_active&8) && bg[3][x] ) { pris[(((BG3CNT&3))<<1)|1] = bg[3][x]<<1; ln[(((BG3CNT&3))<<1)|1] = 3; }
+			if( (layer_active&4) && bg[2][x] ) { pris[(((BG2CNT&3))<<1)|1] = bg[2][x]<<1; ln[(((BG2CNT&3))<<1)|1] = 2; }
+			if( (layer_active&2) && bg[1][x] ) { pris[(((BG1CNT&3))<<1)|1] = bg[1][x]<<1; ln[(((BG1CNT&3))<<1)|1] = 1; }
+			if( (layer_active&1) && bg[0][x] ) { pris[(((BG0CNT&3))<<1)|1] = bg[0][x]<<1; ln[(((BG0CNT&3))<<1)|1] = 0; }
 			
+			int index = 0;
+			u32 target[2] = {0,0};
+
 			for(u32 i = 0; i < 8; ++i)
 			{
 				if( pris[i] )
 				{
-					fbuf[240*Y + x] = c16to32(*(u16*)&palette[pris[i]]);
-					break;
+					target[index++] = i;
+					if( index == 2 ) break;
 				}
 			}
+			
+			u32 blend_mode = ((regs[0x28]>>6)&3);
+			
+			if( !do_blend || blend_mode==0 || !(regs[0x28]&BIT(ln[target[0]])) )
+			{
+				fbuf[L*240+x] = c16to32(*(u16*)&palette[pris[target[0]]]);
+				continue;
+			}
+			
+			if( blend_mode == 2 )
+			{
+				u32 RGB = c16to32(*(u16*)&palette[pris[target[0]]]);
+				u8 R = RGB>>24;
+				u8 G = RGB>>16;
+				u8 B = RGB>>8;
+				u32 cf = regs[0x2A]&0x1f;
+				if( cf > 16 ) cf = 16;
+				float coef = cf/16.f;
+				R = R + (0xff-R)*coef;
+				G = G + (0xff-G)*coef;
+				B = B + (0xff-B)*coef;
+				fbuf[L*240+x] = (R<<24)|(G<<16)|(B<<8);
+				continue;
+			}
+			
+			if( blend_mode == 3 )
+			{
+				u32 RGB = c16to32(*(u16*)&palette[pris[target[0]]]);
+				u8 R = RGB>>24;
+				u8 G = RGB>>16;
+				u8 B = RGB>>8;
+				u32 cf = regs[0x2A]&0x1f;
+				if( cf > 16 ) cf = 16;
+				float coef = cf/16.f;
+				R = R - R*coef;
+				G = G - G*coef;
+				B = B - B*coef;
+				fbuf[L*240+x] = (R<<24)|(G<<16)|(B<<8);
+				continue;
+			}
+			
+			if( index!=2 || !(regs[0x28]&BIT(8+ln[target[1]])) )
+			{
+				fbuf[L*240+x] = c16to32(*(u16*)&palette[pris[target[0]]]);
+				continue;
+			}
+			
+			u32 c1RGB = c16to32(*(u16*)&palette[pris[target[0]]]);
+			u32 c2RGB = c16to32(*(u16*)&palette[pris[target[1]]]);
+			
+			u8 R1 = c1RGB>>24;
+			u8 G1 = c1RGB>>16;
+			u8 B1 = c1RGB>>8;
+			u8 R2 = c2RGB>>24;
+			u8 G2 = c2RGB>>16;
+			u8 B2 = c2RGB>>8;
+			
+			u32 cfa = regs[0x29] & 0x1f;
+			if( cfa > 16 ) cfa = 16;
+			float EVA = cfa/16.f;
+			u32 cfb = (regs[0x29]>>8)&0x1f;
+			if( cfb > 16 ) cfb = 16;
+			float EVB = cfb/16.f;
+			
+			u8 R3 = std::min(255.f, R1*EVA + R2*EVB);
+			u8 G3 = std::min(255.f, G1*EVA + G2*EVB);
+			u8 B3 = std::min(255.f, B1*EVA + B2*EVB);
+			
+			fbuf[L*240+x] = (R3<<24)|(G3<<16)|(B3<<8);
 		}
 		return;
 	}	
