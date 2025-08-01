@@ -544,9 +544,11 @@ void thumb15_ldmia(arm& cpu, u32 opc)
 	u32 base = cpu.r[(opc>>8)&7];
 	if( !(opc&0xff) )
 	{
-		cpu.r[15] = cpu.read(base&~3, 32, ARM_CYCLE::N);
-		if( cpu.armV >= 5 && !(cpu.r[15]&1) ) cpu.cpsr.b.T = 0;
-		cpu.flushp();
+		if( cpu.armV < 5 )
+		{
+			cpu.r[15] = cpu.read(base&~3, 32, ARM_CYCLE::N);
+			cpu.flushp();
+		}
 		cpu.r[RB] += 0x40; //??
 		return;
 	}
@@ -567,20 +569,21 @@ void thumb15_ldmia(arm& cpu, u32 opc)
 void thumb15_stmia(arm& cpu, u32 opc)
 {
 	int RB = (opc>>8)&7;
-	u32 base = cpu.r[(opc>>8)&7];
+	u32 base = cpu.r[RB];
 	u32 start = base;
 	if( !(opc&0xff) )
 	{
-		cpu.write(base&~3, cpu.r[15]+2, 32, ARM_CYCLE::N);
+		if( cpu.armV < 5 ) cpu.write(base&~3, cpu.r[15]+2, 32, ARM_CYCLE::N);
 		cpu.r[RB] += 0x40; //??
 		return;
 	}
 	ARM_CYCLE type = ARM_CYCLE::N;
-	for(u32 i = 0; i < 8; ++i)
+	bool store_new_base = (std::countr_zero(opc&0xff) != RB && cpu.armV<5);
+	for(int i = 0; i < 8; ++i)
 	{
 		if( opc & BIT(i) )
 		{
-			cpu.write(base&~3, cpu.r[i], 32, type);
+			cpu.write(base&~3, (i==RB && store_new_base)? start+std::popcount(opc&0xff)*4 : cpu.r[i], 32, type);
 			type = ARM_CYCLE::S;
 			base += 4;
 		}

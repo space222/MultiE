@@ -20,7 +20,8 @@ union armflags
 		unsigned int T : 1;
 		unsigned int F : 1;
 		unsigned int I : 1;
-		unsigned int resv : 20;
+		unsigned int resv : 19;
+		unsigned int Q : 1;
 		unsigned int V : 1;
 		unsigned int C : 1;
 		unsigned int Z : 1;
