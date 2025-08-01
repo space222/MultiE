@@ -318,7 +318,7 @@ void thumb5_cmp(arm& cpu, u32 opc)
 	const u32 s = ~cpu.r[(opc>>3)&15];
 	const u32 d = cpu.r[((opc>>4)&8)|(opc&7)];
 	u64 t = d;
-	t += s;//^0xffffFFFFu;
+	t += s;
 	t += 1;
 	cpu.cpsr.b.C = (t>>32)&1;
 	cpu.cpsr.b.V = (((t^s) & (t^d) & BIT(31))?1:0);
@@ -336,6 +336,7 @@ void thumb5_mov(arm& cpu, u32 opc)
 void thumb5_bx(arm& cpu, u32 opc)
 {
 	const u32 s = cpu.r[(opc>>3)&15];
+	u32 retaddr = (cpu.r[15]-2)|1;
 	cpu.r[15] = s;
 	if( !(s&1) )
 	{
@@ -343,6 +344,7 @@ void thumb5_bx(arm& cpu, u32 opc)
 		cpu.r[15] &= ~2;
 	}
 	cpu.r[15] &= ~1;
+	if( cpu.armV >= 5 ) { cpu.r[14] = retaddr; }
 	cpu.flushp();
 }
 
@@ -510,6 +512,7 @@ void thumb14_pop(arm& cpu, u32 opc)
 	if( opc & BIT(8) )
 	{
 		cpu.r[15] = cpu.read(cpu.r[13]&~3, 32, type);
+		if( cpu.armV >= 5 && !(cpu.r[15]&1) ) cpu.cpsr.b.T = 0;
 		cpu.r[13] += 4;
 		cpu.flushp();
 	}
@@ -542,6 +545,7 @@ void thumb15_ldmia(arm& cpu, u32 opc)
 	if( !(opc&0xff) )
 	{
 		cpu.r[15] = cpu.read(base&~3, 32, ARM_CYCLE::N);
+		if( cpu.armV >= 5 && !(cpu.r[15]&1) ) cpu.cpsr.b.T = 0;
 		cpu.flushp();
 		cpu.r[RB] += 0x40; //??
 		return;
@@ -907,7 +911,10 @@ void arm::dump_regs()
 	std::println();
 }
 
-
+arm7tdmi::arm7tdmi()
+{
+	armV = 4;
+}
 
 
 

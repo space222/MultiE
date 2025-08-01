@@ -103,6 +103,14 @@ void arm7_xfer_half(arm& cpu, u32 opc)
 	if( opc & BIT(20) )
 	{
 		cpu.r[d] = std::rotr(cpu.read(base&~1, 16, ARM_CYCLE::N), (base&1)*8);
+		if( d == 15 )
+		{
+			if( cpu.armV >= 5 && (cpu.r[15]&1) )
+			{
+				cpu.cpsr.b.T = 1;
+			}		
+			cpu.flushp();
+		}
 	} else {
 		cpu.write(base&~1, cpu.r[d]&0xffff, 16, ARM_CYCLE::N);
 	}
@@ -136,6 +144,15 @@ void arm7_xfer_signed(arm& cpu, u32 opc)
 		cpu.r[d] = (s8)cpu.read(base, 8, ARM_CYCLE::N);
 	} else {
 		cpu.r[d] = (s16)cpu.read(base, 16, ARM_CYCLE::N);
+	}
+	
+	if( d == 15 )
+	{
+		if( cpu.armV >= 5 && (cpu.r[15]&1) )
+		{
+			cpu.cpsr.b.T = 1;
+		}		
+		cpu.flushp();
 	}
 	
 	if( !pre )
@@ -706,7 +723,14 @@ void arm7_ldst_reg(arm& cpu, u32 opc)
 		} else {
 			cpu.r[Rd] = val;
 		}
-		if( Rd == 15 ) cpu.flushp();
+		if( Rd == 15 )
+		{
+			if( cpu.armV >= 5 && (val & 1) )
+			{
+				cpu.cpsr.b.T = 1;
+			}
+			cpu.flushp();
+		}
 	} else {
 		cpu.write(base&(byte?~0:~3), (user?cpu.getUserReg(Rd):cpu.r[Rd]) + ((Rd==15)?4:0), byte?8:32, ARM_CYCLE::N);
 	}
@@ -749,7 +773,14 @@ void arm7_ldst_imm(arm& cpu, u32 opc)
 		} else {
 			cpu.r[Rd] = val;
 		}
-		if( Rd == 15 ) cpu.flushp();
+		if( Rd == 15 ) 
+		{
+			if( cpu.armV >= 5 && (val & 1) )
+			{
+				cpu.cpsr.b.T = 1;
+			}		
+			cpu.flushp();
+		}
 	} else {
 		cpu.write(base&(byte?~0:~3), ((Rd==15)?4:0) + (user?cpu.getUserReg(Rd):cpu.r[Rd]), byte?8:32, ARM_CYCLE::N);
 	}
@@ -784,6 +815,7 @@ void arm7_ldst_m(arm& cpu, u32 opc)
 		if( L )
 		{
 			cpu.r[15] = cpu.read(base&~3, 32, ARM_CYCLE::N);
+			if( cpu.armV >= 5 && (cpu.r[15]&1) ) cpu.cpsr.b.T = 1;
 			cpu.flushp();
 		} else {
 			cpu.write(base&~3, cpu.r[15]+4, 32, ARM_CYCLE::N);
@@ -808,7 +840,8 @@ void arm7_ldst_m(arm& cpu, u32 opc)
 				if( i == 15 )
 				{
 					if( S ) { val = cpu.getSPSR(); cpu.switch_to_mode(val); cpu.cpsr.v = val; }
-					cpu.r[15] &= ~3;
+					if( cpu.armV >= 5 && (cpu.r[15]&1) ) cpu.cpsr.b.T = 1;
+					cpu.r[15] &= ~1;
 					cpu.flushp();
 				}
 			}

@@ -13,7 +13,7 @@ enum class ARM_CYCLE { X, I, N, S };
 #define ARM_MODE_UNDEF 0x1B
 #define ARM_MODE_SYSTEM 0x1F
 
-union arm7flags
+union armflags
 {
 	struct {
 		unsigned int M : 5;
@@ -41,7 +41,7 @@ public:
 		}
 		irq_line = false;
 	}
-	arm7flags cpsr;	
+	armflags cpsr;	
 	u32 r[16];
 	u32 fiq[16]; // only (8, 14) switch, but matching r for ease of use
 	u32 r13_irq, r14_irq;
@@ -90,7 +90,7 @@ public:
 	
 	u32 RbyR; // dataproc adds this, set by the shifter if PC gets used in r shift by r situation
 	ARM_CYCLE next_cycle_type;	
-	//bool flushed;
+	u32 armV;
 	
 	std::function<void(u32, u32, int, ARM_CYCLE)> write;
 	std::function<u32(u32, int, ARM_CYCLE)> read;

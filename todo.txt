@@ -145,12 +145,11 @@ Status: YM2612 uses the Nuken OPN library... Poorly? Fantastic Dizzy and UMK3 la
 
 GBA Todo List
 ----------------
-1. Run the single step tests against the current cpu
-2. timers and timer scheduling
-3. Affine sprites
-4. sound
-5. save hardware
-6. blending
+1. timers and timer scheduling
+2. sound
+3. save hardware
+4. Run the single step tests against the current cpu
+5. improve gfx priority and blending
 
 
 

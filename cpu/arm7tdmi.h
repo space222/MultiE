@@ -8,6 +8,7 @@ typedef void (*arm7_instr)(arm&, u32);
 class arm7tdmi : public arm
 {
 public:
+	arm7tdmi();
 	void reset();
 	void step();
 

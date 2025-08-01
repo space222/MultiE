@@ -69,7 +69,8 @@ void LCDEngine::draw_scanline(u32 L)
 		
 			u16 pris[10] = {0,0,0,0,0,0,0,0,0,0};
 			u16 ln[10] = {5,5,5,5,5,5,5,5,5,5};
-			if( layer_active&0x10 ) { pris[(spr_pri[x])<<1] = (spr[x] ? (512 + (spr[x]<<1)) : 0); ln[(spr_pri[x])<<1] = 4; }
+			if( (layer_active&0x10) && spr[x] ) 
+				{ pris[(spr_pri[x])<<1] = (512 + (spr[x]<<1)); ln[(spr_pri[x])<<1] = 4; }
 			if( (layer_active&8) && bg[3][x] ) { pris[(((BG3CNT&3))<<1)|1] = bg[3][x]<<1; ln[(((BG3CNT&3))<<1)|1] = 3; }
 			if( (layer_active&4) && bg[2][x] ) { pris[(((BG2CNT&3))<<1)|1] = bg[2][x]<<1; ln[(((BG2CNT&3))<<1)|1] = 2; }
 			if( (layer_active&2) && bg[1][x] ) { pris[(((BG1CNT&3))<<1)|1] = bg[1][x]<<1; ln[(((BG1CNT&3))<<1)|1] = 1; }
