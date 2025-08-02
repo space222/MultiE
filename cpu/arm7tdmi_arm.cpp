@@ -812,13 +812,15 @@ void arm7_ldst_m(arm& cpu, u32 opc)
 	
 	if( !rlist )
 	{
-		if( L )
+		if( cpu.armV < 5 )
 		{
-			cpu.r[15] = cpu.read(base&~3, 32, ARM_CYCLE::N);
-			if( cpu.armV >= 5 && (cpu.r[15]&1) ) cpu.cpsr.b.T = 1;
-			cpu.flushp();
-		} else {
-			cpu.write(base&~3, cpu.r[15]+4, 32, ARM_CYCLE::N);
+			if( L )
+			{
+				cpu.r[15] = cpu.read(base&~3, 32, ARM_CYCLE::N);
+				cpu.flushp();
+			} else {
+				cpu.write(base&~3, cpu.r[15]+4, 32, ARM_CYCLE::N);
+			}
 		}
 		cpu.r[Rn] += 0x40;//(U ? 0x40 : -0x40);
 		return;
@@ -832,7 +834,7 @@ void arm7_ldst_m(arm& cpu, u32 opc)
 		if( L )
 		{
 			u32 val = cpu.read(base&~3, 32, ctype);
-			if( S && i!=15 )
+			if( S && !(rlist & 0x8000) )
 			{
 				cpu.setUserReg(i, val);
 			} else {
@@ -854,7 +856,17 @@ void arm7_ldst_m(arm& cpu, u32 opc)
 	
 	if( W )
 	{
-		if( L && (rlist & BIT(Rn)) ) return;
+		if( L && (rlist & BIT(Rn)) )
+		{
+			if( cpu.armV < 5 )
+			{
+				return;
+			} else {
+				bool islastreg = Rn == (15-std::countl_zero(rlist));
+				bool isonlyreg = (rlist == BIT(Rn));
+				if( !(isonlyreg || !islastreg) ) return;
+			}
+		}
 		cpu.r[Rn] = (U ? base : start);
 	}
 }

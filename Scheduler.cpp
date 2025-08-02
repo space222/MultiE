@@ -27,7 +27,7 @@ void Scheduler::filter_out_event(u32 code)
 		if( events[i].code == code )
 		{
 			events[i].code = 0;
-			return;
+			//return
 		}
 	}
 	return;

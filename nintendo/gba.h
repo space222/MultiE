@@ -70,6 +70,16 @@ public:
 	
 	u16 ISTAT, IMASK, IME;
 	
+	struct {
+		u64 last_read;
+		u16 value;
+		u16 reload;
+		u16 ctrl;
+	} tmr[4];
+	void catchup_timer(u32);
+	void tick_overflow_timer(u32);
+	void timer_event(u64,u32);
+	
 	void check_irqs();
 };
 

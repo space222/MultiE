@@ -80,7 +80,7 @@ u32 gba::read_io(u32 addr, int size)
 	if( addr < 0x04000060 ) return read_lcd_io(addr);
 	if( addr < 0x040000B0 ) return read_snd_io(addr);
 	if( addr < 0x04000100 ) return read_dma_io(addr);
-	if( addr < 0x04000120 ) { std::println("read timr reg ${:X}!", addr); return read_tmr_io(addr); }
+	if( addr < 0x04000120 ) return read_tmr_io(addr);
 	if( addr < 0x04000130 ) return read_comm_io(addr);
 	if( addr < 0x04000134 ) return read_pad_io(addr);
 	if( addr < 0x04000200 ) return read_comm_io(addr);

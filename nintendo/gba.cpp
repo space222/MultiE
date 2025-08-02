@@ -125,6 +125,8 @@ void gba::reset()
 	cpu.reset();
 	halted = false;
 	
+	tmr[0].ctrl = tmr[1].ctrl = tmr[2].ctrl = tmr[3].ctrl = 0;
+	tmr[0].last_read = tmr[1].last_read = tmr[2].last_read = tmr[3].last_read = 0;
 	//sched.add_event((16*1024*1024)/32768, EVENT_SND_FIFO);
 	//sched.add_event((16*1024*1024)/44100, EVENT_SND_OUT);
 	VCOUNT = 0xff;
@@ -159,7 +161,7 @@ void gba::run_frame()
 				std::println("CPU Halted with no future events");
 				exit(1);
 			}
-			cpu.stamp = sched.next_stamp();
+			cpu.stamp += 1232; // if halted, advance by a scanline worth
 		}
 		while( cpu.stamp >= sched.next_stamp() )
 		{
@@ -224,22 +226,22 @@ void gba::event(u64 old_stamp, u32 evc)
 {
 	if( evc == EVENT_TMR0_CHECK )
 	{
-	
+		timer_event(old_stamp,0);
 		return;
 	}
 	if( evc == EVENT_TMR1_CHECK )
 	{
-	
+		timer_event(old_stamp,1);	
 		return;
 	}
 	if( evc == EVENT_TMR2_CHECK )
 	{
-	
+		timer_event(old_stamp,2);	
 		return;
 	}
 	if( evc == EVENT_TMR3_CHECK )
 	{
-	
+		timer_event(old_stamp,3);	
 		return;
 	}
 	
