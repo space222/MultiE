@@ -48,7 +48,7 @@ public:
 	bool frame_complete;
 	
 	u32 read_lcd_io(u32);
-	u32 read_snd_io(u32) {return 0; }
+	u32 read_snd_io(u32);
 	u32 read_dma_io(u32);
 	u32 read_tmr_io(u32);
 	u32 read_comm_io(u32) {return 0; }
@@ -57,7 +57,7 @@ public:
 	u32 read_memctrl_io(u32) {return 0; }
 
 	void write_lcd_io(u32, u32);
-	void write_snd_io(u32, u32) {return; }
+	void write_snd_io(u32, u32);
 	void write_dma_io(u32, u32);
 	void write_tmr_io(u32, u32);
 	void write_comm_io(u32, u32) {return; }

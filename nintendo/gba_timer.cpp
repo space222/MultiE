@@ -101,7 +101,7 @@ void gba::timer_event(u64 oldstamp, u32 I)
 {
 	auto& timer = tmr[I];
 	u16 old_value = timer.value;
-	u64 delta = oldstamp - timer.last_read;
+	u64 delta = oldstamp - timer.last_read; //lazy: would be a call to catchup, but need to use oldstamp
 	delta /= prescaler[timer.ctrl&3];
 	if( delta )
 	{
