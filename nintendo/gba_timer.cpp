@@ -25,7 +25,7 @@ void gba::write_tmr_io(u32 addr, u32 v)
 	
 	if( ctrlwrite )
 	{
-		if( (tmr[I].ctrl & 0x82) == 0x80 ) catchup_timer(I); // if timer is running, need to catch it up
+		if( (tmr[I].ctrl & 0x84) == 0x80 ) catchup_timer(I); // if timer is running, need to catch it up
 		
 		v &= 0xc7;
 		auto& timer = tmr[I];
@@ -36,7 +36,9 @@ void gba::write_tmr_io(u32 addr, u32 v)
 		// just get rid of any future timer events
 		sched.filter_out_event(EVENT_TMR0_CHECK+I);
 		
-		if( !(oldctrl&0x80) && (timer.ctrl&0x80) )
+		const bool started = !(oldctrl&0x80) && (timer.ctrl&0x80);
+		
+		if( started )
 		{ // gbatek says if start/stop bit changes from 0 to 1, but might be being too literal here
 		  // possibly just any write with a bit7=1?
 			timer.value = timer.reload;
@@ -55,12 +57,20 @@ void gba::write_tmr_io(u32 addr, u32 v)
 		return;
 	}
 	
-	tmr[I].reload = v;	
+	tmr[I].reload = v;
 	return;
 }
 
 u32 gba::read_tmr_io(u32 addr)
 {
+	auto timer_val = [&](u32 I)->u16
+	{
+		if( !(tmr[I].ctrl & BIT(7)) ) return tmr[I].value;
+		if( I!=0 && (tmr[I].ctrl & BIT(2)) ) return tmr[I].value;
+		return tmr[I].value + (cpu.stamp - tmr[I].last_read)/prescaler[tmr[I].ctrl&3];
+	};
+
+
 	//std::println("timer io read ${:X}", addr);
 	switch( addr )
 	{
@@ -69,10 +79,10 @@ u32 gba::read_tmr_io(u32 addr)
 	case 0x400010A: return tmr[2].ctrl;
 	case 0x400010E: return tmr[3].ctrl;
 
-	case 0x4000100: catchup_timer(0); return tmr[0].value;
-	case 0x4000104: catchup_timer(1); return tmr[1].value;
-	case 0x4000108: catchup_timer(2); return tmr[2].value;
-	case 0x400010C: catchup_timer(3); return tmr[3].value;
+	case 0x4000100: return timer_val(0);
+	case 0x4000104: return timer_val(1);
+	case 0x4000108: return timer_val(2);
+	case 0x400010C: return timer_val(3);
 
 	default:
 		std::println("unimpl timer io read ${:X}", addr);
@@ -95,23 +105,27 @@ void gba::catchup_timer(u32 I)
 	}
 }
 
-static int times = 0;
-
 void gba::timer_event(u64 oldstamp, u32 I)
 {
 	auto& timer = tmr[I];
-	u16 old_value = timer.value;
+	/*u16 old_value = timer.value;
 	u64 delta = oldstamp - timer.last_read; //lazy: would be a call to catchup, but need to use oldstamp
 	delta /= prescaler[timer.ctrl&3];
 	if( delta )
 	{
 		timer.value += delta;
 		timer.last_read = cpu.stamp;
-	}
-
-	if( timer.value < old_value )
+	}*/
+	
+	if( 1 )//timer.value <= old_value )
 	{
 		timer.value = timer.reload;
+		
+		if( snd_master_en )
+		{
+			if( (dma_sound_mix&0x0300) && I==((dma_sound_mix>>10)&1) ) snd_a_timer();
+			if( (dma_sound_mix&0x3000) && I==((dma_sound_mix>>14)&1) ) snd_b_timer();
+		}
 		
 		if( timer.ctrl & BIT(6) )
 		{
@@ -129,13 +143,6 @@ void gba::timer_event(u64 oldstamp, u32 I)
 		if( I!=3 && (tmr[I+1].ctrl & 0x84) == 0x84 ) tick_overflow_timer(I+1);
 		return;
 	}
-
-	if( I==0 || !(timer.ctrl&BIT(2)) )
-	{
-		u64 ticks_til_overflow = 0x10000 - timer.value;
-		sched.add_event(oldstamp + (ticks_til_overflow * prescaler[timer.ctrl&3]), EVENT_TMR0_CHECK+I);
-		timer.last_read = oldstamp;
-	}
 }
 
 void gba::tick_overflow_timer(u32 I)
@@ -145,10 +152,18 @@ void gba::tick_overflow_timer(u32 I)
 	timer.value += 1;
 	if( timer.value ) return;
 	
+	timer.value = timer.reload;
+	
 	if( timer.ctrl & BIT(6) )
 	{
 		ISTAT |= BIT(3+I);
 		check_irqs();
+	}
+	
+	if( I<2 && snd_master_en )
+	{
+		if( (dma_sound_mix&0x0300) && I==((dma_sound_mix>>10)&1) ) snd_a_timer();
+		if( (dma_sound_mix&0x3000) && I==((dma_sound_mix>>14)&1) ) snd_b_timer();
 	}
 
 	if( I!=3 && (tmr[I+1].ctrl & 0x84) == 0x84 ) tick_overflow_timer(I+1);

@@ -22,12 +22,13 @@ void Scheduler::add_event(u64 stamp, u32 code)
 
 void Scheduler::filter_out_event(u32 code)
 {
-	for(u32 i = 0; i < events.size(); ++i)
+	for(auto iter = events.begin(); iter != events.end();)
 	{
-		if( events[i].code == code )
+		if( iter->code == code )
 		{
-			events[i].code = 0;
-			//return
+			iter = events.erase(iter);
+		} else {
+			iter++;
 		}
 	}
 	return;

@@ -9,7 +9,14 @@ void gba::exec_dma(int chan)
 	if( len == 0 ) { len = ((chan==3) ? 0x10000 : 0x4000); }
 	int srcaddr = 0;
 	int dstaddr = 0;
-	memcpy(&srcaddr, &dmaregs[base + 0], 4);
+	if( chan == 1 )
+	{
+		srcaddr = internsrc1;
+	} else if( chan == 2 ) {
+		srcaddr = internsrc2;
+	} else {
+		memcpy(&srcaddr, &dmaregs[base + 0], 4);
+	}
 	memcpy(&dstaddr, &dmaregs[base + 2], 4);
 	
 	//std::println("DMA{} from ${:X} to ${:X}, {} units", chan, srcaddr, dstaddr, len);
@@ -18,7 +25,7 @@ void gba::exec_dma(int chan)
 	if( B32 )
 	{
 		srcaddr &= ~3;
-		dstaddr &= ~3;	
+		dstaddr &= ~3;
 	} else {
 		srcaddr &= ~1;
 		dstaddr &= ~1;	
@@ -36,25 +43,41 @@ void gba::exec_dma(int chan)
 		u32 val = read(srcaddr, 16, ARM_CYCLE::X);
 		write(dstaddr, val&0xffff, 16, ARM_CYCLE::X);
 		
-		dstaddr += dst_inc;
 		srcaddr += src_inc;
+		dstaddr += dst_inc;
 	}
-	
+	 
 	if( ctrl & BIT(14) )
 	{
 		ISTAT |= BIT(8 + chan);
 		check_irqs();
 	}
-	dmaregs[base + 5] &= ~BIT(15);
+	
+	if( !(ctrl & BIT(9)) )
+	{
+		dmaregs[base + 5] &= ~BIT(15);
+	} else {
+		if( ((ctrl>>5)&3) < 2 ) memcpy(&dmaregs[base + 2], &dstaddr, 4);
+		if( chan == 1 )
+		{
+			internsrc1 = srcaddr;
+		} else if( chan == 2 ) {
+			internsrc2 = srcaddr;
+		} else {
+			memcpy(&dmaregs[base + 0], &srcaddr, 4);
+		}
+	}
 }
 
 void gba::write_dma_io(u32 addr, u32 v)
 {
 	if( addr >= 0x040000E0 ) return;
 	//std::println("DMA ${:X} = ${:X}", addr, v);
-	u16 oldval = dmaregs[(addr - 0x040000B0u)>>1];
+	//u16 oldval = dmaregs[(addr - 0x040000B0u)>>1];
 	dmaregs[(addr - 0x040000B0u)>>1] = v;
 	u32 reg = (addr - 0x040000B0u)>>1;
+	if( addr == 0x40000C6 && (v&0x8000) ) { memcpy(&internsrc1, &dmaregs[6], 4); }
+	if( addr == 0x40000D2 && (v&0x8000) ) { memcpy(&internsrc2, &dmaregs[12], 4); } 
 	if( addr == 0x40000BA && (v & 0xB000) == 0x8000 ) { exec_dma(0); dmaregs[reg] &=~BIT(15); }
 	else if( addr == 0x40000C6 && (v & 0xB000) == 0x8000 ) { exec_dma(1); dmaregs[reg] &=~BIT(15); }
 	else if( addr == 0x40000D2 && (v & 0xB000) == 0x8000 ) { exec_dma(2); dmaregs[reg] &=~BIT(15); }

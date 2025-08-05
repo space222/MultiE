@@ -145,11 +145,18 @@ Status: YM2612 uses the Nuken OPN library... Poorly? Fantastic Dizzy and UMK3 la
 
 GBA Todo List
 ----------------
-1. timers and timer scheduling
-2. sound
-3. save hardware
+1. save hardware
+2. psg sound
+3. improve gfx priority and blending
 4. Run the single step tests against the current cpu
-5. improve gfx priority and blending
+
+
+
+Nintendo DS Todo List
+------------------------
+1. Few more arm7/9 edge case differences (ldm/stm specifically)
+2. The extra arm9 instructions
+3. The rest of the hardware
 
 
 

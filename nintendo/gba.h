@@ -9,6 +9,17 @@
 class gba : public console
 {
 public:
+	void key_down(int s) override
+	{
+		if( s == SDL_SCANCODE_ESCAPE )
+		{
+			for(u32 i = 0; i < sched.events.size(); ++i)
+			{
+				std::println("event {}, stamp ${:X}", sched.events[i].code, sched.events[i].stamp);
+			}		
+		}
+	}
+
 	gba();
 	u32 fb_width() override { return 240; }
 	u32 fb_height() override { return 160; }
@@ -26,7 +37,8 @@ public:
 	void event(u64, u32) override;
 	
 	std::deque<s8> snd_fifo_a, snd_fifo_b;
-	float sample;
+	float pcmA,pcmB;
+	u8 fifoa;
 	
 	void write_io(u32, u32, int);
 	u32 read_io(u32, int);
@@ -41,6 +53,11 @@ public:
 	u8 oam[1024];
 	u8 palette[1024];
 	u8 vram[96*1024];
+	
+	u8 save[0x20000];
+	u32 save_type, save_size;
+	u32 flash_state, flash_bank;
+	u32 eeprom_read(u32);
 	
 	u32 bios_open_bus;
 	
@@ -66,6 +83,7 @@ public:
 	void write_memctrl_io(u32, u32) {return; }
 	
 	u16 dmaregs[32];
+	u32 internsrc1, internsrc2;
 	void exec_dma(int);
 	
 	u16 ISTAT, IMASK, IME;
@@ -80,10 +98,14 @@ public:
 	void tick_overflow_timer(u32);
 	void timer_event(u64,u32);
 	
+	bool snd_master_en;
+	u16 dma_sound_mix;
+	void snd_a_timer();
+	void snd_b_timer();
+	
 	void check_irqs();
 };
 
-#define EVENT_SND_FIFO 1
 #define EVENT_SND_OUT  2
 #define EVENT_SCANLINE_START 3
 #define EVENT_SCANLINE_RENDER 4
@@ -92,6 +114,13 @@ public:
 #define EVENT_TMR1_CHECK 7
 #define EVENT_TMR2_CHECK 8
 #define EVENT_TMR3_CHECK 9
+
+#define SAVE_TYPE_UNKNOWN 0
+#define SAVE_TYPE_SRAM 1
+#define SAVE_TYPE_EEPROM 2
+#define SAVE_TYPE_FLASH 3
+
+
 
 
 

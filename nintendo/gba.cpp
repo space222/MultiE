@@ -35,6 +35,7 @@ static bool rtc_active = false;
 void gba::write(u32 addr, u32 v, int size, ARM_CYCLE ct)
 {
 	cpu.stamp += 1;
+	
 	if( size == 8 ) v &= 0xff;
 	else if( size == 16 ) v &= 0xffff;
 	if( addr < 0x02000000 ) { return; } // write to BIOS ignored	
@@ -56,6 +57,57 @@ void gba::write(u32 addr, u32 v, int size, ARM_CYCLE ct)
 		return;
 	}
 	if( addr < 0x08000000 ) { sized_write(oam, addr&0x3ff, v, size); return; }
+	
+	if( addr >= 0x0e000000 && addr <= 0x0e00ffff )
+	{
+		if( save_type == SAVE_TYPE_UNKNOWN || save_type == SAVE_TYPE_SRAM ) { save[addr&0xffff] = v; return; }
+		
+		if( save_type == SAVE_TYPE_UNKNOWN || save_type == SAVE_TYPE_FLASH )
+		{
+			if( addr == 0x0e005555 )
+			{
+				if( flash_state == 0 && v == 0xAA ) 
+				{ 
+					flash_state = 1; 
+					save_type = SAVE_TYPE_FLASH;
+					return;
+				} 
+				if( flash_state == 2 ) 
+				{
+					flash_state = 0;
+					if( flash_cmd == 0x80 && v == 0x10 )
+					{
+						memset(save, 0xff, 0x20000);
+						flash_cmd = 0;
+						return;
+					}
+					flash_cmd = v;
+					return;
+				}
+				return;
+			}
+			if( addr == 0x0e002AAA && v == 0x55 && flash_state == 1 ) { flash_state = 2; return; }
+			
+			if( flash_cmd == 0x80 && v == 0x30 )
+			{
+				flash_cmd = flash_state = 0;
+				addr &= 0xf000;
+				for(u32 i = 0; i < 0x1000; ++i) save[(flash_bank<<16)|(addr+i)] = 0xff;			
+				return;
+			}
+			
+			if( flash_cmd == 0xB0 && addr == 0x0e000000 )
+			{
+				flash_bank = v&1;
+				flash_state = flash_cmd = 0;
+				return;
+			}
+			
+			save[(flash_bank<<16)|(addr&0xffff)] = v;
+			return;	
+		}
+		return;	
+	}
 	std::println("${:X} = ${:X}", addr, v);
 } //end of write
 
@@ -96,12 +148,18 @@ u32 gba::read(u32 addr, int size, ARM_CYCLE ct)
 	}
 	if( addr < 0x10000000ul )
 	{  // either ROM or various types of SaveRAM that isn't supported yet
-		if( addr >= 0x0d000000 && addr  < 0x0e000000 ) return 1;
+		if( (save_type == SAVE_TYPE_UNKNOWN || save_type == SAVE_TYPE_EEPROM)
+			&& addr >= 0x0d000000 && addr < 0x0e000000 ) return eeprom_read(addr);
+		//if( addr >= 0x0d000000 && addr  < 0x0e000000 ) return 1;
 		if( addr >= 0x0e000000 && addr <= 0x0e00FFFF )
 		{
-			if( /*flash_cmd == 0x90 &&*/ addr == 0x0E000000 ) return 0x62;
-			if( /*flash_cmd == 0x90 &&*/ addr == 0x0E000001 ) return 0x13;
-			//return SRAM[flash_bank | (addr&0xffff)];
+			if( save_type == SAVE_TYPE_FLASH && flash_cmd == 0x90 && addr == 0x0E000000 ) return 0x62;
+			if( save_type == SAVE_TYPE_FLASH && flash_cmd == 0x90 && addr == 0x0E000001 ) return 0x13;
+			if( save_type != SAVE_TYPE_EEPROM )
+			{
+				return save[(flash_bank<<16)|(addr&0xffff)];
+			}
+			return 0;
 		}
 		addr &= 0x01ffFFFf;
 		if( addr > ROM.size() )
@@ -116,9 +174,12 @@ u32 gba::read(u32 addr, int size, ARM_CYCLE ct)
 	return 0;	
 }
 
+
+static u32 snd_out_cycles = 380;
+static u64 last_stamp = 0;
+
 void gba::reset()
 {
-	sched.reset();
 	cpu.read = [&](u32 a, int s, ARM_CYCLE c) -> u32 { return read(a,s,c); };
 	cpu.write= [&](u32 a, u32 v, int s, ARM_CYCLE c) { write(a,v,s,c); };
 	for(int i = 0; i < 16; ++i) cpu.r[i] = 0;
@@ -127,13 +188,22 @@ void gba::reset()
 	
 	tmr[0].ctrl = tmr[1].ctrl = tmr[2].ctrl = tmr[3].ctrl = 0;
 	tmr[0].last_read = tmr[1].last_read = tmr[2].last_read = tmr[3].last_read = 0;
-	//sched.add_event((16*1024*1024)/32768, EVENT_SND_FIFO);
-	//sched.add_event((16*1024*1024)/44100, EVENT_SND_OUT);
-	VCOUNT = 0xff;
-	sched.add_event(0, EVENT_SCANLINE_START);
 	
-	//lcd.regs[0] = lcd.regs[2] = 0;
+	sched.reset();
+	//sched.add_event(30, EVENT_SND_OUT);
+	sched.add_event(0, EVENT_SCANLINE_START);
+	VCOUNT = 0xff;
+	
 	ISTAT = IMASK = IME = 0;
+	
+	snd_fifo_a.clear();
+	snd_fifo_b.clear();
+	
+	pcmA = pcmB = 0;
+	dma_sound_mix = 0;	
+	snd_master_en = 0;
+	snd_out_cycles = last_stamp = 0;
+	flash_state = flash_bank = 0;
 	
 	memset(iwram, 0, 32*1024);
 	memset(ewram, 0, 256*1024);
@@ -142,9 +212,9 @@ void gba::reset()
 	memset(vram, 0, 96*1024);
 }
 
-gba::gba() : sched(this), snd_fifo_a(33), snd_fifo_b(33), lcd(vram, palette, oam)
+gba::gba() : sched(this), lcd(vram, palette, oam)
 {
-	//setVsync(false);
+	setVsync(false);
 }
 
 void gba::run_frame()
@@ -161,10 +231,19 @@ void gba::run_frame()
 				std::println("CPU Halted with no future events");
 				exit(1);
 			}
-			cpu.stamp += 1232; // if halted, advance by a scanline worth
+			cpu.stamp += 31;
 		}
-		while( cpu.stamp >= sched.next_stamp() )
+		if( cpu.stamp - last_stamp > 380 )
 		{
+			last_stamp = cpu.stamp;
+			float sample = pcmA + pcmB;
+			sample /= 2.f;
+			audio_add(sample, sample);
+		}
+		int i = 0;
+		while( cpu.stamp >= sched.next_stamp() && i < 10 )
+		{
+			i+=1;
 			sched.run_event();
 		}
 	}
@@ -196,6 +275,47 @@ bool gba::loadROM(const std::string fname)
 	ROM.resize(fsz);
 	[[maybe_unused]] int unu = fread(ROM.data(), 1, fsz, fp);
 	fclose(fp);
+	
+	std::string savefile = fname.substr(0, fname.rfind('.'));
+	savefile += ".sav";
+	
+	FILE* fs = fopen(savefile.c_str(), "rb");
+	unu = fread(save, 1, 0x20000, fs);
+	fclose(fs);
+	
+	if( ROM[0xAC] == 'F' )
+	{
+		save_type = SAVE_TYPE_EEPROM;
+	} else {
+		save_type = SAVE_TYPE_UNKNOWN;
+		for(u32 i = 0; i < ROM.size(); i+=4)
+		{
+			if( !strncmp((const char*)ROM.data()+i, "EEPROM_V", 8) )
+			{
+				save_type = SAVE_TYPE_EEPROM;
+				break;
+			}
+			if( !strncmp((const char*)ROM.data()+i, "SRAM_V", 6) )
+			{
+				save_type = SAVE_TYPE_SRAM;
+				break;
+			}
+			if( !strncmp((const char*)ROM.data()+i, "FLASH_V", 7) || !strncmp((const char*)ROM.data()+i, "FLASH512_V",10) )
+			{
+				save_type = SAVE_TYPE_FLASH;
+				save_size = 64;
+				break;
+			}
+			if( !strncmp((const char*)ROM.data()+i, "FLASH1M_V", 9) )
+			{
+				save_type = SAVE_TYPE_FLASH;
+				save_size = 128;
+				break;
+			}
+		}
+		std::println("Save type {:X} detected", save_type);
+	}
+	
 	return true;	
 }
 
@@ -224,6 +344,8 @@ void gba::check_irqs()
 
 void gba::event(u64 old_stamp, u32 evc)
 {
+	if( evc == 0 ) return;
+	
 	if( evc == EVENT_TMR0_CHECK )
 	{
 		timer_event(old_stamp,0);
@@ -249,10 +371,13 @@ void gba::event(u64 old_stamp, u32 evc)
 	{
 		VCOUNT = (VCOUNT+1)&0xff;
 		
-		if( (dmaregs[5]&0xB000)   == 0xA000 ) { exec_dma(0); }
-		if( (dmaregs[6+5]&0xB000) == 0xA000 ) { exec_dma(1); }
-		if( (dmaregs[12+5]&0xB000)== 0xA000 ) { exec_dma(2); }
-		if( (dmaregs[18+5]&0xB000)== 0xA000 ) { exec_dma(3); }
+		if( VCOUNT < 160 )
+		{
+			if( (dmaregs[5]&0xB000)   == 0xA000 ) { exec_dma(0); }
+			if( (dmaregs[6+5]&0xB000) == 0xA000 ) { exec_dma(1); }
+			if( (dmaregs[12+5]&0xB000)== 0xA000 ) { exec_dma(2); }
+			if( (dmaregs[18+5]&0xB000)== 0xA000 ) { exec_dma(3); }
+		}
 		if( VCOUNT == 160 )
 		{
 			if( (dmaregs[5]&0xB000)   == 0x9000 ) { exec_dma(0); }
@@ -308,28 +433,25 @@ void gba::event(u64 old_stamp, u32 evc)
 		event(old_stamp, EVENT_SCANLINE_START);
 		return;
 	}
-	
-	if( evc == EVENT_SND_FIFO )
-	{
-		sched.add_event(old_stamp+((16*1024*1024)/32768), evc);
-		if( snd_fifo_a.empty() )
-		{
-			sample = 0;
-			return;
-		}
-		float A = snd_fifo_a.back()/128.f; snd_fifo_a.pop_back();
-		float B = snd_fifo_b.back()/128.f; snd_fifo_b.pop_back();
-		A += B;
-		A /= 2;
-		sample = A;
-		return;
-	}
 
 	if( evc == EVENT_SND_OUT )
 	{
-		sched.add_event(old_stamp+((16*1024*1024)/44100), evc);
+		sched.add_event(old_stamp+380, EVENT_SND_OUT);
+		float sample = pcmA + pcmB;
+		sample /= 2.f;
 		audio_add(sample, sample);
 		return;
 	}
+	
+	std::println("event called with {}", evc);
+	exit(1);
 }
+
+u32 gba::eeprom_read(u32 addr)
+{
+
+	return 1;
+}
+
+
 

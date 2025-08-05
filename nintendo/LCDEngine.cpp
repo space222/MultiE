@@ -36,7 +36,6 @@ void LCDEngine::draw_scanline(u32 L)
 		for(u32 x = 0; x < 240; ++x)
 		{
 			u32 layer_active = (DISPCNT >> 8) & 0x1f;
-			
 			u32 win0_y2 = regs[0x22]&0xff;
 			u32 win0_y1 = regs[0x22]>>8;
 			u32 win1_y2 = regs[0x23]&0xff;
