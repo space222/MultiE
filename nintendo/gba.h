@@ -63,7 +63,7 @@ public:
 	
 	u32 eeprom_read();
 	void eeprom_write(u8);
-	u32 eeprom_state;
+	u32 eeprom_state, eeprom_mode, eeprom_count;
 	u32 eeprom_addr;
 	u64 eeprom_out;
 	u32 bios_open_bus;

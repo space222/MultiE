@@ -43,8 +43,13 @@ void gba::exec_dma(int chan)
 	
 	if( dstaddr >= 0x0d000000 && dstaddr < 0x0e000000 )
 	{ // figure out EEPROM size
-		if(!save_size) save_size = len;
-		if( len <= 17 ) eeprom_state = 0;
+		if(!save_size) 
+		{
+			save_size = len;
+			if( save_size == 81 || save_size == 17 ) save_size = 14;
+			else if( save_size == 73 || save_size == 9 ) save_size = 6;
+		}
+		if( len <= 17 || len >= 70 ) { eeprom_mode = eeprom_count = eeprom_state = eeprom_addr = 0; }
 	}
 		
 	for(u32 i = 0; i < len; ++i)

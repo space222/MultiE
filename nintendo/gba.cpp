@@ -502,38 +502,60 @@ void gba::event(u64 old_stamp, u32 evc)
 
 u32 gba::eeprom_read()
 {
-	u32 bit = eeprom_state-save_size;
-	if( bit < 4 ) { eeprom_state+=1; return 0; }
-	bit -= 4;
-	u32 addr = ((eeprom_addr>>1) & (save_size == 9 ? 0x3f : 0x3ff))<<3;
-	addr += bit/8;
-	eeprom_state += 1;
-	return save[addr]>>(7^(bit&7));
+	if( eeprom_mode != 3 ) return 1;
+	if( eeprom_count == 68 ) { eeprom_state = eeprom_mode = eeprom_count = 0; return 1; }
+	if( eeprom_count < 4 ) { eeprom_count++; return 1; }
+	u32 bit = eeprom_count-4;
+	u8 ret = save[(eeprom_addr<<3)+(bit/8)]>>(7^(bit&7));
+	eeprom_count += 1;
+	return ret&1;
 }
 
 void gba::eeprom_write(u8 v)
 {
-	if( eeprom_state < save_size )
-	{
-		eeprom_addr <<= 1;
-		eeprom_addr |= v&1;
-		eeprom_state += 1;
+	if( eeprom_state == 0 )
+	{ // grab mode bits
+		eeprom_mode <<= 1;
+		eeprom_mode |= v&1;
+		eeprom_mode &= 3;
+		eeprom_count += 1;
+		if( eeprom_count >= 2 )
+		{
+			if( eeprom_mode != 2 && eeprom_mode != 3 ) { eeprom_mode = eeprom_count = 0; return; }
+			eeprom_state = 1;
+			eeprom_addr = eeprom_count = 0;
+		}
 		return;
 	}
 	
-	
-	
-	eeprom_out <<= 1;
-	eeprom_out |= v&1;
-	eeprom_state += 1;
-	if( eeprom_state >= (save_size + 64) )
-	{
-		eeprom_addr >>= 1;
-		eeprom_addr &= (save_size == 9 ? 0x3f : 0x3ff);
-		eeprom_addr <<= 3;
-		*(u64*)&save[eeprom_addr] = eeprom_out;
-		eeprom_state = 0;
+	if( eeprom_state == 1 )
+	{  // grab address
+		eeprom_addr <<= 1;
+		eeprom_addr |= v&1;
+		eeprom_count += 1;
+		if( eeprom_count == save_size+(eeprom_mode==3?1:0))
+		{ // writing an address has an extra 'done'ish bit for read mode
+			eeprom_state = 2;
+			eeprom_count = 0;
+			if( eeprom_mode == 3 ) eeprom_addr >>= 1; // get rid of said extra bit
+		}
+		return;
 	}
+	
+	if( eeprom_mode == 2 && eeprom_state == 2 )
+	{
+		if( eeprom_count < 64 )
+		{
+			eeprom_out <<= 1;
+			eeprom_out |= v&1;
+			eeprom_count += 1;		
+		} else {
+			*(u64*)&save[eeprom_addr<<3] = __builtin_bswap64(eeprom_out);
+			save_written = true;
+			eeprom_mode = eeprom_state = eeprom_count = 0;
+		}
+		return;	
+	}	
 }
 
 gba::~gba()
