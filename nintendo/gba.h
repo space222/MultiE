@@ -9,7 +9,7 @@
 class gba : public console
 {
 public:
-	void key_down(int s) override
+	/*void key_down(int s) override
 	{
 		if( s == SDL_SCANCODE_ESCAPE )
 		{
@@ -18,9 +18,10 @@ public:
 				std::println("event {}, stamp ${:X}", sched.events[i].code, sched.events[i].stamp);
 			}		
 		}
-	}
+	}*/
 
 	gba();
+	~gba();
 	u32 fb_width() override { return 240; }
 	u32 fb_height() override { return 160; }
 	u32 fb_bpp() override { return 32; }
@@ -55,10 +56,16 @@ public:
 	u8 vram[96*1024];
 	
 	u8 save[0x20000];
+	bool save_written;
 	u32 save_type, save_size;
+	std::string savefile;
 	u32 flash_state, flash_bank;
-	u32 eeprom_read(u32);
 	
+	u32 eeprom_read();
+	void eeprom_write(u8);
+	u32 eeprom_state;
+	u32 eeprom_addr;
+	u64 eeprom_out;
 	u32 bios_open_bus;
 	
 	LCDEngine lcd;
@@ -102,6 +109,15 @@ public:
 	u16 dma_sound_mix;
 	void snd_a_timer();
 	void snd_b_timer();
+	
+	bool gpio_reads_en;
+	u8 gpio_dir, gpio_data;
+	void gpio_write(u32, u32);
+	u8 gpio_read(u32);
+	
+	u8 rtc_cmd, rtc_ctrl;
+	u32 rtc_state;
+	u64 rtc_out;
 	
 	void check_irqs();
 };

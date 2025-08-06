@@ -51,8 +51,10 @@ void gba::write_tmr_io(u32 addr, u32 v)
 			return;
 		}
 		
-		u64 ticks_til_overflow = 0x10000 - timer.value; // value, not reload: a ctrl write might not trigger reload
-		sched.add_event(cpu.stamp + (ticks_til_overflow * prescaler[timer.ctrl&3]), EVENT_TMR0_CHECK+I);
+		u64 cycles_til_overflow = (0x10000 - timer.value) * prescaler[timer.ctrl&3];
+				// ^value, not reload: a ctrl write might not trigger reload
+		if( cycles_til_overflow == 0 ) cycles_til_overflow += 5;
+		sched.add_event(cpu.stamp + cycles_til_overflow, EVENT_TMR0_CHECK+I);
 		timer.last_read = cpu.stamp;
 		return;
 	}
@@ -91,7 +93,7 @@ u32 gba::read_tmr_io(u32 addr)
 }
 
 void gba::catchup_timer(u32 I)
-{
+{ // currently unused
 	auto& timer = tmr[I];
 	if( !(timer.ctrl & 0x80) ) return; // don't catchup timers that are off
 	if( I!=0 && (timer.ctrl & BIT(2)) ) return; // catchup is for free-running timers
@@ -108,41 +110,29 @@ void gba::catchup_timer(u32 I)
 void gba::timer_event(u64 oldstamp, u32 I)
 {
 	auto& timer = tmr[I];
-	/*u16 old_value = timer.value;
-	u64 delta = oldstamp - timer.last_read; //lazy: would be a call to catchup, but need to use oldstamp
-	delta /= prescaler[timer.ctrl&3];
-	if( delta )
+	timer.value = timer.reload;
+		
+	if( snd_master_en )
 	{
-		timer.value += delta;
-		timer.last_read = cpu.stamp;
-	}*/
-	
-	if( 1 )//timer.value <= old_value )
-	{
-		timer.value = timer.reload;
-		
-		if( snd_master_en )
-		{
-			if( (dma_sound_mix&0x0300) && I==((dma_sound_mix>>10)&1) ) snd_a_timer();
-			if( (dma_sound_mix&0x3000) && I==((dma_sound_mix>>14)&1) ) snd_b_timer();
-		}
-		
-		if( timer.ctrl & BIT(6) )
-		{
-			ISTAT |= BIT(3+I);
-			check_irqs();
-		}
-		
-		if( I==0 || !(timer.ctrl&BIT(2)) )
-		{
-			u64 ticks_til_overflow = 0x10000 - timer.value;
-			sched.add_event(oldstamp + (ticks_til_overflow * prescaler[timer.ctrl&3]), EVENT_TMR0_CHECK+I);
-			timer.last_read = oldstamp;
-		}
-
-		if( I!=3 && (tmr[I+1].ctrl & 0x84) == 0x84 ) tick_overflow_timer(I+1);
-		return;
+		if( (dma_sound_mix&0x0300) && I==((dma_sound_mix>>10)&1) ) snd_a_timer();
+		if( (dma_sound_mix&0x3000) && I==((dma_sound_mix>>14)&1) ) snd_b_timer();
 	}
+	
+	if( timer.ctrl & BIT(6) )
+	{
+		ISTAT |= BIT(3+I);
+		check_irqs();
+	}
+	
+	if( I==0 || !(timer.ctrl&BIT(2)) )
+	{
+		u64 cycles_til_overflow = (0x10000 - timer.value) * prescaler[timer.ctrl&3];
+		if( cycles_til_overflow == 0 ) cycles_til_overflow += 5;
+		sched.add_event(oldstamp + cycles_til_overflow, EVENT_TMR0_CHECK+I);
+		timer.last_read = oldstamp;
+	}
+
+	if( I!=3 && (tmr[I+1].ctrl & 0x84) == 0x84 ) tick_overflow_timer(I+1);
 }
 
 void gba::tick_overflow_timer(u32 I)

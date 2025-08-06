@@ -58,6 +58,28 @@ void gba::write(u32 addr, u32 v, int size, ARM_CYCLE ct)
 	}
 	if( addr < 0x08000000 ) { sized_write(oam, addr&0x3ff, v, size); return; }
 	
+	if( addr == 0x080000C4 )
+	{
+		gpio_write(0, v);
+		return;
+	}
+	if( addr == 0x080000C6 )
+	{
+		gpio_write(1, v);
+		return;
+	}
+	if( addr == 0x080000C8 )
+	{
+		gpio_write(2, v);
+		return;
+	}
+	
+	if( addr >= 0x0d000000 && addr < 0x0e000000 && (save_type == SAVE_TYPE_UNKNOWN || save_type == SAVE_TYPE_EEPROM) )
+	{
+		eeprom_write(v);
+		return;
+	}
+	
 	if( addr >= 0x0e000000 && addr <= 0x0e00ffff )
 	{
 		if( save_type == SAVE_TYPE_UNKNOWN || save_type == SAVE_TYPE_SRAM ) { save[addr&0xffff] = v; return; }
@@ -77,6 +99,7 @@ void gba::write(u32 addr, u32 v, int size, ARM_CYCLE ct)
 					flash_state = 0;
 					if( flash_cmd == 0x80 && v == 0x10 )
 					{
+						save_written = true;
 						memset(save, 0xff, 0x20000);
 						flash_cmd = 0;
 						return;
@@ -92,6 +115,7 @@ void gba::write(u32 addr, u32 v, int size, ARM_CYCLE ct)
 			{
 				flash_cmd = flash_state = 0;
 				addr &= 0xf000;
+				save_written = true;
 				for(u32 i = 0; i < 0x1000; ++i) save[(flash_bank<<16)|(addr+i)] = 0xff;			
 				return;
 			}
@@ -103,6 +127,7 @@ void gba::write(u32 addr, u32 v, int size, ARM_CYCLE ct)
 				return;
 			}
 			
+			save_written = true;
 			save[(flash_bank<<16)|(addr&0xffff)] = v;
 			return;	
 		}
@@ -146,10 +171,16 @@ u32 gba::read(u32 addr, int size, ARM_CYCLE ct)
 	{ // OAM
 		return sized_read(oam, addr&0x3ff, size);
 	}
+	if( gpio_reads_en )
+	{
+		if( addr == 0x080000C4 ) { return gpio_read(0); }
+		if( addr == 0x080000C6 ) { return gpio_read(1); }
+		if( addr == 0x080000C8 ) { return gpio_read(2); }
+	}
 	if( addr < 0x10000000ul )
 	{  // either ROM or various types of SaveRAM that isn't supported yet
 		if( (save_type == SAVE_TYPE_UNKNOWN || save_type == SAVE_TYPE_EEPROM)
-			&& addr >= 0x0d000000 && addr < 0x0e000000 ) return eeprom_read(addr);
+			&& addr >= 0x0d000000 && addr < 0x0e000000 ) return eeprom_read();
 		//if( addr >= 0x0d000000 && addr  < 0x0e000000 ) return 1;
 		if( addr >= 0x0e000000 && addr <= 0x0e00FFFF )
 		{
@@ -174,7 +205,6 @@ u32 gba::read(u32 addr, int size, ARM_CYCLE ct)
 	return 0;	
 }
 
-
 static u32 snd_out_cycles = 380;
 static u64 last_stamp = 0;
 
@@ -194,6 +224,8 @@ void gba::reset()
 	sched.add_event(0, EVENT_SCANLINE_START);
 	VCOUNT = 0xff;
 	
+	gpio_reads_en = false;
+	
 	ISTAT = IMASK = IME = 0;
 	
 	snd_fifo_a.clear();
@@ -210,6 +242,19 @@ void gba::reset()
 	memset(lcd.regs, 0, 48*2);
 	memset(dmaregs, 0, 2*32);
 	memset(vram, 0, 96*1024);
+	
+	if( save_written )
+	{
+		FILE* fs = fopen(savefile.c_str(), "wb");
+		if( !fs )
+		{
+			std::println("GBA: Unable to write out save data to <{}>", savefile);
+			return;
+		}
+		[[maybe_unused]] int unu = fwrite(save, 1, 0x20000, fs);
+		fclose(fs);
+	}
+	save_written = false;
 }
 
 gba::gba() : sched(this), lcd(vram, palette, oam)
@@ -276,16 +321,24 @@ bool gba::loadROM(const std::string fname)
 	[[maybe_unused]] int unu = fread(ROM.data(), 1, fsz, fp);
 	fclose(fp);
 	
-	std::string savefile = fname.substr(0, fname.rfind('.'));
+	savefile = fname.substr(0, fname.rfind('.'));
 	savefile += ".sav";
+	save_written = false;
 	
 	FILE* fs = fopen(savefile.c_str(), "rb");
-	unu = fread(save, 1, 0x20000, fs);
-	fclose(fs);
+	if( fs )
+	{
+		unu = fread(save, 1, 0x20000, fs);
+		fclose(fs);
+	} else {
+		memset(save, 0xff, 0x20000);
+	}
 	
+	save_size = 0;
 	if( ROM[0xAC] == 'F' )
 	{
 		save_type = SAVE_TYPE_EEPROM;
+		save_size = 9;
 	} else {
 		save_type = SAVE_TYPE_UNKNOWN;
 		for(u32 i = 0; i < ROM.size(); i+=4)
@@ -447,11 +500,55 @@ void gba::event(u64 old_stamp, u32 evc)
 	exit(1);
 }
 
-u32 gba::eeprom_read(u32 addr)
+u32 gba::eeprom_read()
 {
-
-	return 1;
+	u32 bit = eeprom_state-save_size;
+	if( bit < 4 ) { eeprom_state+=1; return 0; }
+	bit -= 4;
+	u32 addr = ((eeprom_addr>>1) & (save_size == 9 ? 0x3f : 0x3ff))<<3;
+	addr += bit/8;
+	eeprom_state += 1;
+	return save[addr]>>(7^(bit&7));
 }
 
+void gba::eeprom_write(u8 v)
+{
+	if( eeprom_state < save_size )
+	{
+		eeprom_addr <<= 1;
+		eeprom_addr |= v&1;
+		eeprom_state += 1;
+		return;
+	}
+	
+	
+	
+	eeprom_out <<= 1;
+	eeprom_out |= v&1;
+	eeprom_state += 1;
+	if( eeprom_state >= (save_size + 64) )
+	{
+		eeprom_addr >>= 1;
+		eeprom_addr &= (save_size == 9 ? 0x3f : 0x3ff);
+		eeprom_addr <<= 3;
+		*(u64*)&save[eeprom_addr] = eeprom_out;
+		eeprom_state = 0;
+	}
+}
+
+gba::~gba()
+{
+	if( save_written )
+	{
+		FILE* fs = fopen(savefile.c_str(), "wb");
+		if( !fs )
+		{
+			std::println("GBA: Unable to write out save data to <{}>", savefile);
+			return;
+		}
+		[[maybe_unused]] int unu = fwrite(save, 1, 0x20000, fs);
+		fclose(fs);
+	}
+}
 
 

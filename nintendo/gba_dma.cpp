@@ -33,11 +33,20 @@ void gba::exec_dma(int chan)
 	if( B32 ) len *= 2;
 	int src_inc = 2;
 	int dst_inc = 2;
-	if( ((ctrl>>7)&3) == 1 ) src_inc = -src_inc;
-	else if( ((ctrl>>7)&3) == 2 ) src_inc = 0;
+	if( srcaddr < 0x08000000 )
+	{
+		if( ((ctrl>>7)&3) == 1 ) src_inc = -src_inc;
+		else if( ((ctrl>>7)&3) == 2 ) src_inc = 0;
+	}
 	if( ((ctrl>>5)&3) == 1 ) dst_inc = -dst_inc;
 	else if( ((ctrl>>5)&3) == 2 ) dst_inc = 0;
 	
+	if( dstaddr >= 0x0d000000 && dstaddr < 0x0e000000 )
+	{ // figure out EEPROM size
+		if(!save_size) save_size = len;
+		if( len <= 17 ) eeprom_state = 0;
+	}
+		
 	for(u32 i = 0; i < len; ++i)
 	{
 		u32 val = read(srcaddr, 16, ARM_CYCLE::X);
