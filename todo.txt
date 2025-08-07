@@ -145,10 +145,15 @@ Status: YM2612 uses the Nuken OPN library... Poorly? Fantastic Dizzy and UMK3 la
 
 GBA Todo List
 ----------------
-1. save hardware
-2. psg sound
-3. improve gfx priority and blending
-4. Run the single step tests against the current cpu
+1. improve gfx priority and blending
+2. have rtc actually return date&time rather than set values to make Emerald not complain.
+3. psg sound
+4. either find timer/scheduler bug or ditch scheduling for this emulator
+Status: Most games are playable with saving supported. Gunstar Heroes freezes the emulator.
+On that note, there's a logic error somewhere with the scheduler, timers, and lost events.
+That last part is why sample output is in the main loop and not scheduler. Events get lost
+and short period timers result in an infinite loop somehow even though the cpu timestamp should
+progress past a scanline event and eventually frame complete.
 
 
 
