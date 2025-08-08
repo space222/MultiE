@@ -10,12 +10,6 @@
 #define VCOUNT lcd.regs[3]
 const u32 cycles_per_frame = 280896;
 
-u8 SRAM[0x30000];
-u8 flash_cmd = 0;
-u8 flash_bank = 0;
-u8 flash_state = 0;
-static u8 lastval = 0;
-
 static void sized_write(u8* data, u32 addr, u32 v, int size)
 {
 	if( size == 8 ) data[addr] = v; 
@@ -29,8 +23,6 @@ static u32 sized_read(u8* data, u32 addr, int size)
 	else if( size == 16 ) return *(u16*)&data[addr];
 	else return *(u32*)&data[addr];
 }
-
-static bool rtc_active = false;
 
 void gba::write(u32 addr, u32 v, int size, ARM_CYCLE ct)
 {
@@ -82,7 +74,11 @@ void gba::write(u32 addr, u32 v, int size, ARM_CYCLE ct)
 	
 	if( addr >= 0x0e000000 && addr <= 0x0e00ffff )
 	{
-		if( save_type == SAVE_TYPE_UNKNOWN || save_type == SAVE_TYPE_SRAM ) { save[addr&0xffff] = v; return; }
+		if( save_type == SAVE_TYPE_UNKNOWN || save_type == SAVE_TYPE_SRAM ) 
+		{
+			save[addr&0xffff] = v;
+			return;
+		}
 		
 		if( save_type == SAVE_TYPE_UNKNOWN || save_type == SAVE_TYPE_FLASH )
 		{
@@ -104,16 +100,21 @@ void gba::write(u32 addr, u32 v, int size, ARM_CYCLE ct)
 						flash_cmd = 0;
 						return;
 					}
+					if( flash_cmd == 0x90 && v == 0xf0 )
+					{
+						flash_cmd = 0;
+						return;
+					}
 					flash_cmd = v;
 					return;
 				}
-				return;
 			}
 			if( addr == 0x0e002AAA && v == 0x55 && flash_state == 1 ) { flash_state = 2; return; }
 			
 			if( flash_cmd == 0x80 && v == 0x30 )
 			{
-				flash_cmd = flash_state = 0;
+				flash_cmd = 0;
+				flash_state = 0;
 				addr &= 0xf000;
 				save_written = true;
 				for(u32 i = 0; i < 0x1000; ++i) save[(flash_bank<<16)|(addr+i)] = 0xff;			
@@ -123,12 +124,16 @@ void gba::write(u32 addr, u32 v, int size, ARM_CYCLE ct)
 			if( flash_cmd == 0xB0 && addr == 0x0e000000 )
 			{
 				flash_bank = v&1;
-				flash_state = flash_cmd = 0;
+				flash_cmd = 0;
 				return;
 			}
 			
-			save_written = true;
-			save[(flash_bank<<16)|(addr&0xffff)] = v;
+			if( flash_cmd == 0xA0 )
+			{
+				save_written = true;
+				save[(flash_bank<<16)|(addr&0xffff)] = v;
+				flash_cmd = 0;
+			}
 			return;	
 		}
 		return;	
@@ -181,7 +186,6 @@ u32 gba::read(u32 addr, int size, ARM_CYCLE ct)
 	{  // either ROM or various types of SaveRAM that isn't supported yet
 		if( (save_type == SAVE_TYPE_UNKNOWN || save_type == SAVE_TYPE_EEPROM)
 			&& addr >= 0x0d000000 && addr < 0x0e000000 ) return eeprom_read();
-		//if( addr >= 0x0d000000 && addr  < 0x0e000000 ) return 1;
 		if( addr >= 0x0e000000 && addr <= 0x0e00FFFF )
 		{
 			if( save_type == SAVE_TYPE_FLASH && flash_cmd == 0x90 && addr == 0x0E000000 ) return 0x62;
@@ -190,7 +194,7 @@ u32 gba::read(u32 addr, int size, ARM_CYCLE ct)
 			{
 				return save[(flash_bank<<16)|(addr&0xffff)];
 			}
-			return 0;
+			return save[(flash_bank<<16)|(addr&0xffff)];
 		}
 		addr &= 0x01ffFFFf;
 		if( addr > ROM.size() )
@@ -232,10 +236,10 @@ void gba::reset()
 	snd_fifo_b.clear();
 	
 	pcmA = pcmB = 0;
-	dma_sound_mix = 0;	
+	dma_sound_mix = 0;
 	snd_master_en = 0;
 	snd_out_cycles = last_stamp = 0;
-	flash_state = flash_bank = 0;
+	flash_state = flash_bank = flash_cmd = 0;
 	
 	memset(iwram, 0, 32*1024);
 	memset(ewram, 0, 256*1024);
@@ -508,7 +512,7 @@ u32 gba::eeprom_read()
 	if( eeprom_count == 68 ) { eeprom_state = eeprom_mode = eeprom_count = 0; return 1; }
 	if( eeprom_count < 4 ) { eeprom_count++; return 1; }
 	u32 bit = eeprom_count-4;
-	u8 ret = save[(eeprom_addr<<3)+(bit/8)]>>(7^(bit&7));
+	u8 ret = save[(eeprom_addr<<3)+(((bit/8))&7)]>>(7^(bit&7));
 	eeprom_count += 1;
 	return ret&1;
 }

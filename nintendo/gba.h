@@ -59,7 +59,7 @@ public:
 	bool save_written;
 	u32 save_type, save_size;
 	std::string savefile;
-	u32 flash_state, flash_bank;
+	u32 flash_state, flash_bank, flash_cmd;
 	
 	u32 eeprom_read();
 	void eeprom_write(u8);
