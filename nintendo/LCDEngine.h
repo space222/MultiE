@@ -31,6 +31,7 @@ public:
 	u8 objwin[256];
 	u8 spr[256];
 	u8 spr_pri[256];
+	u8 spr_blend[256];
 	u8 bg[4][256];
 	u32 fbuf[256*192];
 };

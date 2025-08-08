@@ -16,6 +16,11 @@ inline u32 c16to32(u16 c)
 	return R|G|B;
 }
 
+struct layer
+{
+	u32 pri, n, c;
+};
+
 void LCDEngine::draw_scanline(u32 L)
 {
 	u32 Y = L;
@@ -23,6 +28,8 @@ void LCDEngine::draw_scanline(u32 L)
 	{
 		memset(objwin, 0, 240);
 		memset(spr, 0, 240);
+		memset(spr_pri, 9, 240);
+		memset(spr_blend, 0, 240);
 		switch( regs[0] & 7 )
 		{
 		case 0: draw_mode_0(L); break;
@@ -51,53 +58,112 @@ void LCDEngine::draw_scanline(u32 L)
 			if( win1_x2 > 240 || win1_x1 > win1_x2 ) win1_x2 = 240;
 			bool do_blend = true;
 			
-			if( (DISPCNT&BIT(13)) && (Y >= win0_y1) && (Y < win0_y2) && (x >= win0_x1) && (x < win0_x2) )
+			bool win0_in = (Y >= win0_y1) && (Y < win0_y2) && (x >= win0_x1) && (x < win0_x2);
+			bool win1_in = (Y >= win1_y1) && (Y < win1_y2) && (x >= win1_x1) && (x < win1_x2);
+			if( (DISPCNT&BIT(13)) && win0_in )
 			{
 				layer_active &= regs[0x24];
 				do_blend = regs[0x24] & 0x20;
-			} else if( (DISPCNT&BIT(14)) && (Y >= win1_y1) && (Y < win1_y2) && (x >= win1_x1) && (x < win1_x2) ) {
+			} else if( (DISPCNT&BIT(14)) && win1_in ) {
 				layer_active &= regs[0x24]>>8;
 				do_blend = (regs[0x24]>>8)&0x20;	
 			} else if( (DISPCNT&BIT(15)) && objwin[x] ) {
 				layer_active &= regs[0x25]>>8;
-				do_blend = (regs[0x25]>>8)&0x20;	
-			} else if( (DISPCNT&0xe000) ) {
+				do_blend = (regs[0x25]>>8)&0x20;
+			} else if( (DISPCNT&0xe000) ) { // && !(win0_in || win1_in || objwin[x]) ) {
 				layer_active &= regs[0x25];
 				do_blend = regs[0x25]&0x20;	
 			}
-		
-			u16 pris[10] = {0,0,0,0,0,0,0,0,0,0};
-			u16 ln[10] = {5,5,5,5,5,5,5,5,5,5};
-			if( (layer_active&0x10) && spr[x] ) 
-				{ pris[(spr_pri[x])<<1] = (512 + (spr[x]<<1)); ln[(spr_pri[x])<<1] = 4; }
-			if( (layer_active&8) && bg[3][x] ) { pris[(((BG3CNT&3))<<1)|1] = bg[3][x]<<1; ln[(((BG3CNT&3))<<1)|1] = 3; }
-			if( (layer_active&4) && bg[2][x] ) { pris[(((BG2CNT&3))<<1)|1] = bg[2][x]<<1; ln[(((BG2CNT&3))<<1)|1] = 2; }
-			if( (layer_active&2) && bg[1][x] ) { pris[(((BG1CNT&3))<<1)|1] = bg[1][x]<<1; ln[(((BG1CNT&3))<<1)|1] = 1; }
-			if( (layer_active&1) && bg[0][x] ) { pris[(((BG0CNT&3))<<1)|1] = bg[0][x]<<1; ln[(((BG0CNT&3))<<1)|1] = 0; }
-			
-			int index = 0;
-			u32 target[2] = {0,0};
 
-			for(u32 i = 0; i < 8; ++i)
+			layer t[2] = {{15,5,0},{15,5,0}};
+			if( (layer_active&8) && bg[3][x] ) 
 			{
-				if( pris[i] )
+				u32 bgpri = BG3CNT&3;
+				if( bgpri <= t[0].pri )
 				{
-					target[index++] = i;
-					if( index == 2 ) break;
+					t[1] = t[0];
+					t[0].pri = bgpri;
+					t[0].c = bg[3][x]<<1;
+					t[0].n = 3;
+				} else if( bgpri <= t[1].pri ) {
+					t[1].pri = bgpri;
+					t[1].c = bg[3][x]<<1;
+					t[1].n = 3;
+				}
+			}
+			if( (layer_active&4) && bg[2][x] ) 
+			{
+				u32 bgpri = BG2CNT&3;
+				if( bgpri <= t[0].pri )
+				{
+					t[1] = t[0];
+					t[0].pri = bgpri;
+					t[0].c = bg[2][x]<<1;
+					t[0].n = 2;
+				} else if( bgpri <= t[1].pri ) {
+					t[1].pri = bgpri;
+					t[1].c = bg[2][x]<<1;
+					t[1].n = 2;
+				}
+			}
+			if( (layer_active&2) && bg[1][x] ) 
+			{
+				u32 bgpri = BG1CNT&3;
+				if( bgpri <= t[0].pri )
+				{
+					t[1] = t[0];
+					t[0].pri = bgpri;
+					t[0].c = bg[1][x]<<1;
+					t[0].n = 1;
+				} else if( bgpri <= t[1].pri ) {
+					t[1].pri = bgpri;
+					t[1].c = bg[1][x]<<1;
+					t[1].n = 1;
+				}
+			}
+			if( (layer_active&1) && bg[0][x] ) 
+			{
+				u32 bgpri = BG0CNT&3;
+				if( bgpri <= t[0].pri )
+				{
+					t[1] = t[0];
+					t[0].pri = bgpri;
+					t[0].c = bg[0][x]<<1;
+					t[0].n = 0;
+				} else if( bgpri <= t[1].pri ) {
+					t[1].pri = bgpri;
+					t[1].c = bg[0][x]<<1;
+					t[1].n = 0;
+				}
+			}
+			if( (layer_active&0x10) && spr[x] )
+			{
+				u32 pri = spr_pri[x]&3;
+				if( pri <= t[0].pri )
+				{
+					t[1] = t[0];
+					t[0].pri = pri;
+					t[0].c = 512 + (spr[x]<<1);
+					t[0].n = 4;
+				} else if( pri <= t[1].pri ) {
+					t[1].pri = pri;
+					t[1].c = 512 + (spr[x]<<1);
+					t[1].n = 4;
 				}
 			}
 			
-			u32 blend_mode = ((regs[0x28]>>6)&3);
+			bool blended_sprite = ( t[0].n == 4 && spr_blend[x] && (regs[0x28]&BIT(8+t[1].n)) );
+			u32 blend_mode = (blended_sprite ? 1 : ((regs[0x28]>>6)&3));
 			
-			if( !do_blend || blend_mode==0 || !(regs[0x28]&BIT(ln[target[0]])) )
+			if( !blended_sprite && (!do_blend || blend_mode==0 || !(regs[0x28]&BIT(t[0].n))) )
 			{
-				fbuf[L*240+x] = c16to32(*(u16*)&palette[pris[target[0]]]);
+				fbuf[L*240+x] = c16to32(*(u16*)&palette[t[0].c]);
 				continue;
 			}
 			
 			if( blend_mode == 2 )
 			{
-				u32 RGB = c16to32(*(u16*)&palette[pris[target[0]]]);
+				u32 RGB = c16to32(*(u16*)&palette[t[0].c]);
 				u8 R = RGB>>24;
 				u8 G = RGB>>16;
 				u8 B = RGB>>8;
@@ -113,7 +179,7 @@ void LCDEngine::draw_scanline(u32 L)
 			
 			if( blend_mode == 3 )
 			{
-				u32 RGB = c16to32(*(u16*)&palette[pris[target[0]]]);
+				u32 RGB = c16to32(*(u16*)&palette[t[0].c]);
 				u8 R = RGB>>24;
 				u8 G = RGB>>16;
 				u8 B = RGB>>8;
@@ -127,14 +193,14 @@ void LCDEngine::draw_scanline(u32 L)
 				continue;
 			}
 			
-			if( index!=2 || !(regs[0x28]&BIT(8+ln[target[1]])) )
+			if( !(regs[0x28]&BIT(8+t[1].n)) || (t[0].n == 5) )
 			{
-				fbuf[L*240+x] = c16to32(*(u16*)&palette[pris[target[0]]]);
+				fbuf[L*240+x] = c16to32(*(u16*)&palette[t[0].c]);
 				continue;
 			}
 			
-			u32 c1RGB = c16to32(*(u16*)&palette[pris[target[0]]]);
-			u32 c2RGB = c16to32(*(u16*)&palette[pris[target[1]]]);
+			u32 c1RGB = c16to32(*(u16*)&palette[t[0].c]);
+			u32 c2RGB = c16to32(*(u16*)&palette[t[1].c]);
 			
 			u8 R1 = c1RGB>>24;
 			u8 G1 = c1RGB>>16;
@@ -155,7 +221,7 @@ void LCDEngine::draw_scanline(u32 L)
 			u8 B3 = std::min(255.f, B1*EVA + B2*EVB);
 			
 			fbuf[L*240+x] = (R3<<24)|(G3<<16)|(B3<<8);
-		}
+		} // end of compositing for loop
 		return;
 	}	
 	memset(fbuf+L*240, 0, 240*4);
@@ -203,17 +269,18 @@ void LCDEngine::render_affine_sprite(int Y, int S)
 	s32 spry = (PD*(sLine - (dH/2)));
 	
 	u32 sprite_mode = ((attr0>>10)&3);
-	
+	u32 spri = (attr2>>10)&3;
+
 	for(int x = 0; x < dW; ++x)
 	{
-		if( x+sX < 0 || (sprite_mode<2 && spr[x+sX]) ) continue;
+		if( x+sX < 0 || (sprite_mode<2 && spr[x+sX] /*&& spr_pri[sX+x]<=spri*/) ) continue;
 		if( x+sX >= 240 ) break;
 		
 		s32 tx = (sprx + PA*(x-(dW/2)))>>8;
 		s32 ty = (spry + PC*(x-(dW/2)))>>8;
 		tx += W/2;
 		ty += H/2;
-		if(tx < 0 || ty < 0 || tx >= W || ty >= H ) continue;
+		if( tx < 0 || ty < 0 || tx >= W || ty >= H ) continue;
 		
 		u32 charbase = 0x10000 + ((attr2&0x3ff)*32);
 		if( DISPCNT & BIT(6) )
@@ -239,16 +306,18 @@ void LCDEngine::render_affine_sprite(int Y, int S)
 			objwin[sX+x] |= (p?1:0);
 			continue;
 		}
-		spr[sX+x] = p;
-		spr_pri[sX+x] = (attr2>>10)&3;
+		if( p )
+		{
+			spr[sX+x] = p;
+			spr_blend[sX+x] = (sprite_mode==1 ? 1:0);
+			spr_pri[sX+x] = spri;
+		}
 	}
-	//std::putchar('\n');
 }
 
 void LCDEngine::render_sprites(int Y)
 {
 	if( !(DISPCNT & BIT(12)) ) return;
-	memset(spr_pri, 0, 240);
 	
 	for(int S = 0; S < 128; ++S)
 	{
@@ -280,10 +349,11 @@ void LCDEngine::render_sprites(int Y)
 		
 		int tilesize = ((attr0&BIT(13))?64:32);
 		u32 sprite_mode = ((attr0>>10)&3);
+		u32 spri = (attr2>>10)&3;
 		
 		for(int x = 0; x < W; ++x)
 		{
-			if( sX+x < 0 || (sprite_mode<2 && spr[x+sX]) ) continue;
+			if( sX+x < 0 || (sprite_mode<2 && spr[sX+x] /*&& spr_pri[sX+x]<=spri*/) ) continue;
 			if( sX+x >= 240 ) break;
 			int uX = (attr1 & BIT(12)) ? W-x-1 : x;
 			u32 charbase = 0x10000 + ((attr2&0x3ff)*32);
@@ -310,8 +380,12 @@ void LCDEngine::render_sprites(int Y)
 				objwin[sX+x] |= (p?1:0);
 				continue;
 			}
-			spr[sX+x] = p;
-			spr_pri[sX+x] = (attr2>>10)&3;
+			if( p )
+			{
+				spr[sX+x] = p;
+				spr_blend[sX+x] = (sprite_mode==1 ? 1:0);
+				spr_pri[sX+x] = spri;
+			}
 		}
 	}
 }

@@ -19,7 +19,8 @@ void gba::write_tmr_io(u32 addr, u32 v)
 	case 0x4000108: I = 2; break;
 	case 0x400010C: I = 3; break;
 	default:
-		std::println("unimpl timer io write ${:X} = ${:X}", addr, v);
+		//std::println("unimpl timer io write ${:X} = ${:X}", addr, v);
+		// ^ bios does a bunch of nonsense writes to timer "area" that aren't regs, got tired of seeing this output
 		return;
 	}
 	
