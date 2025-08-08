@@ -34,7 +34,7 @@ static bool rtc_active = false;
 
 void gba::write(u32 addr, u32 v, int size, ARM_CYCLE ct)
 {
-	cpu.stamp += 1;
+	if( ct != ARM_CYCLE::X) cpu.stamp += 1;
 	
 	if( size == 8 ) v &= 0xff;
 	else if( size == 16 ) v &= 0xffff;
@@ -138,7 +138,7 @@ void gba::write(u32 addr, u32 v, int size, ARM_CYCLE ct)
 
 u32 gba::read(u32 addr, int size, ARM_CYCLE ct)
 {
-	cpu.stamp += 1;
+	if( ct != ARM_CYCLE::X) cpu.stamp += 1;
 	
 	if( addr < 0x02000000ul )
 	{ // BIOS
@@ -276,7 +276,9 @@ void gba::run_frame()
 				std::println("CPU Halted with no future events");
 				exit(1);
 			}
-			cpu.stamp += 31;
+			//cpu.stamp += 31;
+			//cpu.stamp = sched.next_stamp();
+			cpu.stamp += 1;
 		}
 		if( cpu.stamp - last_stamp > 380 )
 		{
@@ -285,10 +287,10 @@ void gba::run_frame()
 			sample /= 2.f;
 			audio_add(sample, sample);
 		}
-		int i = 0;
-		while( cpu.stamp >= sched.next_stamp() && i < 10 )
+		//int i = 0;
+		while( cpu.stamp >= sched.next_stamp() ) //&& i < 10 )
 		{
-			i+=1;
+			//i+=1;
 			sched.run_event();
 		}
 	}
