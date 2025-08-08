@@ -755,14 +755,14 @@ void arm7tdmi::flushp()
 	if( cpsr.b.T )
 	{
 		r[15] &= ~1;
-		decode = read(r[15], 16, ARM_CYCLE::X);
+		decode = read(r[15], 16, ARM_CYCLE::N);
 		r[15] += 2;
-		fetch = read(r[15], 16, ARM_CYCLE::X);	
+		fetch = read(r[15], 16, ARM_CYCLE::S);	
 	} else {
 		r[15] &= ~3;
-		decode = read(r[15], 32, ARM_CYCLE::X);
+		decode = read(r[15], 32, ARM_CYCLE::N);
 		r[15] += 4;
-		fetch = read(r[15], 32, ARM_CYCLE::X);
+		fetch = read(r[15], 32, ARM_CYCLE::S);
 	}
 }
 
