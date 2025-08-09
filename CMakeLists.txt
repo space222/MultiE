@@ -5,7 +5,7 @@ project(test)
 find_package(SDL2)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
-#set(CMAKE_CXX_FLAGS "-g -fabi-version=16 -fsanitize=undefined -ftree-vectorize -march=native -Wall -Wpedantic -Wextra -Wshadow -Wimplicit-fallthrough")
+#set(CMAKE_CXX_FLAGS "-g -fabi-version=16 -fsanitize=address -ftree-vectorize -march=native -Wall -Wpedantic -Wextra -Wshadow -Wimplicit-fallthrough")
 set(CMAKE_CXX_FLAGS "-O2 -ftree-vectorize  -march=native -Wall -Wpedantic -Wextra -Wshadow -Wimplicit-fallthrough")
 set(CMAKE_CPP_COMPILER clang++)
 

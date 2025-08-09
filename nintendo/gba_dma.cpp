@@ -54,8 +54,8 @@ void gba::exec_dma(int chan)
 		
 	for(u32 i = 0; i < len; ++i)
 	{
-		u32 val = read(srcaddr, 16, ARM_CYCLE::X);
-		write(dstaddr, val&0xffff, 16, ARM_CYCLE::X);
+		u32 val = read(srcaddr, 16, ARM_CYCLE::N);
+		write(dstaddr, val&0xffff, 16, ARM_CYCLE::N);
 		
 		srcaddr += src_inc;
 		dstaddr += dst_inc;

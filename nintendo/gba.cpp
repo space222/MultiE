@@ -223,9 +223,9 @@ void gba::reset()
 	tmr[0].ctrl = tmr[1].ctrl = tmr[2].ctrl = tmr[3].ctrl = 0;
 	tmr[0].last_read = tmr[1].last_read = tmr[2].last_read = tmr[3].last_read = 0;
 	
-	sched.reset();
+	sched->reset();
 	//sched.add_event(30, EVENT_SND_OUT);
-	sched.add_event(0, EVENT_SCANLINE_START);
+	sched->add_event(0, EVENT_SCANLINE_START);
 	VCOUNT = 0xff;
 	
 	gpio_reads_en = false;
@@ -247,6 +247,8 @@ void gba::reset()
 	memset(dmaregs, 0, 2*32);
 	memset(vram, 0, 96*1024);
 	
+	lcd.regs[0x10] = lcd.regs[0x11] = lcd.regs[0x12] = lcd.regs[13] = 0x100;
+	
 	if( save_written )
 	{
 		FILE* fs = fopen(savefile.c_str(), "wb");
@@ -261,7 +263,7 @@ void gba::reset()
 	save_written = false;
 }
 
-gba::gba() : sched(this), lcd(vram, palette, oam)
+gba::gba() : sched(new Scheduler(this)), lcd(vram, palette, oam)
 {
 	setVsync(false);
 }
@@ -271,11 +273,12 @@ void gba::run_frame()
 	frame_complete = false;
 	while( !frame_complete )
 	{
+		u64 last = cpu.stamp;
 		if( !halted )
 		{
 			cpu.step();
 		} else {
-			if( sched.next_stamp() == 0xffffFFFFffffFFFFull )
+			if( sched->next_stamp() == 0xffffFFFFffffFFFFull )
 			{
 				std::println("CPU Halted with no future events");
 				exit(1);
@@ -292,10 +295,10 @@ void gba::run_frame()
 			audio_add(sample, sample);
 		}
 		//int i = 0;
-		while( cpu.stamp >= sched.next_stamp() ) //&& i < 10 )
+		while( cpu.stamp >= sched->next_stamp() ) //&& i < 10 )
 		{
 			//i+=1;
-			sched.run_event();
+			sched->run_event();
 		}
 	}
 }
@@ -464,8 +467,8 @@ void gba::event(u64 old_stamp, u32 evc)
 			ISTAT |= BIT(1);
 			check_irqs();
 		}
-		if( VCOUNT < 160 ) sched.add_event(old_stamp + 280, EVENT_SCANLINE_RENDER);
-		sched.add_event(old_stamp + 1232, (VCOUNT==227) ? EVENT_FRAME_COMPLETE : EVENT_SCANLINE_START);
+		if( VCOUNT < 160 ) sched->add_event(old_stamp + 280, EVENT_SCANLINE_RENDER);
+		sched->add_event(old_stamp + 1232, (VCOUNT==227) ? EVENT_FRAME_COMPLETE : EVENT_SCANLINE_START);
 		return;
 	}
 	
@@ -495,7 +498,7 @@ void gba::event(u64 old_stamp, u32 evc)
 
 	if( evc == EVENT_SND_OUT )
 	{
-		sched.add_event(old_stamp+380, EVENT_SND_OUT);
+		sched->add_event(old_stamp+380, EVENT_SND_OUT);
 		float sample = pcmA + pcmB;
 		sample /= 2.f;
 		audio_add(sample, sample);
@@ -577,6 +580,7 @@ gba::~gba()
 		[[maybe_unused]] int unu = fwrite(save, 1, 0x20000, fs);
 		fclose(fs);
 	}
+	delete sched;
 }
 
 

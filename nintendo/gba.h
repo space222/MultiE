@@ -34,7 +34,7 @@ public:
 	u32 read(u32, int, ARM_CYCLE);
 	void write(u32, u32, int, ARM_CYCLE);
 	arm7tdmi cpu;
-	Scheduler sched;
+	Scheduler *sched;
 	void event(u64, u32) override;
 	
 	std::deque<s8> snd_fifo_a, snd_fifo_b;
@@ -51,16 +51,16 @@ public:
 	u8 bios[16*1024];
 	u8 iwram[32*1024];
 	u8 ewram[256*1024];
-	u8 oam[1024];
 	u8 palette[1024];
 	u8 vram[96*1024];
+	u8 oam[1024];
 	
 	u8 save[0x20000];
 	bool save_written;
 	u32 save_type, save_size;
 	std::string savefile;
 	u32 flash_state, flash_bank, flash_cmd;
-	
+		
 	u32 eeprom_read();
 	void eeprom_write(u8);
 	u32 eeprom_state, eeprom_mode, eeprom_count;

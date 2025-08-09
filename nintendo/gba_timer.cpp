@@ -35,7 +35,7 @@ void gba::write_tmr_io(u32 addr, u32 v)
 		timer.ctrl = v;
 		
 		// just get rid of any future timer events
-		sched.filter_out_event(EVENT_TMR0_CHECK+I);
+		sched->filter_out_event(EVENT_TMR0_CHECK+I);
 		
 		const bool started = !(oldctrl&0x80) && (timer.ctrl&0x80);
 		
@@ -55,7 +55,7 @@ void gba::write_tmr_io(u32 addr, u32 v)
 		u64 cycles_til_overflow = (0x10000 - timer.value) * prescaler[timer.ctrl&3];
 				// ^value, not reload: a ctrl write might not trigger reload
 		if( cycles_til_overflow == 0 ) cycles_til_overflow += 5;
-		sched.add_event(cpu.stamp + cycles_til_overflow, EVENT_TMR0_CHECK+I);
+		sched->add_event(cpu.stamp + cycles_til_overflow, EVENT_TMR0_CHECK+I);
 		timer.last_read = cpu.stamp;
 		return;
 	}
@@ -129,7 +129,7 @@ void gba::timer_event(u64 oldstamp, u32 I)
 	{
 		u64 cycles_til_overflow = (0x10000 - timer.value) * prescaler[timer.ctrl&3];
 		if( cycles_til_overflow == 0 ) cycles_til_overflow += 5;
-		sched.add_event(oldstamp + cycles_til_overflow, EVENT_TMR0_CHECK+I);
+		sched->add_event(oldstamp + cycles_til_overflow, EVENT_TMR0_CHECK+I);
 		timer.last_read = oldstamp;
 	}
 
