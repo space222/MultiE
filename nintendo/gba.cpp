@@ -247,7 +247,8 @@ void gba::reset()
 	memset(dmaregs, 0, 2*32);
 	memset(vram, 0, 96*1024);
 	
-	lcd.regs[0x10] = lcd.regs[0x11] = lcd.regs[0x12] = lcd.regs[13] = 0x100;
+	lcd.regs[0x10] = lcd.regs[0x11] = lcd.regs[0x12] = lcd.regs[0x13] = 0x100;
+	lcd.regs[0x18] = lcd.regs[0x19] = lcd.regs[0x1A] = lcd.regs[0x1B] = 0x100;
 	
 	if( save_written )
 	{
@@ -479,7 +480,7 @@ void gba::event(u64 old_stamp, u32 evc)
 		lcd.bg2x += (s16)lcd.regs[0x11];
 		lcd.bg2y += (s16)lcd.regs[0x13];
 		lcd.bg3x += (s16)lcd.regs[0x19];
-		lcd.bg3y += (s16)lcd.regs[0x21];
+		lcd.bg3y += (s16)lcd.regs[0x1B];
 		return;
 	}
 	

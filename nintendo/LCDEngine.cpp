@@ -193,8 +193,9 @@ void LCDEngine::draw_scanline(u32 L)
 				continue;
 			}
 			
+			//got to blend_mode == 1
 			if( !(regs[0x28]&BIT(8+t[1].n)) || (t[0].n == 5) )
-			{
+			{ // if top layer is backdrop or second layer is not a targetB, output top pixel
 				fbuf[L*240+x] = c16to32(*(u16*)&palette[t[0].c]);
 				continue;
 			}
@@ -274,7 +275,7 @@ void LCDEngine::render_affine_sprite(int Y, int S)
 	for(int x = 0; x < dW; ++x)
 	{
 		if( x+sX >= 240 ) break;
-		if( x+sX < 0 || (sprite_mode<2 && spr[x+sX] /*&& spr_pri[sX+x]<=spri*/) ) continue;
+		if( x+sX < 0 || ( sprite_mode<2 && spr[x+sX] && spr_pri[sX+x]<=spri ) ) continue;
 		
 		s32 tx = (sprx + PA*(x-(dW/2)))>>8;
 		s32 ty = (spry + PC*(x-(dW/2)))>>8;
@@ -327,7 +328,7 @@ void LCDEngine::render_sprites(int Y)
 		u32 sprite_mode = ((attr0>>10)&3);
 		if( sprite_mode == 3 ) continue;
 
-		if( !(attr0 & BIT(8)) && (attr0 & BIT(9)) ) continue;
+		if( /*sprite_mode < 2 &&*/ !(attr0 & BIT(8)) && (attr0 & BIT(9)) ) continue;
 		if( (attr2&0x3ff)<512 && (DISPCNT&7)>=3 ) continue;
 		
 		if( attr0 & BIT(8) )
@@ -356,7 +357,7 @@ void LCDEngine::render_sprites(int Y)
 		for(int x = 0; x < W; ++x)
 		{
 			if( sX+x >= 240 ) break;
-			if( sX+x < 0 || (sprite_mode<2 && spr[sX+x] /*&& spr_pri[sX+x]<=spri*/) ) continue;
+			if( sX+x < 0 || (sprite_mode<2 && spr[sX+x] && spr_pri[sX+x]<=spri ) ) continue;
 			int uX = (attr1 & BIT(12)) ? W-x-1 : x;
 			u32 charbase = 0x10000 + ((attr2&0x3ff)*32);
 			if( DISPCNT & BIT(6) )
