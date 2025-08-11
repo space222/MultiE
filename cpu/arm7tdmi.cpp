@@ -1,5 +1,6 @@
 #include <cstdlib>
 #include <print>
+#include <bit>
 #include "arm7tdmi.h"
 
 #define setNZ(a) cpu.cpsr.b.N = (((a)&BIT(31))?1:0); cpu.cpsr.b.Z = (((a)==0)?1:0)

@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 #set(CMAKE_CXX_FLAGS "-g -fabi-version=16 -fsanitize=address -ftree-vectorize -march=native -Wall -Wpedantic -Wextra -Wshadow -Wimplicit-fallthrough")
 set(CMAKE_CXX_FLAGS "-O2 -ftree-vectorize  -march=native -Wall -Wpedantic -Wextra -Wshadow -Wimplicit-fallthrough")
-set(CMAKE_CPP_COMPILER clang++)
+#set(CMAKE_CXX_COMPILER g++)
 
 add_executable(test main.cpp imgui/backends/imgui_impl_sdl2.cpp progopt.cpp commodore/c64.cpp commodore/TAPFile.cpp 
 atari/a26.cpp atari/a52.cpp atari/antic.cpp atari/tia.cpp cpu/6502.cpp

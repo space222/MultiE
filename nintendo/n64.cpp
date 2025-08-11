@@ -291,11 +291,14 @@ bool n64::loadROM(const std::string fname)
 		fclose(eep);
 	}
 	
-	fp = fopen("./bios/pifdata.bin", "rb");
+	
+	std::string biospath = Settings::get<std::string>("n64", "pif");
+	if( biospath.empty() ) biospath = "bios/pifdata.bin";
+	fp = fopen(biospath.c_str(), "rb");
 	if( !fp )
 	{
 		do_boot_hle = true;
-		printf("N64: Will attempt to HLE IPL1&2.\nPut 'pifdata.bin' in the bios folder.\n");
+		printf("N64: Unable to open configured pifrom <%s>.\n", biospath.c_str());
 		return true;
 	}
 	unu = fread(pifrom, 1, 0x7c0, fp);

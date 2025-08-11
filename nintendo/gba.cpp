@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include "gba.h"
+#include "Settings.h"
 
 #define DISPCNT lcd.regs[0]
 #define DISPSTAT lcd.regs[2]
@@ -307,10 +308,12 @@ void gba::run_frame()
 bool gba::loadROM(const std::string fname)
 {
 	{
-		FILE* fbios = fopen("./bios/GBABIOS.BIN", "rb");
+		std::string biosfile = Settings::get<std::string>("gba", "bios");
+		if( biosfile.empty() ) biosfile = "bios/GBABIOS.BIN";
+		FILE* fbios = fopen(biosfile.c_str(), "rb");
 		if( !fbios )
 		{
-			printf("Need gba.bios in the bios folder\n");
+			std::println("Unable to open gba bios file <{}>", biosfile);
 			return false;
 		}
 		[[maybe_unused]] int unu = fread(bios, 1, 16*1024, fbios);

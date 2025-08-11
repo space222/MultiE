@@ -5,7 +5,7 @@ void gba::exec_dma(int chan)
 {
 	const int base = chan*6;
 	const u16 ctrl = dmaregs[base + 5];
-	u16 len = dmaregs[base + 4];
+	u32 len = dmaregs[base + 4];
 	if( len == 0 ) { len = ((chan==3) ? 0x10000 : 0x4000); }
 	int srcaddr = 0;
 	int dstaddr = 0;

@@ -1,5 +1,6 @@
 #include <cstdlib>
 #include <print>
+#include <bit>
 #include "arm7tdmi.h"
 
 #define SBIT (opc&BIT(20))
