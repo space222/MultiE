@@ -30,7 +30,9 @@
 #include "genesis.h"
 #include "intellivision.h"
 #include "ibmpc.h"
+#ifndef _WIN32
 #include "psx.h"
+#endif
 #include "casio_pv1k.h"
 #include "jag.h"
 #include "colecovision.h"
@@ -398,6 +400,7 @@ void imgui_run()
 				}
 				ImGui::EndMenu();
 			}
+		#ifndef _WIN32
 			if( ImGui::BeginMenu("Sony") ) 
 			{
 				if( ImGui::MenuItem("PSX") )
@@ -418,6 +421,7 @@ void imgui_run()
 				}
 				ImGui::EndMenu();
 			}
+		#endif
 			if( ImGui::BeginMenu("Coleco") ) 
 			{
 				if( ImGui::MenuItem("ColecoVision") )
@@ -923,14 +927,33 @@ void setPlayerInputMap(u32 player, std::vector<std::string>& m)
 std::string lastDir;
 
 #ifdef _WIN32
-#include <Windows.h>
+#include <windows.h>
 
 std::string getOpenFile(const std::string& title)
 {
+	OPENFILENAMEA ofn;
+	char szFile[257];
+	ZeroMemory(&ofn, sizeof(ofn));
+	ofn.lStructSize = sizeof(ofn);
+	ofn.hwndOwner = nullptr;
+	ofn.lpstrFile = szFile;
+	// Set lpstrFile[0] to '\0' so that GetOpenFileName does not 
+	// use the contents of szFile to initialize itself.
+	ofn.lpstrFile[0] = '\0';
+	ofn.nMaxFile = 255;
+	ofn.lpstrFilter = "All\0*.*\0";
+	ofn.nFilterIndex = 1;
+	ofn.lpstrFileTitle = NULL;
+	ofn.nMaxFileTitle = 0;
+	ofn.lpstrInitialDir = NULL;
+	ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+	if( ! GetOpenFileName(&ofn) ) return {};
+	return szFile;
+}
 
-
-	return "";
-
+int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
+{
+	main(0, nullptr);
 }
 
 #else

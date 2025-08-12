@@ -7,7 +7,7 @@
 #define TOML_IMPLEMENTATION
 #include "Settings.h"
 
-static const char* conf_file_name = "./config.toml";
+static const char* conf_file_name = "config.toml";
 
 Settings::Settings()
 {
