@@ -4,6 +4,7 @@ static const u64 prescaler[4] = { 1, 64, 256, 1024 };
 
 void gba::write_tmr_io(u32 addr, u32 v)
 {
+	v &= 0xffff;
 	//std::println("timer io write ${:X} = ${:X}", addr, v);
 	bool ctrlwrite = false;
 	u32 I = 0;
@@ -26,10 +27,12 @@ void gba::write_tmr_io(u32 addr, u32 v)
 	
 	if( ctrlwrite )
 	{
+		auto& timer = tmr[I];
+		//std::println("timer ctrl write = ${:X}", v);
+		//std::println("old ctrl = ${:X}, value = ${:X}, reload = ${:X}", timer.ctrl, timer.value, timer.reload);
 		if( (tmr[I].ctrl & 0x84) == 0x80 ) catchup_timer(I); // if timer is running, need to catch it up
 		
 		v &= 0xc7;
-		auto& timer = tmr[I];
 		if( timer.ctrl == v ) return;
 		u8 oldctrl = timer.ctrl;
 		timer.ctrl = v;
@@ -53,6 +56,7 @@ void gba::write_tmr_io(u32 addr, u32 v)
 		}
 		
 		u64 cycles_til_overflow = (0x10000 - timer.value) * prescaler[timer.ctrl&3];
+		//std::println("cto = ${:X}", cycles_til_overflow);
 				// ^value, not reload: a ctrl write might not trigger reload
 		if( cycles_til_overflow == 0 ) cycles_til_overflow += 5;
 		sched->add_event(cpu.stamp + cycles_til_overflow, EVENT_TMR0_CHECK+I);
@@ -72,7 +76,6 @@ u32 gba::read_tmr_io(u32 addr)
 		if( I!=0 && (tmr[I].ctrl & BIT(2)) ) return tmr[I].value;
 		return tmr[I].value + (cpu.stamp - tmr[I].last_read)/prescaler[tmr[I].ctrl&3];
 	};
-
 
 	//std::println("timer io read ${:X}", addr);
 	switch( addr )
@@ -94,7 +97,7 @@ u32 gba::read_tmr_io(u32 addr)
 }
 
 void gba::catchup_timer(u32 I)
-{ // currently unused
+{
 	auto& timer = tmr[I];
 	if( !(timer.ctrl & 0x80) ) return; // don't catchup timers that are off
 	if( I!=0 && (timer.ctrl & BIT(2)) ) return; // catchup is for free-running timers

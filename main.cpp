@@ -187,9 +187,9 @@ int main(int argc, char** args)
 				break;
 			case SDL_KEYDOWN:
 				if( sys ) sys->key_down(e.key.keysym.scancode);
-				if( e.key.keysym.scancode == SDL_SCANCODE_X )
+				if( e.key.keysym.scancode == SDL_SCANCODE_P )
 				{
-					try_kirq();
+					//try_kirq();
 				}
 				if( e.key.keysym.scancode == SDL_SCANCODE_F1 )
 				{

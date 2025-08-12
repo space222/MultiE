@@ -225,7 +225,7 @@ void gba::reset()
 	tmr[0].last_read = tmr[1].last_read = tmr[2].last_read = tmr[3].last_read = 0;
 	
 	sched->reset();
-	//sched.add_event(30, EVENT_SND_OUT);
+	sched->add_event(0, EVENT_SND_OUT);
 	sched->add_event(0, EVENT_SCANLINE_START);
 	VCOUNT = 0xff;
 	
@@ -275,7 +275,6 @@ void gba::run_frame()
 	frame_complete = false;
 	while( !frame_complete )
 	{
-		u64 last = cpu.stamp;
 		if( !halted )
 		{
 			cpu.step();
@@ -285,21 +284,10 @@ void gba::run_frame()
 				std::println("CPU Halted with no future events");
 				exit(1);
 			}
-			//cpu.stamp += 31;
-			//cpu.stamp = sched.next_stamp();
-			cpu.stamp += 1;
+			cpu.stamp = sched->next_stamp();
 		}
-		if( cpu.stamp - last_stamp > 380 )
+		while( cpu.stamp >= sched->next_stamp() )
 		{
-			last_stamp = cpu.stamp;
-			float sample = pcmA + pcmB;
-			sample /= 2.f;
-			audio_add(sample, sample);
-		}
-		//int i = 0;
-		while( cpu.stamp >= sched->next_stamp() ) //&& i < 10 )
-		{
-			//i+=1;
 			sched->run_event();
 		}
 	}
@@ -489,7 +477,6 @@ void gba::event(u64 old_stamp, u32 evc)
 	
 	if( evc == EVENT_FRAME_COMPLETE )
 	{
-		//std::println("mode {}", lcd.regs[0]&7);
 		frame_complete = true;
 		VCOUNT = 0xff;
 		memcpy(&lcd.bg2x, &lcd.regs[0x14], 4); lcd.bg2x = (lcd.bg2x<<4)>>4;

@@ -41,6 +41,7 @@ A2600 Todo List
 
 A5200 Todo List
 ------------------
+0. Put what was try_kirq() into the newer Console::key_down event
 1. Check what Berzerk is doing to render player and weapon fire and support that.
 2. Figure out what button fires player weapon
 3. Figure out how to emulate joystick position
@@ -146,20 +147,13 @@ Status: YM2612 uses the Nuken OPN library... Poorly? Fantastic Dizzy and UMK3 la
 GBA Todo List
 ----------------
 1. improve gfx priority and blending
-	a) write a blender function for modes 3-5. Advance Wars uses blending and bitmap modes
-	b) figure out wtf the bios intro is doing. 
-	- other than bios intro and Advance Wars, most things look right at this point
+	a) implement mode 5, affine support for mode 3, and write a blender function for modes 3&5.
+	b) Yoshi's Island first castle falling walls not composited correctly.
 2. have rtc actually return date&time rather than set values to make Emerald not complain.
 3. complete arm.gba
 4. psg sound
-5. either find timer/scheduler bug or ditch scheduling for this emulator
+5. link cable?
 Status: Most games are playable with saving supported.
-There's a logic error somewhere with the scheduler, timers, and lost events.
-That last part is why sample output is in the main loop and not scheduler. Events get lost
-and short period timers result in an infinite loop somehow even though the cpu timestamp should
-progress past a scanline event and eventually frame complete. This is being hidden for most
-games (at least V-Rally 3 still freezes) by tweaking memory access cycle times until 
-almost everything works without complaint.
 
 
 

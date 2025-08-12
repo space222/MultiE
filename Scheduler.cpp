@@ -1,42 +1,22 @@
 #include <vector>
+#include <algorithm>
+#include <print>
 #include "itypes.h"
 #include "Scheduler.h"
 
 void Scheduler::add_event(u64 stamp, u32 code)
 {
-	if( events.empty() || stamp < events.back().stamp )
-	{
-		events.emplace_back(stamp, code);
-	} else {
-		for(u32 i = 0; i < events.size(); ++i)
-		{
-			if( events[i].stamp < stamp )
-			{
-				events.insert(events.begin()+i, {stamp,code});
-				return;
-			}	
-		}
-	}
-	return;
+	auto iter = std::find_if(events.begin(), events.end(), [=](auto E)->bool { return E.stamp < stamp; });
+	events.insert(iter, event{stamp,code});
 }
 
 void Scheduler::filter_out_event(u32 code)
 {
-	for(auto iter = events.begin(); iter != events.end();)
-	{
-		if( iter->code == code )
-		{
-			iter = events.erase(iter);
-		} else {
-			iter++;
-		}
-	}
-	return;
+	std::erase_if(events, [=](auto& E) { return E.code == code; });
 }
 
 u64 Scheduler::next_stamp()
 {
-	//if( events.empty() ) return SCHED_NO_EVENT;
 	return events.back().stamp;
 }
 

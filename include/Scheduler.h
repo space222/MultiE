@@ -23,7 +23,7 @@ public:
 	void reset()
 	{
 		events.clear();
-		add_event(0xffffFFFFffffFFFFull, 0);
+		events.emplace_back(event{0xffffFFFFffffFFFFull, 0});
 	}
 	
 	void add_event(u64 stamp, u32 code);
