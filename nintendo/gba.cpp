@@ -189,8 +189,8 @@ u32 gba::read(u32 addr, int size, ARM_CYCLE ct)
 			&& addr >= 0x0d000000 && addr < 0x0e000000 ) return eeprom_read();
 		if( addr >= 0x0e000000 && addr <= 0x0e00FFFF )
 		{
-			if( save_type == SAVE_TYPE_FLASH && flash_cmd == 0x90 && addr == 0x0E000000 ) return 0x62;
-			if( save_type == SAVE_TYPE_FLASH && flash_cmd == 0x90 && addr == 0x0E000001 ) return 0x13;
+			if( save_type == SAVE_TYPE_FLASH && flash_cmd == 0x90 && addr == 0x0E000000 ) return save_size==128 ? 0x62 : 0x32;
+			if( save_type == SAVE_TYPE_FLASH && flash_cmd == 0x90 && addr == 0x0E000001 ) return save_size==128 ? 0x13 : 0x1B;
 			if( save_type != SAVE_TYPE_EEPROM )
 			{
 				return save[(flash_bank<<16)|(addr&0xffff)];

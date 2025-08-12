@@ -825,6 +825,8 @@ void psx::reset()
 		reset_exe();
 	}
 	
+	sched.reset();
+	
 	gpu_dispmode = 0;
 	gpu_read_active = false;
 	slot[0].pos = slot[1].pos = 0;
