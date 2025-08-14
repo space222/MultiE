@@ -225,9 +225,10 @@ void gba::reset()
 	tmr[0].last_read = tmr[1].last_read = tmr[2].last_read = tmr[3].last_read = 0;
 	
 	sched->reset();
+	sched->add_event(280896, EVENT_FRAME_COMPLETE);
 	sched->add_event(0, EVENT_SND_OUT);
 	sched->add_event(0, EVENT_SCANLINE_START);
-	VCOUNT = 0xff;
+	VCOUNT = 227;
 	
 	gpio_reads_en = false;
 	
@@ -423,15 +424,9 @@ void gba::event(u64 old_stamp, u32 evc)
 	
 	if( evc == EVENT_SCANLINE_START )
 	{
-		VCOUNT = (VCOUNT+1)&0xff;
+		VCOUNT += 1;
+		if( VCOUNT >= 228 ) VCOUNT = 0;
 		
-		if( VCOUNT < 160 )
-		{
-			if( (dmaregs[5]&0xB000)   == 0xA000 ) { exec_dma(0); }
-			if( (dmaregs[6+5]&0xB000) == 0xA000 ) { exec_dma(1); }
-			if( (dmaregs[12+5]&0xB000)== 0xA000 ) { exec_dma(2); }
-			if( (dmaregs[18+5]&0xB000)== 0xA000 ) { exec_dma(3); }
-		}
 		if( VCOUNT == 160 )
 		{
 			if( (dmaregs[5]&0xB000)   == 0x9000 ) { exec_dma(0); }
@@ -443,7 +438,6 @@ void gba::event(u64 old_stamp, u32 evc)
 		DISPSTAT &= ~7;
 		DISPSTAT |= (VCOUNT >= 160 && VCOUNT != 228) ? 1 : 0;
 		DISPSTAT |= (VCOUNT == (DISPSTAT>>8)) ? BIT(2) : 0;
-		DISPSTAT |= 2;
 		if( VCOUNT == 160 && (DISPSTAT & BIT(3)) )
 		{
 			ISTAT |= BIT(0);
@@ -454,36 +448,43 @@ void gba::event(u64 old_stamp, u32 evc)
 			ISTAT |= BIT(2);
 			check_irqs();
 		}
+		
+		sched->add_event(old_stamp + 1006, EVENT_HBLANK_START);
+		sched->add_event(old_stamp + 1232, EVENT_SCANLINE_START);	
+		return;
+	}
+	
+	if( evc == EVENT_HBLANK_START )
+	{
+		DISPSTAT |= 2;
 		if( DISPSTAT & BIT(4) )
 		{
 			ISTAT |= BIT(1);
 			check_irqs();
 		}
-		if( VCOUNT < 160 ) sched->add_event(old_stamp + 280, EVENT_SCANLINE_RENDER);
-		sched->add_event(old_stamp + 1232, (VCOUNT==227) ? EVENT_FRAME_COMPLETE : EVENT_SCANLINE_START);
-		return;
-	}
-	
-	if( evc == EVENT_SCANLINE_RENDER )
-	{
-		DISPSTAT &= ~2;
-		lcd.draw_scanline(VCOUNT);
-		lcd.bg2x += (s16)lcd.regs[0x11];
-		lcd.bg2y += (s16)lcd.regs[0x13];
-		lcd.bg3x += (s16)lcd.regs[0x19];
-		lcd.bg3y += (s16)lcd.regs[0x1B];
+		if( VCOUNT < 160 )
+		{
+			lcd.draw_scanline(VCOUNT);
+			if( (dmaregs[5]&0xB000)   == 0xA000 ) { exec_dma(0); }
+			if( (dmaregs[6+5]&0xB000) == 0xA000 ) { exec_dma(1); }
+			if( (dmaregs[12+5]&0xB000)== 0xA000 ) { exec_dma(2); }
+			if( (dmaregs[18+5]&0xB000)== 0xA000 ) { exec_dma(3); }
+			lcd.bg2x += (s16)lcd.regs[0x11];
+			lcd.bg2y += (s16)lcd.regs[0x13];
+			lcd.bg3x += (s16)lcd.regs[0x19];
+			lcd.bg3y += (s16)lcd.regs[0x1B];
+		}
 		return;
 	}
 	
 	if( evc == EVENT_FRAME_COMPLETE )
 	{
 		frame_complete = true;
-		VCOUNT = 0xff;
 		memcpy(&lcd.bg2x, &lcd.regs[0x14], 4); lcd.bg2x = (lcd.bg2x<<4)>>4;
 		memcpy(&lcd.bg2y, &lcd.regs[0x16], 4); lcd.bg2y = (lcd.bg2y<<4)>>4;
 		memcpy(&lcd.bg3x, &lcd.regs[0x1C], 4); lcd.bg3x = (lcd.bg3x<<4)>>4;
 		memcpy(&lcd.bg3y, &lcd.regs[0x1E], 4); lcd.bg3y = (lcd.bg3y<<4)>>4;
-		event(old_stamp, EVENT_SCANLINE_START);
+		sched->add_event(old_stamp+280896, EVENT_FRAME_COMPLETE);
 		return;
 	}
 

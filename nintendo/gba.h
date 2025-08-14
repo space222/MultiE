@@ -13,10 +13,7 @@ public:
 	{
 		if( s == SDL_SCANCODE_ESCAPE )
 		{
-			for(u32 i = 0; i < sched.events.size(); ++i)
-			{
-				std::println("event {}, stamp ${:X}", sched.events[i].code, sched.events[i].stamp);
-			}		
+			std::println("Currently in mode {:X}", lcd.regs[0]&7);
 		}
 	}*/
 
@@ -40,6 +37,10 @@ public:
 	std::deque<s8> snd_fifo_a, snd_fifo_b;
 	float pcmA,pcmB;
 	u8 fifoa;
+	u16 sndregs[0x20];
+	struct {
+		
+	} psg[4];
 	
 	void write_io(u32, u32, int);
 	u32 read_io(u32, int);
@@ -90,7 +91,7 @@ public:
 	void write_memctrl_io(u32, u32) {return; }
 	
 	u16 dmaregs[32];
-	u32 internsrc1, internsrc2;
+	u32 internsrc0, internsrc1, internsrc2;
 	void exec_dma(int);
 	
 	u16 ISTAT, IMASK, IME;
@@ -124,7 +125,7 @@ public:
 
 #define EVENT_SND_OUT  2
 #define EVENT_SCANLINE_START 3
-#define EVENT_SCANLINE_RENDER 4
+#define EVENT_HBLANK_START 4
 #define EVENT_FRAME_COMPLETE 5
 #define EVENT_TMR0_CHECK 6
 #define EVENT_TMR1_CHECK 7

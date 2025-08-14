@@ -750,6 +750,12 @@ void imgui_run()
 			{
 				if( sys ) sys->reset();
 			}
+			ImGui::Separator();
+			if( ImGui::MenuItem("Power Off") )
+			{
+				delete sys;
+				sys = nullptr;
+			}
 			ImGui::EndMenu();
 		}
 		if( sys && ImGui::BeginMenu("Media") )

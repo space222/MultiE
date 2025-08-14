@@ -224,7 +224,7 @@ void LCDEngine::draw_scanline(u32 L)
 			fbuf[L*240+x] = (R3<<24)|(G3<<16)|(B3<<8);
 		} // end of compositing for loop
 		return;
-	}	
+	}
 	memset(fbuf+L*240, 0, 240*4);
 }
 
@@ -406,14 +406,14 @@ void LCDEngine::render_text_bg(u32 Y, u32 bgind)
 	const int H = (bgctrl&BIT(15)) ? 512 : 256;
 	Y += scrolly;
 	Y &= (H-1);
-	mapbase += (Y > 255) ? (0x800*(W==512?2:1)) : 0;
+	mapbase += ((Y > 255) ? (0x800*(W==512?2:1)) : 0);
 	Y &= 255;
 	
 	for(u32 x = 0; x < 240; ++x)
 	{
 		u32 mX = (x + scrollx) & (W-1);
 		u32 mXoffs = ((mX > 255) ? 0x800 : 0);
-		mX &= 255;	
+		mX &= 255;
 		
 		u16 entry = *(u16*)&VRAM[mapbase + mXoffs + ((Y/8)*32 + (mX/8))*2];
 		u32 toffs = (entry&0x3ff)*tilesize;

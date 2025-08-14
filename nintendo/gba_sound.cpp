@@ -12,6 +12,11 @@ u32 gba::read_snd_io(u32 addr)
 	
 	if( addr == 0x04000082 ) { return dma_sound_mix; }
 	
+	if( addr >= 0x04000060 && addr <= 0x04000086 )
+	{
+		return sndregs[(addr-0x04000060)>>1];
+	}
+	
 	return 0;
 }
 
@@ -39,6 +44,12 @@ void gba::write_snd_io(u32 addr, u32 v)
 		if( v & BIT(15) ) snd_fifo_b.clear();
 		dma_sound_mix = v & ~(BIT(11)|BIT(15));
 		return; 
+	}
+	
+	if( addr >= 0x04000060 && addr <= 0x04000086 )
+	{
+		sndregs[(addr-0x04000060)>>1] = v;
+		return;
 	}
 }
 

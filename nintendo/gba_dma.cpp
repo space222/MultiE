@@ -9,8 +9,10 @@ void gba::exec_dma(int chan)
 	if( len == 0 ) { len = ((chan==3) ? 0x10000 : 0x4000); }
 	int srcaddr = 0;
 	int dstaddr = 0;
-	if( chan == 1 )
+	if( chan == 0 )
 	{
+		srcaddr = internsrc0;	
+	} else if( chan == 1 ) {
 		srcaddr = internsrc1;
 	} else if( chan == 2 ) {
 		srcaddr = internsrc2;
@@ -19,7 +21,7 @@ void gba::exec_dma(int chan)
 	}
 	memcpy(&dstaddr, &dmaregs[base + 2], 4);
 	
-	//std::println("DMA{} from ${:X} to ${:X}, {} units", chan, srcaddr, dstaddr, len);
+	//if( chan == 0 ) std::println("DMA{} from ${:X} to ${:X}, {} units", chan, srcaddr, dstaddr, len);
 	
 	const bool B32 = ctrl & BIT(10);
 	if( B32 )
@@ -30,6 +32,8 @@ void gba::exec_dma(int chan)
 		srcaddr &= ~1;
 		dstaddr &= ~1;	
 	}
+	srcaddr &= 0x0fffFFFF;
+	dstaddr &= 0x0fffFFFF;
 	if( B32 ) len *= 2;
 	int src_inc = 2;
 	int dst_inc = 2;
@@ -72,8 +76,10 @@ void gba::exec_dma(int chan)
 		dmaregs[base + 5] &= ~BIT(15);
 	} else {
 		if( ((ctrl>>5)&3) < 2 ) memcpy(&dmaregs[base + 2], &dstaddr, 4);
-		if( chan == 1 )
+		if( chan == 0 )
 		{
+			internsrc0 = srcaddr;
+		} else if( chan == 1 ) {
 			internsrc1 = srcaddr;
 		} else if( chan == 2 ) {
 			internsrc2 = srcaddr;
@@ -90,6 +96,7 @@ void gba::write_dma_io(u32 addr, u32 v)
 	//u16 oldval = dmaregs[(addr - 0x040000B0u)>>1];
 	dmaregs[(addr - 0x040000B0u)>>1] = v;
 	u32 reg = (addr - 0x040000B0u)>>1;
+	if( addr == 0x40000BA && (v&0x8000) ) { memcpy(&internsrc0, &dmaregs[0], 4); }
 	if( addr == 0x40000C6 && (v&0x8000) ) { memcpy(&internsrc1, &dmaregs[6], 4); }
 	if( addr == 0x40000D2 && (v&0x8000) ) { memcpy(&internsrc2, &dmaregs[12], 4); } 
 	if( addr == 0x40000BA && (v & 0xB000) == 0x8000 ) { exec_dma(0); dmaregs[reg] &=~BIT(15); }
