@@ -323,6 +323,9 @@ bool gba::loadROM(const std::string fname)
 	[[maybe_unused]] int unu = fread(ROM.data(), 1, fsz, fp);
 	fclose(fp);
 	
+	std::vector<std::string> imap = Settings::get<std::vector<std::string>>("gba", "player1");
+	setPlayerInputMap(1, imap);
+	
 	savefile = fname.substr(0, fname.rfind('.'));
 	savefile += ".sav";
 	save_written = false;
@@ -376,18 +379,17 @@ bool gba::loadROM(const std::string fname)
 
 u16 gba::getKeys()
 {
-	auto keys = SDL_GetKeyboardState(nullptr);
 	u16 val = 0x3ff;
-	if( keys[SDL_SCANCODE_Q] ) val ^= BIT(9);
-	if( keys[SDL_SCANCODE_W] ) val ^= BIT(8);
-	if( keys[SDL_SCANCODE_DOWN] ) val ^= BIT(7);
-	if( keys[SDL_SCANCODE_UP] ) val ^= BIT(6);
-	if( keys[SDL_SCANCODE_LEFT] ) val ^= BIT(5);
-	if( keys[SDL_SCANCODE_RIGHT] ) val ^= BIT(4);
-	if( keys[SDL_SCANCODE_S] ) val ^= BIT(3);
-	if( keys[SDL_SCANCODE_A] ) val ^= BIT(2);
-	if( keys[SDL_SCANCODE_X] ) val ^= BIT(1);
-	if( keys[SDL_SCANCODE_Z] ) val ^= BIT(0);
+	if( getInputState(1, 4) ) val ^= BIT(9);
+	if( getInputState(1, 5) ) val ^= BIT(8);
+	if( getInputState(1, 7) ) val ^= BIT(7);
+	if( getInputState(1, 6) ) val ^= BIT(6);
+	if( getInputState(1, 8) ) val ^= BIT(5);
+	if( getInputState(1, 9) ) val ^= BIT(4);
+	if( getInputState(1, 3) ) val ^= BIT(3);
+	if( getInputState(1, 2) ) val ^= BIT(2);
+	if( getInputState(1, 1) ) val ^= BIT(1);
+	if( getInputState(1, 0) ) val ^= BIT(0);
 	return val;
 }
 

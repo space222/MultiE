@@ -146,13 +146,12 @@ Status: YM2612 uses the Nuken OPN library... Poorly? Fantastic Dizzy and UMK3 la
 
 GBA Todo List
 ----------------
-1. improve gfx priority and blending
-	a) implement mode 5, affine support for mode 3, and write a blender function for modes 3&5.
-	b) Yoshi's Island first castle falling walls not composited correctly.
-2. have rtc actually return date&time rather than set values to make Emerald not complain.
-3. complete arm.gba
-4. psg sound
-5. link cable?
+1. Use the newer input settings
+2. complete arm.gba
+3. psg sound
+4. have rtc actually return date&time rather than set values to make Emerald not complain.
+5. implement mode 5, affine support for mode 3, and write a blender function for modes 3&5.
+6. link cable?
 Status: Most games are playable with saving supported.
 
 

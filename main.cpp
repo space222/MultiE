@@ -76,6 +76,9 @@ std::string dialog_msg;
 
 console* sys = nullptr;
 
+bool volume_open = false;
+float global_volume = 0.8f;
+
 const int sbuflen = 735*3;
 float sample_buf[sbuflen];
 float last_sample = 0;
@@ -84,7 +87,7 @@ std::atomic<int> sample_rd(1), sample_wr(2);
 void audio_add(float L, float R)
 {
 	while( sample_wr == sample_rd ) std::this_thread::yield();
-	sample_buf[sample_wr++] = Settings::mute ? 0 : ((L+R)/2);
+	sample_buf[sample_wr++] = Settings::mute ? 0 : (global_volume*((L+R)/2));
 	sample_wr = sample_wr % sbuflen;
 }
 
@@ -744,8 +747,6 @@ void imgui_run()
 			{
 				//if( !Paused ) SDL_ClearQueuedAudio(audio_dev);
 			}
-			ImGui::MenuItem("Mute", nullptr, &Settings::mute);
-			ImGui::Separator();
 			if( ImGui::MenuItem("Reset") )
 			{
 				if( sys ) sys->reset();
@@ -777,18 +778,26 @@ void imgui_run()
 			}
 			ImGui::EndMenu();
 		}
-		if( ImGui::BeginMenu("Scale") )
+		if( ImGui::BeginMenu("Settings") )
 		{
-			if( ImGui::MenuItem("1x") ) crt_scale = 1;
-			if( ImGui::MenuItem("1.5x") ) crt_scale = 1.5f;
-			if( ImGui::MenuItem("2x") ) crt_scale = 2;
-			if( ImGui::MenuItem("3x") ) crt_scale = 3;
-			if( ImGui::MenuItem("4x") ) crt_scale = 4;
-			if( ImGui::MenuItem("5x") ) crt_scale = 5;
-			if( ImGui::MenuItem("6x") ) crt_scale = 6;
-			if( ImGui::MenuItem("7x") ) crt_scale = 7;
+			if( ImGui::BeginMenu("Scale") )
+			{
+				if( ImGui::MenuItem("1x") ) crt_scale = 1;
+				if( ImGui::MenuItem("1.5x") ) crt_scale = 1.5f;
+				if( ImGui::MenuItem("2x") ) crt_scale = 2;
+				if( ImGui::MenuItem("3x") ) crt_scale = 3;
+				if( ImGui::MenuItem("4x") ) crt_scale = 4;
+				if( ImGui::MenuItem("5x") ) crt_scale = 5;
+				if( ImGui::MenuItem("6x") ) crt_scale = 6;
+				if( ImGui::MenuItem("7x") ) crt_scale = 7;
+				ImGui::EndMenu();
+			}
+			ImGui::MenuItem("Volume", nullptr, &volume_open);
+			ImGui::Separator();
+			ImGui::MenuItem("Mute", nullptr, &Settings::mute);
 			ImGui::EndMenu();
 		}
+		
 		/*if( ImGui::BeginMenu("Settings") )
 		{
 			if( ImGui::BeginMenu("Atari") )
@@ -838,6 +847,17 @@ void imgui_run()
 			ImGui::Image((void*)Screen, ImVec2(sys->fb_scale_w()*crt_scale,sys->fb_scale_h()*crt_scale));
 			//ImGui::Dummy(ImVec2(sys->fb_width()*crt_scale,sys->fb_height()*crt_scale));
 		ImGui::End();
+	}
+	
+	if( volume_open  )
+	{
+		ImGui::Begin("Volume", &volume_open, ImGuiWindowFlags_AlwaysAutoResize|ImGuiWindowFlags_NoNav);
+		float percent = global_volume * 100.f;
+		ImGui::SliderFloat("##v1", &percent, 0.f, 100.f, "%.1f%%");
+		global_volume = percent / 100.f;
+		ImGui::NewLine();
+		ImGui::Checkbox("Mute##m2", &Settings::mute);
+		ImGui::End();	
 	}
 	
 	ImGui::Render();
