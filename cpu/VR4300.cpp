@@ -312,10 +312,25 @@ vr4300_instr decode_regular(VR4300& proc, u32 opcode)
 		{
 			ITYPE; 
 			cpu.ndelay = true;
-			if( s == 0 && t == 0 && cpu.read(cpu.pc+4, 32) == 0 ) cpu.in_infinite_loop = true;
-			if( cpu.r[s] == cpu.r[t] ) cpu.branch(DS_REL_ADDR); 
+			if( cpu.r[s] == cpu.r[t] ) 
+			{
+				cpu.branch(DS_REL_ADDR); 
+				if( u32(cpu.nnpc) == u32(cpu.pc) 
+					/*&& s == 0 && t == 0*/ && cpu.read(cpu.pc+4, 32) == 0 ) cpu.in_infinite_loop = true;
+			}
 		};
-	case 0x05: return INSTR { ITYPE; cpu.ndelay = true; if( cpu.r[s] != cpu.r[t] ) cpu.branch(DS_REL_ADDR); }; // BNE
+	case 0x05: // BNE 
+		return INSTR 
+		{ 
+			ITYPE; 
+			cpu.ndelay = true; 
+			if( cpu.r[s] != cpu.r[t] ) 
+			{
+				cpu.branch(DS_REL_ADDR);
+				if( u32(cpu.nnpc) == u32(cpu.pc) && cpu.read(cpu.pc+4, 32) == 0 ) cpu.in_infinite_loop = true;
+				
+			}
+		};
 	case 0x06: return INSTR { ITYPE; cpu.ndelay = true; if( s64(cpu.r[s]) <= 0 ) cpu.branch(DS_REL_ADDR); }; // BLEZ
 	case 0x07: return INSTR { ITYPE; cpu.ndelay = true; if( s64(cpu.r[s]) > 0 ) cpu.branch(DS_REL_ADDR); }; // BGTZ
 	case 0x08: // ADDI

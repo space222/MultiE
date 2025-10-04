@@ -2,7 +2,7 @@
 #include <string>
 #include <cstdio>
 #include "console.h"
-#include "z80.h"
+#include "z80_new.h"
 #include "TMS9918A.h"
 #include "AY-3-8910.h"
 
@@ -43,7 +43,7 @@ public:
 	void run_frame() override;
 	u8* framebuffer() override { return vdp.framebuffer(); }
 	
-	z80 cpu;
+	z80n cpu;
 	TMS9918A vdp;
 	AY_3_8910 psg;
 	

@@ -51,6 +51,7 @@
 #include "SuperVision.h"
 #include "rca_studio_ii.h"
 #include "gc/GameCube.h"
+#include "dc/dreamcast.h"
 void try_kirq();
 void gdb_start();
 extern std::atomic<int> gdb_active;
@@ -244,7 +245,9 @@ void resize_screen()
 	if( Screen ) SDL_DestroyTexture(Screen);
 	auto format = SDL_PIXELFORMAT_RGBA8888;
 	if( sys->fb_bpp() == 16 ) format = SDL_PIXELFORMAT_BGR555;
+	else if( sys->fb_bpp() == 17 ) format = SDL_PIXELFORMAT_RGB565;
 	else if( sys->fb_bpp() == 24 ) format = SDL_PIXELFORMAT_BGR24;
+	else if( sys->fb_bpp() == 33 ) format = SDL_PIXELFORMAT_XRGB8888;
 	oldbpp = sys->fb_bpp();
 	oldwidth = sys->fb_width();
 	oldheight = sys->fb_height();
@@ -532,6 +535,22 @@ void imgui_run()
 			}
 			if( ImGui::BeginMenu("Alpha") )
 			{
+				if( ImGui::MenuItem("Sega Dreamcast") )
+				{
+					std::string f = getOpenFile("Sega Dreamcast");
+					if( !f.empty() )
+					{
+						delete sys;
+						sys = new dreamcast;
+						if( ! sys->loadROM(f) ) 
+						{
+							printf("unable to load ROM\n");
+							exit(1);
+						}
+						else newinstance = true;
+						crt_scale = 1.f;
+					}				
+				}
 				if( ImGui::MenuItem("Nintendo GameCube") )
 				{
 					std::string f = getOpenFile("Nintendo GameCube");

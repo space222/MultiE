@@ -6,8 +6,9 @@ find_package(SDL2)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 #set(CMAKE_CXX_FLAGS "-g -fabi-version=16 -fsanitize=address -ftree-vectorize -march=native -Wall -Wpedantic -Wextra -Wshadow -Wimplicit-fallthrough")
-set(CMAKE_CXX_FLAGS "-O2 -ftree-vectorize  -march=native -Wall -Wpedantic -Wextra -Wshadow -Wimplicit-fallthrough")
+set(CMAKE_CXX_FLAGS "-O2 -ftree-vectorize -march=native -Wall -Wpedantic -Wextra -Wshadow -Wimplicit-fallthrough")
 #set(CMAKE_CXX_COMPILER g++)
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
 
 add_executable(test main.cpp imgui/backends/imgui_impl_sdl2.cpp progopt.cpp commodore/c64.cpp commodore/TAPFile.cpp 
 atari/a26.cpp atari/a52.cpp atari/antic.cpp atari/tia.cpp cpu/6502.cpp
@@ -27,7 +28,8 @@ cpu/VR4300_fpu.cpp nintendo/n64_rdp.cpp nintendo/n64_dp.cpp nintendo/n64_sp.cpp 
 neogeo/aes.cpp other/bally_astrocade.cpp atari/Lynx.cpp other/SuperVision.cpp other/rca_studio_ii.cpp cpu/rca1802.cpp
 cpu/gekko.cpp nintendo/gc/GameCube.cpp nintendo/gc/gc_exi.cpp nintendo/gc/gc_dsp_io.cpp nintendo/gc/gc_dsp_cpu.cpp
 nintendo/gba_io.cpp nintendo/gba_lcd.cpp nintendo/gba_dma.cpp nintendo/LCDEngine.cpp
-nintendo/gba_timer.cpp nintendo/gba_sound.cpp nintendo/gba_gpio.cpp
+nintendo/gba_timer.cpp nintendo/gba_sound.cpp nintendo/gba_gpio.cpp cpu/z80_new.cpp cpu/sh4.cpp util.cpp
+sega/dc/dreamcast.cpp sega/dc/cpuregs.cpp sega/dc/timer.cpp
 #stub/gdb_stub.cpp
 )
 

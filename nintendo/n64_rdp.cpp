@@ -351,7 +351,8 @@ void n64_rdp::load_tile(u64 cmd)
 	u32 linesize = T.line*8;
 	
 	u32 roffs = (((ulS*T.bpp)+7)/8) + teximg.addr;
-	u32 rdram_stride = ((teximg.width*T.bpp) + 7) / 8; 
+	u32 rdram_stride = ((teximg.width*T.bpp) + 7) / 8;
+	//roffs += rdram_stride;
 
 	for(u32 Y = ulT; Y <= lrT; ++Y)
 	{
@@ -969,7 +970,7 @@ void n64_rdp::load_block(u64 cmd)
 	u32 lrS = (cmd>>12)&0xfff;
 	auto& T = tiles[(cmd>>24)&7];
 	u32 ulT = (cmd>>32)&0xfff;
-	u32 ulS = (cmd>>44)&0xfff;  // all 3 are u10.2
+	u32 ulS = (cmd>>44)&0xfff;  // all 3 are u12.0
 	//T.SL = ulS<<2;
 	//T.TL = ulT<<2;
 	u32 num_texels = lrS - ulS + 1;
@@ -994,7 +995,8 @@ void n64_rdp::load_block(u64 cmd)
 	// was num_texels*8, hence: TIMES EIGHT?? WTF. yep, times8 makes both mario, starfox, and lcars work
 	// the current expression was yoinked from MAME.
 	u32 swpcnt = 0;//dxt;
-	u32 ramoff = teximg.addr;// + ((ulS*T.bpp+7)/8);// + ((ulT*teximg.width*T.bpp+7)/8);
+	u32 ramoff = teximg.addr;// + ((ulS*T.bpp+7)/8) + ((ulT*teximg.width*T.bpp+7)/8);
+	
 	u32 t = 0;
 	u32 taddr = (T.addr + T.line*t)*8;
 	for(u32 i = 0; i < num_words; ++i, taddr+=8, ramoff+=8)

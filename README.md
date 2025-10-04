@@ -16,16 +16,16 @@ See todo.txt for the full status information. Systems that I've declared out of 
 * Sega: SMS, Genesis
 * Colecovision
 
-##Building
+## Building
 
 SDL2 required on all platforms.
 
-###Linux
+### Linux
 
 Linux builds need Zenity installed for the open file dialog.
 Builds with CMake.
 
-###Windows
+### Windows
 
 Eventually
 

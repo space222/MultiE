@@ -247,11 +247,11 @@ void msx::reset()
 {
 	vdp.reset();
 	psg.reset();
-	memset(&cpu, 0, sizeof(cpu));
-	cpu.write = [](u16 a, u8 v) { dynamic_cast<msx*>(sys)->write(a,v); };
-	cpu.out = [](u16 a, u8 v) { dynamic_cast<msx*>(sys)->out(a,v); };
-	cpu.in = [](u16 a)->u8 { return dynamic_cast<msx*>(sys)->in(a); };
-	cpu.read = [](u16 a)->u8 { return dynamic_cast<msx*>(sys)->read(a); };
+	//memset(&cpu, 0, sizeof(cpu));
+	cpu.write8 = [](u16 a, u8 v) { dynamic_cast<msx*>(sys)->write(a,v); };
+	cpu.out8 = [](u16 a, u8 v) { dynamic_cast<msx*>(sys)->out(a,v); };
+	cpu.in8 = [](u16 a)->u8 { return dynamic_cast<msx*>(sys)->in(a); };
+	cpu.read8 = [](u16 a)->u8 { return dynamic_cast<msx*>(sys)->read(a); };
 	stamp = last_target = sample_cycles = 0;
 	slotreg = 0b11110000;
 	slots[0] = slots[1] = 0;
@@ -261,6 +261,11 @@ void msx::reset()
 	pastepos = 0;
 	shifted = false;
 	pfr = 4;
+	cpu.pc = 0;
+	cpu.sp = 0xdffe;
+	cpu.irq_line = 0;
+	cpu.iff1 = cpu.iff2 = false;
+	cpu.halted = false;
 }
 
 bool msx::loadROM(const std::string fname) 
