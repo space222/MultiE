@@ -37,6 +37,8 @@ u64 dreamcast::cpureg_read(u32 addr, u32 sz)
 {
 	switch( addr )
 	{
+	case 0xFF000010: return 0; // MMUCR
+	
 	case 0xFF00001C: return intern.CCR;
 	case 0xFF000038: return intern.QACR0;
 	case 0xFF00003C: return intern.QACR1;
@@ -50,9 +52,11 @@ u64 dreamcast::cpureg_read(u32 addr, u32 sz)
 	case 0xFFD00004: return intern.IPRA;
 	case 0xFFD00008: return intern.IPRB;
 	case 0xFFD0000C: return intern.IPRC;
+
+	case 0xFFA0003C: return intern.CHCR3;
+
 	
 	case 0xFF800030: return 0x30; // gpio a
-	
 	
 	case 0xFF000084: std::println("${:X}: Undoc perf counter $FF000084",cpu.pc); return 0; // ??? not in manual
 	

@@ -8,6 +8,7 @@ class dreamcast : public console
 {
 public:
 	dreamcast() : sched(this) {}
+	~dreamcast() { std::println("Ended @PC = ${:X}", cpu.pc); }
 	
 	u32 fb_bpp() override;
 	u8* framebuffer() override { return (u8*)&fbuf[0]; }
@@ -37,10 +38,12 @@ public:
 		u8 WTCNT;
 		
 		u32 IPRA, IPRB, IPRC;
+		
+		u32 CHCR3;
 	} intern;
 	
 	void catch_up_timer(u32);
-	void timer_underflow(u32);
+	void timer_underflow(u64, u32);
 	
 	u8 RAM[16_MB];
 	u8 vram[8_MB];
@@ -152,6 +155,10 @@ public:
 	const u32 STARTRENDER_ADDR = 0x5F8014;
 	const u32 REGION_BASE_ADDR = 0x5F802C;
 	const u32 PARAM_BASE_ADDR = 0x5F8020;
+	const u32 SB_ADSUSP_ADDR = 0x5F781C;
+	const u32 SB_E1SUSP_ADDR=  0x5F783C;
+	const u32 SB_E2SUSP_ADDR = 0x5F785C;
+	const u32 SB_DDSUSP_ADDR = 0x5F787C;
 	
 	const u32 TA_OL_BASE_ADDR = 0x5F8124;
 	const u32 TA_ISP_BASE_ADDR = 0x5F8128;

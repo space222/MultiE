@@ -3,7 +3,6 @@
 
 u64 dreamcast::io_read(u32 a, u32 sz)
 {
-	//std::println("IO Read{} ${:X}", sz, a);
 	if( a == REGION_BASE_ADDR ) return holly.region_base;
 	if( a == HOLLY_ID_ADDR ) return 0x17FD11DB;
 	if( a == HOLLY_SOFT_RESET_ADDR ) return holly.soft_reset;
@@ -60,7 +59,7 @@ u64 dreamcast::io_read(u32 a, u32 sz)
 	if( a == SB_G1CWC_ADDR ) { return holly.sb_g1cwc; }
 	if( a == SB_G1GDWC_ADDR ) { return holly.sb_g1gdrc; }
 	if( a == SB_G1GDRC_ADDR ) { return holly.sb_g1gdwc; }
-	if( a == SB_FFST_ADDR ) { std::println("rd sb_ffst"); return 0; /*holly.sb_ffst^=0x3f;*/ }
+	if( a == SB_FFST_ADDR ) { std::println("rd sb_ffst"); return holly.sb_ffst^=0x3f; }
 	if( a == SB_IML2NRM_ADDR ) { return holly.sb_iml2nrm; }
 	if( a == SB_IML4NRM_ADDR ) { return holly.sb_iml4nrm; }
 	if( a == SB_IML6NRM_ADDR ) { return holly.sb_iml6nrm; }
@@ -85,7 +84,10 @@ u64 dreamcast::io_read(u32 a, u32 sz)
 	if( a == SB_RBSPLT_ADDR ) { return holly.sb_rbsplt; }
 	if( a == UNKNOWN_REG_68A4 ) { return holly.unkn68A4; }
 	if( a == PARAM_BASE_ADDR ) { return holly.param_base; }
-	
+	if( a == SB_ADSUSP_ADDR || a == SB_E1SUSP_ADDR || a == SB_E2SUSP_ADDR || a == SB_DDSUSP_ADDR )
+	{
+		return BIT(5)|BIT(4); // dma operations are always possible and have ended
+	}	
 	if( a == SPG_STATUS_ADDR )
 	{
 		const u64 cpl = 200000000/60/262;
@@ -186,6 +188,13 @@ void dreamcast::io_write(u32 a, u64 v, u32 sz)
 	if( a == SB_RBSPLT_ADDR ) { holly.sb_rbsplt = v&BIT(31); return; }
 	if( a == UNKNOWN_REG_68A4 ) { holly.unkn68A4 = v; return; }
 	if( a >= 0x5F68A0 && a < 0x5F68B0 ) { std::println("Unkn reg write{} ${:X} = ${:X}", sz, a, v); return; }
+	if( a == 0x5F74E4 ) { return; /*GD_UNLOCK*/ }
+	
+	if( a == SB_ADSUSP_ADDR || a == SB_E1SUSP_ADDR || a == SB_E2SUSP_ADDR || a == SB_DDSUSP_ADDR )
+	{
+		return; // only writable bit is write-only
+	}
+
 	std::println("Unimpl IO Write{} ${:X} = ${:X}", sz, a, v);
 	//exit(1);
 }
@@ -226,9 +235,7 @@ void dreamcast::write(u32 a, u64 v, u32 sz)
 	{
 		//todo: store queue
 		u32 ptr = (intern.QACR0<<24)|(a&0x3ffffff);
-		if( a == 0xe0000000u )
-			std::println("store queue ${:X}(${:X}) = ${:X}", a, ptr, v);
-		
+		std::println("store queue ${:X}(${:X}) = ${:X}", a, ptr, v);
 		return;
 	}
 	
@@ -302,10 +309,9 @@ void dreamcast::check_irqs()
 	
 	if( lvl == 0 ) return;
 	
+	if( lvl <= cpu.sr.b.IMASK ) return;
 	std::println("got here with lvl = ${:X}, env = ${:X}", lvl, env);
 	std::println("IMASK = ${:X}", (u32) cpu.sr.b.IMASK);
-	if( lvl <= cpu.sr.b.IMASK ) return;
-	std::println("passed mask check");
 	
 	cpu.SGR = cpu.r[15];
 	cpu.SPC = cpu.pc;
@@ -326,7 +332,7 @@ void dreamcast::run_frame()
 	frame_start = stamp;
 	for(u32 i = 0; i < (200000000/60); ++i)
 	{
-		//if( cpu.pc < 0x8c0084F0 || cpu.pc > 0x8c0084FF ) std::println("pc = ${:X}", cpu.pc);
+		//if( cpu.pc > 0x8c010000u ) std::println("pc = ${:X}", cpu.pc);
 		check_irqs();
 		cpu.step();
 		if( cpu.pc == 0xcafebabe )
@@ -341,7 +347,7 @@ void dreamcast::run_frame()
 			sched.run_event();
 		}
 	}
-	holly.sb_istnrm |= 0xff;
+	holly.sb_istnrm |= 0x88;
 	
 	memcpy(fbuf, vram+0x200000, 640*480*4);
 }
@@ -468,19 +474,19 @@ void dreamcast::event(u64 oldstamp, u32 code)
 {
 	if( code == TMR0_UNDERFLOW )
 	{
-		timer_underflow(0);
+		timer_underflow(oldstamp, 0);
 		return;
 	}
 
 	if( code == TMR1_UNDERFLOW )
 	{
-		timer_underflow(1);
+		timer_underflow(oldstamp, 1);
 		return;
 	}
 
 	if( code == TMR2_UNDERFLOW )
 	{
-		timer_underflow(2);
+		timer_underflow(oldstamp, 2);
 		return;
 	}
 }
