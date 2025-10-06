@@ -3,6 +3,7 @@
 
 u64 dreamcast::io_read(u32 a, u32 sz)
 {
+	if( a == 0x5F74EC ) { return 3; /* G1_ATA_BUS_PROTECTION_STATUS_PASSED */ }
 	if( a == REGION_BASE_ADDR ) return holly.region_base;
 	if( a == HOLLY_ID_ADDR ) return 0x17FD11DB;
 	if( a == HOLLY_SOFT_RESET_ADDR ) return holly.soft_reset;
@@ -84,6 +85,8 @@ u64 dreamcast::io_read(u32 a, u32 sz)
 	if( a == SB_RBSPLT_ADDR ) { return holly.sb_rbsplt; }
 	if( a == UNKNOWN_REG_68A4 ) { return holly.unkn68A4; }
 	if( a == PARAM_BASE_ADDR ) { return holly.param_base; }
+	if( a == SB_GDST_ADDR ) { return 0; /* GD DMA never in progress */ }
+		
 	if( a == SB_ADSUSP_ADDR || a == SB_E1SUSP_ADDR || a == SB_E2SUSP_ADDR || a == SB_DDSUSP_ADDR )
 	{
 		return BIT(5)|BIT(4); // dma operations are always possible and have ended
@@ -189,6 +192,9 @@ void dreamcast::io_write(u32 a, u64 v, u32 sz)
 	if( a == UNKNOWN_REG_68A4 ) { holly.unkn68A4 = v; return; }
 	if( a >= 0x5F68A0 && a < 0x5F68B0 ) { std::println("Unkn reg write{} ${:X} = ${:X}", sz, a, v); return; }
 	if( a == 0x5F74E4 ) { return; /*GD_UNLOCK*/ }
+	if( a == SB_MDSTAR_ADDR ) { holly.sb_mdstar = v & 0x1fffFFe0; return; }
+	if( a == SB_MDST_ADDR ) { if( v&1 ) maple_dma(); return; }
+	
 	
 	if( a == SB_ADSUSP_ADDR || a == SB_E1SUSP_ADDR || a == SB_E2SUSP_ADDR || a == SB_DDSUSP_ADDR )
 	{
@@ -215,7 +221,8 @@ u64 dreamcast::read(u32 a, u32 sz)
 	if( a < 0x220000 ) return sized_read(flashrom, a&0x1ffff, sz);
 	
 	if( a >= 0x5F6000 && a < 0x5FA000 ) { return io_read(a, sz); }
-	
+	if( a == 0x600004 ) { return 0xff; /* modem stuff? */ }
+		
 	if( a >= 0x700000 && a < 0x800000 ) { return 0; /* snd ctrl todo */ }
 	
 	if( a >= 0x800000 && a < 0xa00000 ) return sized_read(sndram, a&0x1fffff, sz);	
@@ -235,7 +242,7 @@ void dreamcast::write(u32 a, u64 v, u32 sz)
 	{
 		//todo: store queue
 		u32 ptr = (intern.QACR0<<24)|(a&0x3ffffff);
-		std::println("store queue ${:X}(${:X}) = ${:X}", a, ptr, v);
+		if( ptr > 0x10000000 ) std::println("store queue ${:X}(${:X}) = ${:X}", a, ptr, v);
 		return;
 	}
 	
@@ -307,11 +314,9 @@ void dreamcast::check_irqs()
 		env = 0x3A0;
 	}
 	
-	if( lvl == 0 ) return;
-	
-	if( lvl <= cpu.sr.b.IMASK ) return;
-	std::println("got here with lvl = ${:X}, env = ${:X}", lvl, env);
-	std::println("IMASK = ${:X}", (u32) cpu.sr.b.IMASK);
+	if( lvl == 0 || lvl <= cpu.sr.b.IMASK ) return;
+	//std::println("got here with lvl = ${:X}, env = ${:X}", lvl, env);
+	//std::println("IMASK = ${:X}", (u32) cpu.sr.b.IMASK);
 	
 	cpu.SGR = cpu.r[15];
 	cpu.SPC = cpu.pc;
@@ -324,7 +329,7 @@ void dreamcast::check_irqs()
 	cpu.setSR(sr.v);
 	cpu.INTEVT = env;
 	cpu.pc = cpu.VBR + 0x600;
-	std::println("IRQ to ${:X}", cpu.pc);
+	//std::println("IRQ to ${:X}", cpu.pc);
 }
 
 void dreamcast::run_frame()
@@ -335,11 +340,18 @@ void dreamcast::run_frame()
 		//if( cpu.pc > 0x8c010000u ) std::println("pc = ${:X}", cpu.pc);
 		check_irqs();
 		cpu.step();
-		if( cpu.pc == 0xcafebabe )
+		if( (cpu.pc>>8) == 0xcafeba )
 		{
-			std::println("BIOS call r6=${:X}, r7=${:X}", cpu.r[6], cpu.r[7]);
 			cpu.pc = cpu.PR;
-			cpu.r[0] = 2;
+			if( (cpu.pc&0xff) == 0xb4  )
+			{
+				std::println("ROMFONT Requested");
+				if( cpu.r[1] == 0 ) cpu.r[0] = 0xA0100020;
+				else if( cpu.r[1] == 1 ) cpu.r[0] = 0;
+			} else {
+				//std::println("BIOS call:${:X}: r6=${:X}, r7=${:X}", cpu.pc&0xff, cpu.r[6], cpu.r[7]);
+				cpu.r[0] = 2;
+			}
 		}
 		stamp += 1;
 		while( stamp >= sched.next_stamp() )
@@ -349,12 +361,12 @@ void dreamcast::run_frame()
 	}
 	holly.sb_istnrm |= 0x88;
 	
-	memcpy(fbuf, vram+0x200000, 640*480*4);
+	memcpy(fbuf, vram+(holly.fb_r_sof1&0x7ffff0), 640*480*4);
 }
 
 void dreamcast::reset()
 {
-	cpu.pc = 0x8c008300u;
+	//cpu.pc = 0x8c008300u;
 }
 
 bool dreamcast::loadROM(std::string fname)
@@ -437,11 +449,11 @@ bool dreamcast::loadROM(std::string fname)
 	cpu.VBR = 0x8c000000; //0x8C000000;
 	cpu.PR = 0x8c00e09c;//0x0C00043C;
 	cpu.FPUL = 0;
-	cpu.pc = 0x8c008300;
+	cpu.pc = 0x8c008300u; //0xa0000000u; 
 	stamp = 0;
 	
 	holly.vo_control = 0x108;
-	for(u32 i = 0xb0; i < 0xf0; i+=4) *(u32*)&RAM[i] = 0xcafebabe;
+	for(u32 i = 0xb0; i < 0xf0; i+=4) *(u32*)&RAM[i] = 0xcafeba00|i;
 	
 	if( !freadall(bios, fopen("./bios/dc_boot.bin", "rb"), 2_MB) )
 	{
@@ -549,6 +561,41 @@ void dreamcast::ta_list_init()
 	region[0] |= BIT(31);
 }
 
+void dreamcast::maple_dma()
+{
+	u32 start = holly.sb_mdstar & 0xffFFff;
+	std::println("Maple DMA Initiated from ${:X}", start);
+	for(u32 i = 0; i < 4; ++i) std::println("\tMaple cmd = ${:X}", *(u32*)&RAM[start+i*4]);
+	u32 dest = *(u32*)&RAM[start+4] & 0xffFFff;
+	
+	
+	if( *(u32*)&RAM[start] != 0x80000000u )
+	{
+	//	*(u32*)&RAM[dest] = 0xffffFFFFu;
+		//holly.sb_istnrm |= BIT(12);
+		//return;
+	}
+	
+	u32 cmd = __builtin_bswap32(*(u32*)&RAM[start+8]);
+	std::println("Maple cmd = ${:X}", cmd);
+	
+	if( (cmd>>24) != 1 ) { std::println("Got maple cmd = ${:X}", cmd>>24); exit(1); }
+	
+	
+	const char* prod = "Dreamcast Controller           ";
+	const char* lic = "Produced By or Under License From SEGA ENTERPRISES,LTD.     ";
+	std::println("Trying to return maple-attached gamepad.");
+		
+	*(u32*)&RAM[dest] = __builtin_bswap32(28|(5<<24)|(0x20<<16)); dest += 4;
+	*(u32*)&RAM[dest] = 0x01000000; dest+=4; // func
+	*(u32*)&RAM[dest] = 0xFE0F0600; dest+=4; // func data[0-2];
+	*(u32*)&RAM[dest] = 0; dest+=4; // func data[0-2];
+	*(u32*)&RAM[dest] = 0; dest+=6; // func data[0-2];
+	memcpy(&RAM[dest], prod, strlen(prod)+1); // func data[0-2];
+	dest += strlen(prod);
+	memcpy(&RAM[dest], lic, strlen(lic)+1);
+	holly.sb_istnrm |= BIT(12);
+}
 
 
 

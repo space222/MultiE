@@ -19,6 +19,9 @@ void dreamcast::cpureg_write(u32 addr, u64 v, u32 sz)
 	case 0xFFE80004: intern.SCBRR2 = v; return;
 	case 0xFFE8000C: std::cerr << (char)v; return;
 	case 0xFFE80010: return;
+	
+	case 0xFF80002C: { intern.PCTRA = (v & 0xFFFF); return; }
+	case 0xFF800030: { intern.PDTRA = v; return; }
 
 	default: break;
 	}
@@ -39,6 +42,14 @@ u64 dreamcast::cpureg_read(u32 addr, u32 sz)
 	{
 	case 0xFF000010: return 0; // MMUCR
 	
+	case 0xFF000024: return 0; // EXPEVT
+	
+	case 0xFF800028: //RFCR
+			intern.RFCR = (intern.RFCR+1)&0x3ff;
+			return intern.RFCR;
+	
+	case 0xFF000028: return cpu.INTEVT;
+	
 	case 0xFF00001C: return intern.CCR;
 	case 0xFF000038: return intern.QACR0;
 	case 0xFF00003C: return intern.QACR1;
@@ -55,8 +66,37 @@ u64 dreamcast::cpureg_read(u32 addr, u32 sz)
 
 	case 0xFFA0003C: return intern.CHCR3;
 
-	
-	case 0xFF800030: return 0x30; // gpio a
+	case 0xFF80002C: return intern.PCTRA;
+	case 0xFF800030: { // PDTRA
+		//assert(sz==2);
+		// PDTRA from Bus Control
+		// Note: I got it from originaldave on discord who: I got it from Deecy...
+		// Note: I have absolutely no idea what's going on here.
+		//       This is directly taken from Flycast, kind already got it from Chankast.
+		//       This is needed for the bios to work properly, without it, it will
+		//       go to sleep mode with all interrupts disabled early on.
+		u32 tpctra = intern.PCTRA;
+		u32 tpdtra = intern.PDTRA;
+
+		u16 tfinal = 0;
+		if ((tpctra & 0xf) == 0x8) {
+		tfinal = 3;
+		} else if ((tpctra & 0xf) == 0xB) {
+		tfinal = 3;
+		} else {
+		tfinal = 0;
+		}
+
+		if (((tpctra & 0xf) == 0xB) && ((tpdtra & 0xf) == 2)) {
+		tfinal = 0;
+		} else if (((tpctra & 0xf) == 0xC) && ((tpdtra & 0xf) == 2)) {
+		tfinal = 3;
+		}
+
+		tfinal |= 0; // 0=VGA, 2=RGB, 3=composite //@intFromEnum(self._dc.?.cable_type) << 8;
+
+		return 0x300 | tfinal;
+        }
 	
 	case 0xFF000084: std::println("${:X}: Undoc perf counter $FF000084",cpu.pc); return 0; // ??? not in manual
 	

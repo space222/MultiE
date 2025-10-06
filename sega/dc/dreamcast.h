@@ -36,10 +36,13 @@ public:
 		u8 SCBRR2;
 		
 		u8 WTCNT;
+		u16 RFCR;
 		
 		u32 IPRA, IPRB, IPRC;
 		
 		u32 CHCR3;
+		
+		u32 PDTRA, PCTRA;
 	} intern;
 	
 	void catch_up_timer(u32);
@@ -77,6 +80,9 @@ public:
 	const u32 TMR0_UNDERFLOW = 1;
 	const u32 TMR1_UNDERFLOW = 2;
 	const u32 TMR2_UNDERFLOW = 3;
+	
+	const u32 SB_MDSTAR_ADDR = 0x5F6C04;
+	const u32 SB_MDST_ADDR = 0x5F6C18;
 		
 	const u32 HOLLY_ID_ADDR = 0x5F8000;
 	const u32 HOLLY_SOFT_RESET_ADDR = 0x5F8008;
@@ -160,6 +166,8 @@ public:
 	const u32 SB_E2SUSP_ADDR = 0x5F785C;
 	const u32 SB_DDSUSP_ADDR = 0x5F787C;
 	
+	const u32 SB_GDST_ADDR = 0x5F7418;
+	
 	const u32 TA_OL_BASE_ADDR = 0x5F8124;
 	const u32 TA_ISP_BASE_ADDR = 0x5F8128;
 	const u32 TA_OL_LIMIT_ADDR =0x5F812C;
@@ -174,6 +182,8 @@ public:
 	void ta_list_init();	
 	void start_render();
 	void render_opaque(u32);
+	
+	void maple_dma();
 	
 	struct {
 		u32 ol_base, ol_limit;
@@ -197,6 +207,8 @@ public:
 		u32 sb_c2dstat, sb_c2dlen, sb_c2dmaxl, sb_c2dpryc, sb_rbsplt;
 		
 		u32 sb_sdstaw, sb_sdbaaw, sb_sdwlt, sb_sdlas, sb_dbreqm, sb_bavlwc;
+		
+		u32 sb_mdstar, sb_mdst;
 		
 		u32 text_control, region_base, param_base;
 		u32 y_coeff;
