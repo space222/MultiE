@@ -58,10 +58,13 @@ void dreamcast::timer_write(u32 addr, u64 v, u32 sz)
 		if( intern.TSTR & 1 ) 
 		{
 			catch_up_timer(0);
-			intern.TCR0 = v;
+			intern.TCR0 = v | (intern.TCR0&BIT(8));
+			if( !(v&BIT(8)) ) intern.TCR0 &= ~BIT(8);
+			intern.last_tmr0_read = stamp;
 			sched.add_event(stamp + (intern.TCNT0*tmrdiv[intern.TCR0&7]), TMR0_UNDERFLOW);
 		} else {
-			intern.TCR0 = v;
+			intern.TCR0 = v | (intern.TCR0&BIT(8));
+			if( !(v&BIT(8)) ) intern.TCR0 &= ~BIT(8);
 		}
 		return;
 	
@@ -77,10 +80,13 @@ void dreamcast::timer_write(u32 addr, u64 v, u32 sz)
 		if( intern.TSTR & 2 ) 
 		{
 			catch_up_timer(1);
-			intern.TCR1 = v;
+			intern.TCR1 = v | (intern.TCR1&BIT(8));
+			if( !(v&BIT(8)) ) intern.TCR1 &= ~BIT(8);
+			intern.last_tmr1_read = stamp;
 			sched.add_event(stamp + (intern.TCNT1*tmrdiv[intern.TCR1&7]), TMR1_UNDERFLOW);
 		} else {
-			intern.TCR1 = v;
+			intern.TCR1 = v | (intern.TCR1&BIT(8));
+			if( !(v&BIT(8)) ) intern.TCR1 &= ~BIT(8);
 		}
 		return;
 	
@@ -97,10 +103,13 @@ void dreamcast::timer_write(u32 addr, u64 v, u32 sz)
 		if( intern.TSTR & 4 ) 
 		{
 			catch_up_timer(2);
-			intern.TCR2 = v;
+			intern.TCR2 = v | (intern.TCR2&BIT(8));
+			if( !(v&BIT(8)) ) intern.TCR2 &= ~BIT(8);
+			intern.last_tmr2_read = stamp;
 			sched.add_event(stamp + (intern.TCNT2*tmrdiv[intern.TCR2&7]), TMR2_UNDERFLOW);
 		} else {
-			intern.TCR2 = v;
+			intern.TCR2 = v | (intern.TCR2&BIT(8));
+			if( !(v&BIT(8)) ) intern.TCR2 &= ~BIT(8);
 		}
 		return;
 	
@@ -116,6 +125,7 @@ u64 dreamcast::timer_read(u32 addr, u32 sz)
 	{
 	case 0xFFD80000: return intern.TOCR;
 	case 0xFFD80004: return intern.TSTR;
+	
 	case 0xFFD80008: return intern.TCOR0;
 	case 0xFFD8000C: catch_up_timer(0); return intern.TCNT0;
 	case 0xFFD80010: return intern.TCR0;
@@ -177,6 +187,7 @@ void dreamcast::timer_underflow(u64 oldstamp, u32 index)
 		intern.TCR0 |= BIT(8);
 		sched.add_event(oldstamp + (intern.TCNT0*tmrdiv[intern.TCR0&7]), TMR0_UNDERFLOW);
 		intern.last_tmr0_read = oldstamp;
+		//std::println("Timer 0 underflow, irq={:x}", intern.TCR0&BIT(5)?1:0);
 	}
 	else if( index == 1 ) 
 	{
@@ -184,7 +195,7 @@ void dreamcast::timer_underflow(u64 oldstamp, u32 index)
 		intern.TCR1 |= BIT(8);
 		sched.add_event(oldstamp + (intern.TCNT1*tmrdiv[intern.TCR1&7]), TMR1_UNDERFLOW);
 		intern.last_tmr1_read = oldstamp;
-		std::println("Timer 1 underflow");
+		//std::println("Timer 1 underflow, irq={:x}", intern.TCR1&BIT(5)?1:0);
 	}
 	else if( index == 2 )
 	{
@@ -192,6 +203,7 @@ void dreamcast::timer_underflow(u64 oldstamp, u32 index)
 		intern.TCR2 |= BIT(8);
 		intern.last_tmr2_read = oldstamp;
 		sched.add_event(oldstamp + (intern.TCNT2*tmrdiv[intern.TCR2&7]), TMR2_UNDERFLOW);
+		//std::println("Timer 2 underflow, irq={:x}", intern.TCR2&BIT(5)?1:0);
 	}
 	//std::println("Timer #{:X} underflow", index);
 }

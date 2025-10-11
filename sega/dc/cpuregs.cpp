@@ -38,17 +38,19 @@ void dreamcast::cpureg_write(u32 addr, u64 v, u32 sz)
 
 u64 dreamcast::cpureg_read(u32 addr, u32 sz)
 {
+	if( debug_on ) { if( addr != 0xFF000028 && addr != 0xFF000024 ) std::println("cpureg{} <${:X}", sz, addr); }
 	switch( addr )
 	{
 	case 0xFF000010: return 0; // MMUCR
 	
-	case 0xFF000024: return 0; // EXPEVT
+	case 0xFF000020: return cpu.TRA;
+	case 0xFF000024: return cpu.EXPEVT;
+	case 0xFF000028: return cpu.INTEVT;
 	
 	case 0xFF800028: //RFCR
 			intern.RFCR = (intern.RFCR+1)&0x3ff;
 			return intern.RFCR;
 	
-	case 0xFF000028: return cpu.INTEVT;
 	
 	case 0xFF00001C: return intern.CCR;
 	case 0xFF000038: return intern.QACR0;
@@ -93,9 +95,9 @@ u64 dreamcast::cpureg_read(u32 addr, u32 sz)
 		tfinal = 3;
 		}
 
-		tfinal |= 0; // 0=VGA, 2=RGB, 3=composite //@intFromEnum(self._dc.?.cable_type) << 8;
+		tfinal |= 0x300; // 0=VGA, 2=RGB, 3=composite << 8;
 
-		return 0x300 | tfinal;
+		return tfinal;
         }
 	
 	case 0xFF000084: std::println("${:X}: Undoc perf counter $FF000084",cpu.pc); return 0; // ??? not in manual

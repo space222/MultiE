@@ -347,12 +347,15 @@ Status: panda.dol works. no idea whether cpu instructions or irqs or etc is wron
 
 Sega Dreamcast Todo List
 ---------------------------
-1. start working through the BIOS implementing stuff as encountered
-2. will need functional gdrom (possibly hle, does bios call it's own syscall vectors?)
-3. add interrupts to SH4
-4. at first it looked like things use the cpu's dma, but there's actually a few regular mmio dma things: implement all the things
-5. gfx?
-6. snd?
+1. most kos demos run, start working through bios
+2. bios will use the cd, gonna try LLE that.
+3. probably ask on discord about interrupt priorities and video timing
+4. implement TA proper
+5. sound?
+6. Games running by this point?
+
+
+
 
 
 

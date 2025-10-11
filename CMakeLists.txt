@@ -29,7 +29,7 @@ neogeo/aes.cpp other/bally_astrocade.cpp atari/Lynx.cpp other/SuperVision.cpp ot
 cpu/gekko.cpp nintendo/gc/GameCube.cpp nintendo/gc/gc_exi.cpp nintendo/gc/gc_dsp_io.cpp nintendo/gc/gc_dsp_cpu.cpp
 nintendo/gba_io.cpp nintendo/gba_lcd.cpp nintendo/gba_dma.cpp nintendo/LCDEngine.cpp
 nintendo/gba_timer.cpp nintendo/gba_sound.cpp nintendo/gba_gpio.cpp cpu/z80_new.cpp cpu/sh4.cpp util.cpp
-sega/dc/dreamcast.cpp sega/dc/cpuregs.cpp sega/dc/timer.cpp
+sega/dc/dreamcast.cpp sega/dc/cpuregs.cpp sega/dc/timer.cpp sega/dc/maple.cpp sega/dc/disc.cpp sega/dc/ta.cpp
 #stub/gdb_stub.cpp
 )
 

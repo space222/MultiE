@@ -178,7 +178,7 @@ sh4_instr sh4_opcodes[] = {
 
 	// system control
 	
-{ 0xFFFF, 0x001B, INSTR { cpu.pc -= 2; }, "sleep", "0000000000011011" },
+{ 0xFFFF, 0x001B, INSTR { cpu.sleeping = true; }, "sleep", "0000000000011011" },
 { 0xFFFF, 0x0028, INSTR { cpu.MACH = cpu.MACL = 0; }, "clrmac", "0000000000101000" },
 { 0xFFFF, 0x0048, INSTR { cpu.sr.b.S = 0; }, "clrs", "0000000001001000" },
 { 0xFFFF, 0x0008, INSTR { srT = 0; }, "clrt", "0000000000001000" },
@@ -229,14 +229,14 @@ sh4_instr sh4_opcodes[] = {
 { 0xF08F, 0x4087, INSTR { PRIV; cpu.rbank[(opc>>4)&7] = cpu.read(Rn, 32); Rn += 4; }, "ldc.l @Rn+,Rm_BANK", "0100nnnn1mmm0111"},
 { 0xFF00, 0xC300, INSTR { 
 		cpu.SPC = cpu.pc+2; 
-		cpu.SSR = cpu.sr.v; 
+		cpu.SSR = cpu.sr.v;
 		cpu.TRA = u8(opc)<<2; 
 		cpu.EXPEVT = 0x160;
 		cpu.pc = cpu.VBR + 0x100 - 2;
 		auto f = cpu.sr;
 		f.b.MD = f.b.RB = f.b.BL = 1;
 		cpu.setSR(f.v);
-		//std::println("trapa VBR = ${:X}", cpu.VBR);
+		//std::println("trapa VBR = ${:X}, from ${:X}", cpu.VBR, cpu.SPC);
 	}, "trapa #imm", "11000011iiiiiiii" },
 
 	// fr/fschg

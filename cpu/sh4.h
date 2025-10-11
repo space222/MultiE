@@ -10,6 +10,7 @@ public:
 	u32 r[16];
 	u32 rbank[16];
 	u8 irq_line;
+	bool sleeping = false;
 	
 	union {
 		float f[32];
@@ -23,7 +24,7 @@ public:
 	
 	u64 read(u32 a, u32 sz) { return bus_read(a,sz); }
 	void write(u32 a, u64 v, u32 sz) { bus_write(a,v,sz); }	
-	
+		
 	union sh4_sr_t
 	{
 		struct {

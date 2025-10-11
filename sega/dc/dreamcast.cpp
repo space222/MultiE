@@ -3,6 +3,7 @@
 
 u64 dreamcast::io_read(u32 a, u32 sz)
 {
+	if( debug_on ) { /*if( a != 0x5F6900 && a != 0x5F6920 )*/ std::println("read{} <${:X}", sz, a); }
 	if( a == 0x5F74EC ) { return 3; /* G1_ATA_BUS_PROTECTION_STATUS_PASSED */ }
 	if( a == REGION_BASE_ADDR ) return holly.region_base;
 	if( a == HOLLY_ID_ADDR ) return 0x17FD11DB;
@@ -60,7 +61,7 @@ u64 dreamcast::io_read(u32 a, u32 sz)
 	if( a == SB_G1CWC_ADDR ) { return holly.sb_g1cwc; }
 	if( a == SB_G1GDWC_ADDR ) { return holly.sb_g1gdrc; }
 	if( a == SB_G1GDRC_ADDR ) { return holly.sb_g1gdwc; }
-	if( a == SB_FFST_ADDR ) { std::println("rd sb_ffst"); return holly.sb_ffst^=0x3f; }
+	if( a == SB_FFST_ADDR ) { /*std::println("rd sb_ffst");*/ return 0; return holly.sb_ffst^=0x3f; }
 	if( a == SB_IML2NRM_ADDR ) { return holly.sb_iml2nrm; }
 	if( a == SB_IML4NRM_ADDR ) { return holly.sb_iml4nrm; }
 	if( a == SB_IML6NRM_ADDR ) { return holly.sb_iml6nrm; }
@@ -86,9 +87,11 @@ u64 dreamcast::io_read(u32 a, u32 sz)
 	if( a == UNKNOWN_REG_68A4 ) { return holly.unkn68A4; }
 	if( a == PARAM_BASE_ADDR ) { return holly.param_base; }
 	if( a == SB_GDST_ADDR ) { return 0; /* GD DMA never in progress */ }
+	if( a == SB_MDST_ADDR ) { return 0; /* Maple DMA never in progress */ }
 		
 	if( a == SB_ADSUSP_ADDR || a == SB_E1SUSP_ADDR || a == SB_E2SUSP_ADDR || a == SB_DDSUSP_ADDR )
 	{
+		std::println("Dma status read ${:X}", a);
 		return BIT(5)|BIT(4); // dma operations are always possible and have ended
 	}	
 	if( a == SPG_STATUS_ADDR )
@@ -107,6 +110,10 @@ u64 dreamcast::io_read(u32 a, u32 sz)
 
 void dreamcast::io_write(u32 a, u64 v, u32 sz)
 {
+	if( debug_on ) { if( a != 0x5F6900 
+			  && a != 0x5F6920 
+			  && a != 0x5F6C04 
+			  && a != 0x5F6C18 ) std::println("write{} ${:X}=${:X}", sz, a, v); }
 	if( a == STARTRENDER_ADDR ) { start_render(); return; }
 	if( a == PARAM_BASE_ADDR ) { holly.param_base = v; return; }
 	if( a == REGION_BASE_ADDR ) { holly.region_base = v & 0xffFFfc; return; }
@@ -146,7 +153,7 @@ void dreamcast::io_write(u32 a, u64 v, u32 sz)
 	if( a == FB_R_SOF1_ADDR ) { holly.fb_r_sof1 = v&0x1ffFFfc; return; }
 	if( a == FB_R_SOF2_ADDR ) { holly.fb_r_sof2 = v&0x1ffFFfc; return; }
 	if( a == FB_R_SIZE_ADDR ) { holly.fb_r_size = v; return; }
-	if( a == SPG_HBLANK_INT_ADDR ) { holly.spg_hblank_int = v; return; }
+	if( a == SPG_HBLANK_INT_ADDR ) { std::println(stderr, "hblank_int = ${:X}", v); holly.spg_hblank_int = v; return; }
 	if( a == FPU_SHAD_SCALE_ADDR ) { holly.fpu_shad_scale = v&0x1ff; return; }
 	if( a == FPU_CULL_VAL_ADDR ) { holly.fpu_cull = v; return; }
 	if( a == FPU_PARAM_CFG_ADDR ) { holly.fpu_param_cfg = v; return; }
@@ -228,6 +235,12 @@ u64 dreamcast::read(u32 a, u32 sz)
 	if( a >= 0x800000 && a < 0xa00000 ) return sized_read(sndram, a&0x1fffff, sz);	
 	if( a >= 0xc000000 && a < 0x10000000 ) return sized_read(RAM, a&0xffFFff, sz);
 
+	if( a >= 0x4000000 && a < 0x4800000 ) 
+	{
+		a &= 0x7fffff;
+		a = (((a&0x3fffff)>>1)&~3)|((a&BIT(2))?0x400000:0)|(a&3);
+		return sized_read(vram, a&0x7fffff, sz);
+	}
 	if( a >= 0x5000000 && a < 0x5800000 ) return sized_read(vram, a&0x7fffff, sz);
 	
 	if( a >= 0x1E000000 && a < 0x1E001fff ) return (intern.CCR&CCR_ORA_BIT) ? sized_read(opcache,a&0x1fff,sz):0;
@@ -242,7 +255,8 @@ void dreamcast::write(u32 a, u64 v, u32 sz)
 	{
 		//todo: store queue
 		u32 ptr = (intern.QACR0<<24)|(a&0x3ffffff);
-		if( ptr > 0x10000000 ) std::println("store queue ${:X}(${:X}) = ${:X}", a, ptr, v);
+		//if( ptr > 0x10000000 ) std::println("store queue ${:X}(${:X}) = ${:X}", a, ptr, v);
+		write(ptr, v, sz);
 		return;
 	}
 	
@@ -254,12 +268,28 @@ void dreamcast::write(u32 a, u64 v, u32 sz)
 	if( a >= 0xc000000 && a < 0x10000000 ) return sized_write(RAM, a&0xffFFff, v, sz);
 
 	if( a >= 0x5F6000 && a < 0x5FA000 ) { return io_write(a, v, sz); }
+
+	if( a >= 0x4000000 && a < 0x4800000 ) 
+	{
+		a &= 0x7fffff;
+		a = (((a&0x3fffff)>>1)&~3)|((a&BIT(2))?0x400000:0)|(a&3);
+		sized_write(vram, a&0x7fffff, v, sz);
+		return;
+	}
 	
 	if( a >= 0x5000000 && a < 0x5800000 ) return sized_write(vram, a&0x7fffff, v, sz);
 
 	if( a >= 0x1E000000 && a < 0x1E001fff ) 
 	{ 
 		if(intern.CCR&CCR_ORA_BIT) sized_write(opcache,a&0x1fff,v,sz); 
+		return;
+	}
+	
+	if( a >= 0x10000000 && a <= 0x13FFFFFF )
+	{
+		if( sz < 32 ) { std::println("TA write under 32bits ignored"); return; }
+		ta_input(v);
+		if( sz == 64 ) ta_input(v>>32);
 		return;
 	}
 
@@ -299,26 +329,45 @@ u32 dreamcast::fb_bpp()
 void dreamcast::check_irqs()
 {
 	u8 lvl = 0;
-	u16 env = 0;
+	u16 evt = 0;
+	bool fire = false;
 	if( cpu.sr.b.BL == 1 ) return;
 
-	if( holly.sb_istnrm & holly.sb_iml6nrm )
+	if( holly.sb_istnrm & holly.sb_iml6nrm & 0x3fffff )
 	{
-		lvl = 6;
-		env = 0x320;
-	} else if( holly.sb_istnrm & holly.sb_iml4nrm ) {
-		lvl = 4;
-		env = 0x360;
-	} else if( holly.sb_istnrm & holly.sb_iml2nrm ) {
-		lvl = 2;
-		env = 0x3A0;
+		lvl = 6^15;
+		evt = 0x320;
+		fire = true;
+		//if(lvl <= cpu.sr.b.IMASK )std::println("Lvl 6 irq: istnrm = ${:X}, iml6nrm = ${:X}", holly.sb_istnrm, holly.sb_iml6nrm);
+	} else if( holly.sb_istnrm & holly.sb_iml4nrm & 0x3fffff ) {
+		lvl = 4^15;
+		evt = 0x360;
+		fire = true;
+		//if(lvl <= cpu.sr.b.IMASK )std::println("Lvl 4 irq: istnrm = ${:X}, iml4nrm = ${:X}", holly.sb_istnrm, holly.sb_iml4nrm);
+	} else if( holly.sb_istnrm & holly.sb_iml2nrm & 0x3fffff ) {
+		lvl = 0x2^15;
+		evt = 0x3A0;
+		fire = true;
+		//if(lvl <= cpu.sr.b.IMASK )std::println("Lvl 2 irq: istnrm = ${:X}, iml2nrm = ${:X}", holly.sb_istnrm, holly.sb_iml2nrm);
+	} else if( (intern.TCR0 & TMR_IRQ_ACTIVE) == TMR_IRQ_ACTIVE ) {
+		lvl = (intern.IPRA>>12)&15;
+		evt = 0x400;
+		fire = true;
+	} else if( (intern.TCR1 & TMR_IRQ_ACTIVE) == TMR_IRQ_ACTIVE ) {
+		lvl = (intern.IPRA>>8)&15;
+		evt = 0x420;
+		fire = true;
+	} else if( (intern.TCR2 & TMR_IRQ_ACTIVE) == TMR_IRQ_ACTIVE ) {
+		lvl = (intern.IPRA>>4)&15;
+		evt = 0x440;
+		fire = true;
 	}
 	
-	if( lvl == 0 || lvl <= cpu.sr.b.IMASK ) return;
+	if( !fire || lvl <= cpu.sr.b.IMASK ) return;
 	//std::println("got here with lvl = ${:X}, env = ${:X}", lvl, env);
 	//std::println("IMASK = ${:X}", (u32) cpu.sr.b.IMASK);
 	
-	cpu.SGR = cpu.r[15];
+	//cpu.SGR = cpu.r[15];
 	cpu.SPC = cpu.pc;
 	cpu.SSR = cpu.sr.v;
 	
@@ -327,8 +376,9 @@ void dreamcast::check_irqs()
 	sr.b.BL = 1;
 	sr.b.RB = 1;
 	cpu.setSR(sr.v);
-	cpu.INTEVT = env;
+	cpu.INTEVT = evt;
 	cpu.pc = cpu.VBR + 0x600;
+	cpu.sleeping = false;
 	//std::println("IRQ to ${:X}", cpu.pc);
 }
 
@@ -339,19 +389,37 @@ void dreamcast::run_frame()
 	{
 		//if( cpu.pc > 0x8c010000u ) std::println("pc = ${:X}", cpu.pc);
 		check_irqs();
-		cpu.step();
+		if( !cpu.sleeping ) cpu.step();
 		if( (cpu.pc>>8) == 0xcafeba )
 		{
-			cpu.pc = cpu.PR;
-			if( (cpu.pc&0xff) == 0xb4  )
+			u32 bcall = cpu.pc;
+			if( (bcall&0xff) == 0xe0 )
 			{
-				std::println("ROMFONT Requested");
+				cpu.sr.b.IMASK = 0;
+				holly.sb_iml2nrm = 0;
+			} else if( (bcall&0xff) == 0xb4  ) { // romfont
 				if( cpu.r[1] == 0 ) cpu.r[0] = 0xA0100020;
 				else if( cpu.r[1] == 1 ) cpu.r[0] = 0;
+			} else if( (bcall&0xff) == 0xbc ) {
+				if( cpu.r[7] == 4 )
+				{
+					u32 addr = cpu.r[4] & 0xffFFff;
+					*(u32*)&RAM[addr] = 2;
+					*(u32*)&RAM[addr+4] = 0x20;
+					cpu.r[0] = 0;
+				} else if( cpu.r[7] == 1 ) {
+					cpu.r[0] = 2;
+					u32 addr = cpu.r[5] & 0xffFFff;
+					for(u32 x=0;x<4;++x) *(u32*)&RAM[addr+x*4]=0;
+				}
+				std::println("${:X}: BIOS call:${:X}: r4=${:X}, r6=${:X}, r7=${:X}", 
+					cpu.pc, bcall&0xff, cpu.r[4], cpu.r[6], cpu.r[7]);
 			} else {
-				//std::println("BIOS call:${:X}: r6=${:X}, r7=${:X}", cpu.pc&0xff, cpu.r[6], cpu.r[7]);
-				cpu.r[0] = 2;
+				//cpu.r[0] = 0;
+				std::println("${:X}: BIOS call:${:X}: r4=${:X}, r6=${:X}, r7=${:X}", 
+					cpu.pc, bcall&0xff, cpu.r[4], cpu.r[6], cpu.r[7]);
 			}
+			cpu.pc = cpu.PR;	
 		}
 		stamp += 1;
 		while( stamp >= sched.next_stamp() )
@@ -359,14 +427,27 @@ void dreamcast::run_frame()
 			sched.run_event();
 		}
 	}
-	holly.sb_istnrm |= 0x88;
+	holly.sb_istnrm |= 0x38|0xff; // if I make this depend on VO_CONTROL.b3, IP.BIN never gets going
 	
 	memcpy(fbuf, vram+(holly.fb_r_sof1&0x7ffff0), 640*480*4);
+	ta_clear = true;
 }
 
 void dreamcast::reset()
 {
 	//cpu.pc = 0x8c008300u;
+	holly.vo_control = 0;
+	holly.fb_r_ctrl = 0xc;
+	holly.fb_r_sof1 = 0x200000;
+	//holly.sb_istnrm |= 0x80;
+	cpu.sr.b.IMASK = 15;
+	intern.IPRA = intern.IPRB = intern.IPRC = 0;
+	
+	intern.TSTR = 0;
+	intern.TCR0 = intern.TCR1 = intern.TCR2 = 0;
+	intern.TCNT0 = intern.TCNT1 = intern.TCNT2 = 0xffffFFFFu;
+	intern.TCOR0 = intern.TCOR1 = intern.TCOR2 = 0xffffFFFFu;
+	debug_on = false;
 }
 
 bool dreamcast::loadROM(std::string fname)
@@ -375,6 +456,18 @@ bool dreamcast::loadROM(std::string fname)
 	cpu.bus_write =[&](u32 a, u64 v, u32 sz) { write(a,v,sz); };
 	cpu.fetch = [&](u32 a)->u16 { return read(a,16); };
 	cpu.init();
+
+	if( !freadall(bios, fopen("./bios/dc_boot.bin", "rb"), 2_MB) )
+	{
+		std::println("Unable to open './bios/dc_boot.bin'");
+		return false;	
+	}
+	
+	if( !freadall(flashrom, fopen("./bios/dc_flash.bin", "rb"), 128_KB) )
+	{
+		std::println("Unable to open './bios/dc_flash.bin'");
+		return false;
+	}
 	
 	for (u32 i = 0; i < 16; i++) 
 	{
@@ -455,18 +548,6 @@ bool dreamcast::loadROM(std::string fname)
 	holly.vo_control = 0x108;
 	for(u32 i = 0xb0; i < 0xf0; i+=4) *(u32*)&RAM[i] = 0xcafeba00|i;
 	
-	if( !freadall(bios, fopen("./bios/dc_boot.bin", "rb"), 2_MB) )
-	{
-		std::println("Unable to open './bios/dc_boot.bin'");
-		return false;	
-	}
-	
-	if( !freadall(flashrom, fopen("./bios/dc_flash.bin", "rb"), 128_KB) )
-	{
-		std::println("Unable to open './bios/dc_flash.bin'");
-		return false;
-	}
-	
 	if( !freadall(RAM+0x8000, fopen("./bios/dc_IP.BIN", "rb")) )
 	{
 		std::println("Unable to open './bios/dc_IP.BIN'");
@@ -530,6 +611,9 @@ void dreamcast::start_render()
 			if( region[0] & BIT(31) ) break;
 		}
 	}
+	
+	std::println(stderr,"opaq irq");
+	holly.sb_istnrm |= OPAQUE_LIST_CMPL_IRQ_BIT|2;
 }
 
 void dreamcast::ta_list_init()
@@ -564,37 +648,32 @@ void dreamcast::ta_list_init()
 void dreamcast::maple_dma()
 {
 	u32 start = holly.sb_mdstar & 0xffFFff;
-	std::println("Maple DMA Initiated from ${:X}", start);
-	for(u32 i = 0; i < 4; ++i) std::println("\tMaple cmd = ${:X}", *(u32*)&RAM[start+i*4]);
-	u32 dest = *(u32*)&RAM[start+4] & 0xffFFff;
+	//std::println("Maple DMA Initiated from ${:X}", start);
 	
-	
-	if( *(u32*)&RAM[start] != 0x80000000u )
+	bool dmadone = false;
+	u32 temp = start;
+	while( !dmadone )
 	{
-	//	*(u32*)&RAM[dest] = 0xffffFFFFu;
-		//holly.sb_istnrm |= BIT(12);
-		//return;
+		u32 header = *(u32*)&RAM[temp];
+		if( header & BIT(31) ) dmadone = true;
+		u32 resaddr = *(u32*)&RAM[temp+4] & 0xffFFff;
+		temp += 8;
+		u32 words = (header&0x7f)+1;
+		//std::println("maple dsc ${:X}, ${:X}", header, resaddr);		
+
+		u32* frameptr = (u32*)&RAM[temp];
+		const u32 port = ((header>>16)&3);
+		switch( port )
+		{
+		case 0: maple_port1(resaddr, frameptr, words); break;
+		case 1: maple_port2(resaddr, frameptr, words); break;
+		default:
+			*(u32*)&RAM[resaddr] = 0xffffFFFFu; break;
+		}
+		temp += words*4;
 	}
 	
-	u32 cmd = __builtin_bswap32(*(u32*)&RAM[start+8]);
-	std::println("Maple cmd = ${:X}", cmd);
-	
-	if( (cmd>>24) != 1 ) { std::println("Got maple cmd = ${:X}", cmd>>24); exit(1); }
-	
-	
-	const char* prod = "Dreamcast Controller           ";
-	const char* lic = "Produced By or Under License From SEGA ENTERPRISES,LTD.     ";
-	std::println("Trying to return maple-attached gamepad.");
-		
-	*(u32*)&RAM[dest] = __builtin_bswap32(28|(5<<24)|(0x20<<16)); dest += 4;
-	*(u32*)&RAM[dest] = 0x01000000; dest+=4; // func
-	*(u32*)&RAM[dest] = 0xFE0F0600; dest+=4; // func data[0-2];
-	*(u32*)&RAM[dest] = 0; dest+=4; // func data[0-2];
-	*(u32*)&RAM[dest] = 0; dest+=6; // func data[0-2];
-	memcpy(&RAM[dest], prod, strlen(prod)+1); // func data[0-2];
-	dest += strlen(prod);
-	memcpy(&RAM[dest], lic, strlen(lic)+1);
-	holly.sb_istnrm |= BIT(12);
+	holly.sb_istnrm |= MAPLE_DMA_CMPL_IRQ_BIT;// BIT(12);
 }
 
 

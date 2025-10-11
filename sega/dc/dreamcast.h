@@ -1,4 +1,5 @@
 #pragma once
+#include <deque>
 #include "console.h"
 #include "sh4.h"
 #include "util.h"
@@ -47,6 +48,7 @@ public:
 	
 	void catch_up_timer(u32);
 	void timer_underflow(u64, u32);
+	const u32 TMR_IRQ_ACTIVE = BIT(8)|BIT(5);
 	
 	u8 RAM[16_MB];
 	u8 vram[8_MB];
@@ -67,6 +69,12 @@ public:
 	void cpureg_write(u32,u64,u32);
 	u64 timer_read(u32, u32);
 	void timer_write(u32,u64,u32);
+	
+	u64 gdread(u32,u32);
+	void gdwrite(u32,u64,u32);
+	struct {
+		
+	} gd;
 
 	u32 fbuf[640*480];
 	
@@ -179,11 +187,35 @@ public:
 	
 	const u32 TA_NEXT_OPB_INIT_ADDR = 0x5F8164;
 	
-	void ta_list_init();	
+	struct ta_vertex
+	{
+		float x, y, z;
+		float u, v;
+		float r, g, b, a;
+	};
+	
+	std::deque<u32> ta_q;
+	std::deque<ta_vertex> ta_vertq;
+	u32 ta_prim_type, ta_col_type;
+	bool ta_clear;
+	void ta_draw_tri();
+	void ta_vertex_in();
+	void ta_list_init();
+	void ta_input(u32);
+	void ta_run();
 	void start_render();
 	void render_opaque(u32);
 	
 	void maple_dma();
+	void maple_port1(u32 dest, u32* msg, u32 len);
+	void maple_port2(u32 dest, u32* msg, u32 len);
+	u32 maple_keys1();
+	
+	bool debug_on;
+	void key_down(int k)
+	{
+		if( k == SDL_SCANCODE_ESCAPE ) debug_on = !debug_on;
+	}
 	
 	struct {
 		u32 ol_base, ol_limit;
@@ -229,6 +261,11 @@ public:
 		u32 unkn68A4;
 	} holly;
 	
+	const u32 HBLANK_IRQ_BIT = 0x20;
+	const u32 VBLANK_IN_IRQ_BIT = 0x8;
+	const u32 VBLANK_OUT_IRQ_BIT = 0x10;
+	const u32 OPAQUE_LIST_CMPL_IRQ_BIT = 0x80;
+	const u32 MAPLE_DMA_CMPL_IRQ_BIT = BIT(12);
 };
 
 
