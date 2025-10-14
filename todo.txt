@@ -347,12 +347,13 @@ Status: panda.dol works. no idea whether cpu instructions or irqs or etc is wron
 
 Sega Dreamcast Todo List
 ---------------------------
-1. most kos demos run, start working through bios
-2. bios will use the cd, gonna try LLE that.
-3. probably ask on discord about interrupt priorities and video timing
-4. implement TA proper
-5. sound?
-6. Games running by this point?
+1. Fix store queues. Direct pass-thru writing is allowing out-of-order writes to TA input, gotta actually Q the writes
+2. most kos demos run, start working through bios
+3. bios will use the cd, gonna try LLE that.
+4. probably ask on discord about interrupt priorities and video timing
+5. implement TA proper
+6. sound?
+7. Games running by this point?
 
 
 

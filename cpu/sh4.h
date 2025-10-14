@@ -19,8 +19,9 @@ public:
 	
 	std::function<u64(u32, u32)> bus_read;
 	std::function<void(u32,u64,u32)> bus_write;
-	
 	std::function<u16(u32)> fetch = [&](u32 a)->u16 { return bus_read(a,16); };
+
+	std::function<void(u32)> pref;
 	
 	u64 read(u32 a, u32 sz) { return bus_read(a,sz); }
 	void write(u32 a, u64 v, u32 sz) { bus_write(a,v,sz); }	

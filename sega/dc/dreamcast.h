@@ -24,6 +24,9 @@ public:
 	sh4 cpu;
 	u64 stamp, frame_start;
 	
+	u32 storeq[16];
+	void write_storeQ(u32);
+	
 	struct {
 		u32 CCR, QACR0, QACR1;
 	
@@ -70,16 +73,26 @@ public:
 	u64 timer_read(u32, u32);
 	void timer_write(u32,u64,u32);
 	
+	const u32 GD_ALT_STAT = 0x5F7018;
+	const u32 GD_STAT_CMD = 0x5F709C;
 	u64 gdread(u32,u32);
 	void gdwrite(u32,u64,u32);
+	void gdevent(u64,u32);
 	struct {
+		u8 stat;
+		u8 dev_ctrl;
 		
+		
+		u8 curcmd;
 	} gd;
 
 	u32 fbuf[640*480];
 	
 	Scheduler sched;
 	void event(u64, u32) override;
+	const u32 HBLANK_IN = 0x100;
+	const u32 VBLANK_IN = 0x101;
+	const u32 VBLANK_OUT = 0x102;	
 	
 	const u32 CCR_ORA_BIT = BIT(5);
 	const u32 CCR_OIX_BIT = BIT(7);
@@ -215,6 +228,13 @@ public:
 	void key_down(int k)
 	{
 		if( k == SDL_SCANCODE_ESCAPE ) debug_on = !debug_on;
+		if( k == SDL_SCANCODE_F ) 
+		{ 
+			intern.TCR2 |= TMR_IRQ_ACTIVE;
+			intern.TCR1 |= TMR_IRQ_ACTIVE;
+			intern.TCR0 |= TMR_IRQ_ACTIVE;
+			std::println(stderr, "${:X}, ${:X}, ${:X}", intern.TCR0, intern.TCR1, intern.TCR2); 
+		}
 	}
 	
 	struct {

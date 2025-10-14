@@ -13,6 +13,7 @@ struct sh4_instr { u16 mask,res; std::function<void(sh4&,u16)> func; std::string
 //#define PRIV if( cpu.sr.b.MD==0 ) return cpu.priv()
 #define PRIV
 //extern u32 cyc;
+//#define DELAY cyc+=1; cpu.exec(cpu.fetch(cpu.pc))
 #define DELAY cpu.exec(cpu.fetch(cpu.pc))
 #define FDCHK if( cpu.sr.b.FD==1 ) return cpu.fpu_disabled()
 #define FRn cpu.fpu.f[(((opc>>8)&15)^1)+(cpu.fpctrl.b.FR<<4)]
@@ -256,7 +257,7 @@ sh4_instr sh4_opcodes[] = {
 
 	// cache
 	
-{ 0xF0FF, 0x0083, INSTR { }, "pref @Rn", "0000nnnn10000011" }, // ??
+{ 0xF0FF, 0x0083, INSTR { cpu.pref(Rn); }, "pref @Rn", "0000nnnn10000011" }, // ??
 { 0xF0FF, 0x0093, INSTR { }, "ocbi @Rn", "0000nnnn10010011" }, // ??
 { 0xF0FF, 0x00A3, INSTR { }, "ocbp @Rn", "0000nnnn10100011" }, // ??
 { 0xF0FF, 0x00B3, INSTR { }, "ocbwb @Rn", "0000nnnn10110011" }, //??

@@ -184,6 +184,13 @@ void dreamcast::ta_run()
 	} else if( ptype == 7 ) {
 		ta_vertex_in();
 		if( paractrl & BIT(28) ) ta_vertq.clear();
+	} else if( ptype == 0 ) {
+		//todo: list types other than opaque
+		u32 endlisttype = ((paractrl>>24)&7);
+		if( endlisttype == 0 )
+		{
+			holly.sb_istnrm |= OPAQUE_LIST_CMPL_IRQ_BIT;
+		}
 	}
 	
 
@@ -197,7 +204,7 @@ void dreamcast::ta_input(u32 v)
 	
 	if( ta_q.size() == 8 )
 	{
-		if( ta_q[0] == 0 && ta_q[1] == 0 ) { ta_q.pop_front(); ta_q.pop_front(); return; }
+		//if( ta_q[0] == 0 && ta_q[1] == 0 ) { ta_q.pop_front(); ta_q.pop_front(); return; }
 		ta_run();
 	}
 }
