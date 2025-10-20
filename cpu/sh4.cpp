@@ -228,7 +228,8 @@ sh4_instr sh4_opcodes[] = {
 { 0xF08F, 0x4083, INSTR { PRIV; Rn-=4; cpu.write(Rn, cpu.rbank[(opc>>4)&7], 32); }, "stc.l Rm_BANK,@-Rn","0100nnnn1mmm0011"},
 { 0xF08F, 0x408E, INSTR { PRIV; cpu.rbank[(opc>>4)&7] = Rn; }, "ldc Rn,Rm_BANK", "0100nnnn1mmm1110" },
 { 0xF08F, 0x4087, INSTR { PRIV; cpu.rbank[(opc>>4)&7] = cpu.read(Rn, 32); Rn += 4; }, "ldc.l @Rn+,Rm_BANK", "0100nnnn1mmm0111"},
-{ 0xFF00, 0xC300, INSTR { 
+{ 0xFF00, 0xC300, INSTR {
+		
 		cpu.SPC = cpu.pc+2; 
 		cpu.SSR = cpu.sr.v;
 		cpu.TRA = u8(opc)<<2; 
@@ -237,7 +238,7 @@ sh4_instr sh4_opcodes[] = {
 		auto f = cpu.sr;
 		f.b.MD = f.b.RB = f.b.BL = 1;
 		cpu.setSR(f.v);
-		//std::println("trapa VBR = ${:X}, from ${:X}", cpu.VBR, cpu.SPC);
+		//std::println("${:X}: trapa ${:X}", cpu.SPC-2, cpu.TRA>>2);
 	}, "trapa #imm", "11000011iiiiiiii" },
 
 	// fr/fschg
@@ -472,51 +473,102 @@ void sh4::fipr(u32 a, u32 b)
 
 void sh4::ftrv(u32 n)
 {
+	std::println("FTRV unimpl");
+	exit(1);
 	float v[4] = { fpu.f[n+1], fpu.f[n+0], fpu.f[n+3], fpu.f[n+2] };
 }
 
 void sh4::div1(u32 m, u32 n)
-{ // ripped from flycast or a manual, either fails just as many json/sst tests as any other impl.
-	const u8 old_q = sr.b.Q;
-	sr.b.Q = (u8)((0x80000000 & r[n]) != 0);
+{ // from MAME. only one that passes the SSTs
+	const u32 SH_T = 0x00000001;
+	const u32 SH_S = 0x00000002;
+	const u32 SH_Q = 0x00000100;
+	const u32 SH_M = 0x00000200;
 
-	const u32 old_rm = r[m];
-	r[n] <<= 1;
-	r[n] |= sr.b.T;
+	uint32_t old_q = sr.v & SH_Q;
+	if (0x80000000 & r[n])
+		sr.v |= SH_Q;
+	else
+		sr.v &= ~SH_Q;
 
-	const u32 old_rn = r[n];
+	r[n] = (r[n] << 1) | (sr.v & SH_T);
 
-	if (old_q == 0)
+	if (!old_q)
 	{
-		if (sr.b.M == 0)
+		if (!(sr.v & SH_M))
 		{
-			r[n] -= old_rm;
-			bool tmp1 = r[n] > old_rn;
-			sr.b.Q = sr.b.Q ^ tmp1;
+			uint32_t tmp = r[n];
+			r[n] -= r[m];
+			if (!(sr.v & SH_Q))
+				if (r[n] > tmp)
+					sr.v |= SH_Q;
+				else
+					sr.v &= ~SH_Q;
+			else
+				if (r[n] > tmp)
+					sr.v &= ~SH_Q;
+				else
+					sr.v |= SH_Q;
 		}
 		else
 		{
-			r[n] += old_rm;
-			bool tmp1 = r[n] < old_rn;
-			sr.b.Q = !sr.b.Q ^ tmp1;
+			uint32_t tmp = r[n];
+			r[n] += r[m];
+			if (!(sr.v & SH_Q))
+			{
+				if (r[n] < tmp)
+					sr.v &= ~SH_Q;
+				else
+					sr.v |= SH_Q;
+			}
+			else
+			{
+				if (r[n] < tmp)
+					sr.v |= SH_Q;
+				else
+					sr.v &= ~SH_Q;
+			}
 		}
 	}
 	else
 	{
-		if (sr.b.M == 0)
+		if (!(sr.v & SH_M))
 		{
-			r[n] += old_rm;
-			bool tmp1 = r[n] < old_rn;
-			sr.b.Q = sr.b.Q ^ tmp1;
+			uint32_t tmp = r[n];
+			r[n] += r[m];
+			if (!(sr.v & SH_Q))
+				if (r[n] < tmp)
+					sr.v |= SH_Q;
+				else
+					sr.v &= ~SH_Q;
+			else
+				if (r[n] < tmp)
+					sr.v &= ~SH_Q;
+				else
+					sr.v |= SH_Q;
 		}
 		else
 		{
-			r[n] -= old_rm;
-			bool tmp1 = r[n] > old_rn;
-			sr.b.Q = !sr.b.Q ^ tmp1;
+			uint32_t tmp = r[n];
+			r[n] -= r[m];
+			if (!(sr.v & SH_Q))
+				if (r[n] > tmp)
+					sr.v &= ~SH_Q;
+				else
+					sr.v |= SH_Q;
+			else
+				if (r[n] > tmp)
+					sr.v |= SH_Q;
+				else
+					sr.v &= ~SH_Q;
 		}
 	}
-	sr.b.T = (sr.b.Q == sr.b.M);
+
+	uint32_t tmp = (sr.v & (SH_Q | SH_M));
+	if (tmp == 0 || tmp == 0x300) /* if Q == M set T else clear T */
+		sr.v |= SH_T;
+	else
+		sr.v &= ~SH_T;
 }
 
 void sh4::init()

@@ -186,6 +186,7 @@ public:
 	const u32 SB_E1SUSP_ADDR=  0x5F783C;
 	const u32 SB_E2SUSP_ADDR = 0x5F785C;
 	const u32 SB_DDSUSP_ADDR = 0x5F787C;
+	const u32 SB_C2DST_ADDR = 0x5F6808;
 	
 	const u32 SB_GDST_ADDR = 0x5F7418;
 	
@@ -209,7 +210,8 @@ public:
 	
 	std::deque<u32> ta_q;
 	std::deque<ta_vertex> ta_vertq;
-	u32 ta_prim_type, ta_col_type;
+	u32 ta_prim_type, ta_col_type, ta_obj_ctrl, ta_tex_ctrl, ta_tsp_mode;
+	int ta_active_list;
 	bool ta_clear;
 	void ta_draw_tri();
 	void ta_vertex_in();
@@ -234,6 +236,50 @@ public:
 			intern.TCR1 |= TMR_IRQ_ACTIVE;
 			intern.TCR0 |= TMR_IRQ_ACTIVE;
 			std::println(stderr, "${:X}, ${:X}, ${:X}", intern.TCR0, intern.TCR1, intern.TCR2); 
+		}
+		if( k == SDL_SCANCODE_F1 ) 
+		{ 
+			holly.sb_istnrm |= 1;
+		}
+		if( k == SDL_SCANCODE_F2 ) 
+		{ 
+			holly.sb_istnrm |= 2;
+		}
+		if( k == SDL_SCANCODE_F3 ) 
+		{ 
+			holly.sb_istnrm |= 4;
+		}
+		if( k == SDL_SCANCODE_F4 ) 
+		{ 
+			holly.sb_istnrm |= 8;
+		}
+		if( k == SDL_SCANCODE_F5 ) 
+		{ 
+			holly.sb_istnrm |= 0x10;
+		}
+		if( k == SDL_SCANCODE_F6 ) 
+		{ 
+			holly.sb_istnrm |= 0x20;
+		}
+		if( k == SDL_SCANCODE_F7 ) 
+		{ 
+			holly.sb_istnrm |= 0x40;
+		}
+		if( k == SDL_SCANCODE_F8 ) 
+		{ 
+			holly.sb_istnrm |= 0x80;
+		}
+		if( k == SDL_SCANCODE_F9 ) 
+		{ 
+			holly.sb_istnrm |= 0x100;
+		}
+		if( k == SDL_SCANCODE_F10 ) 
+		{ 
+			holly.sb_istnrm |= 0x200;
+		}
+		if( k == SDL_SCANCODE_F11 ) 
+		{ 
+			holly.sb_istnrm |= 0x400;
 		}
 	}
 	
@@ -284,7 +330,8 @@ public:
 	const u32 HBLANK_IRQ_BIT = 0x20;
 	const u32 VBLANK_IN_IRQ_BIT = 0x8;
 	const u32 VBLANK_OUT_IRQ_BIT = 0x10;
-	const u32 OPAQUE_LIST_CMPL_IRQ_BIT = 0x80;
+	const u32 OPAQUE_LIST_CMPL_IRQ_BIT = BIT(7);
+	const u32 TRANSP_LIST_CMPL_IRQ_BIT = BIT(9);
 	const u32 MAPLE_DMA_CMPL_IRQ_BIT = BIT(12);
 };
 

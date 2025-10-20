@@ -80,8 +80,47 @@ void render_tri_shaded(rend_context* ctx, rvertex a, rvertex b, rvertex c)
 					rgb |= u16(R*31)<<11;
 					((u16*)ctx->fbuf)[Y*ctx->stride + X] = rgb;				
 				}break;
-				default: std::println("tri rendered with bpp={}", rendbpp); exit(1);
+				default: std::println("tri rendered with bpp={}", rendbpp); //exit(1);
 				}
+			}
+		}
+	}
+}
+
+void render_tri_tex(rend_context* ctx, rvertex a, rvertex b, rvertex c, u32 texid=0)
+{
+	float w = edge_func(a, b, c);
+	if( w < 0 )
+	{
+		std::swap(a,b);
+		w = -w;
+	}
+
+	int minX = std::max((float)ctx->clip_x1, min(a.p[0], b.p[0], c.p[0]));
+	int minY = std::max((float)ctx->clip_y1, min(a.p[1], b.p[1], c.p[1]));
+	int maxX = std::min((float)ctx->clip_x2, max(a.p[0], b.p[0], c.p[0]));
+	int maxY = std::min((float)ctx->clip_y2, max(a.p[1], b.p[1], c.p[1]));
+	
+	for(int Y = minY; Y < maxY; ++Y)
+	{
+		for(int X = minX; X < maxX; ++X)
+		{
+			rvertex P;
+			P.p[0] = X;
+			P.p[1] = Y;
+			const auto ABP = edge_func(a, b, P);
+			const auto BCP = edge_func(b, c, P);
+			const auto CAP = edge_func(c, a, P);
+			if( ABP >= 0 && BCP >= 0 && CAP >= 0 )
+			{
+				float wa = BCP/w;
+				float wb = CAP/w;
+				float wc = ABP/w;
+			
+				float U = a.t[0] * wa + b.t[0] * wb + c.t[0] * wc;
+				float V = a.t[1] * wa + b.t[1] * wb + c.t[1] * wc;
+				
+				((u16*)ctx->fbuf)[Y*ctx->stride + X] = 0x3e0;// ctx->texture_sample(texid, U, V);
 			}
 		}
 	}
@@ -102,13 +141,17 @@ void dreamcast::ta_draw_tri()
 	v1.c[0] = a.r;
 	v1.c[1] = a.g;
 	v1.c[2] = a.b;
-
+	v1.t[0] = a.u;
+	v1.t[1] = a.v;
+	
 	v2.p[0] = b.x;
 	v2.p[1] = b.y;
 	v2.p[2] = b.z;
 	v2.c[0] = b.r;
 	v2.c[1] = b.g;
 	v2.c[2] = b.b;
+	v2.t[0] = b.u;
+	v2.t[1] = b.v;
 
 	v3.p[0] = c.x;
 	v3.p[1] = c.y;
@@ -116,6 +159,8 @@ void dreamcast::ta_draw_tri()
 	v3.c[0] = c.r;
 	v3.c[1] = c.g;
 	v3.c[2] = c.b;
+	v3.t[0] = c.u;
+	v3.t[1] = c.v;
 	
 	rend_context ctx;
 	ctx.clip_x1 = ctx.clip_y1 = 0;
@@ -123,7 +168,12 @@ void dreamcast::ta_draw_tri()
 	ctx.clip_y2 = 480;
 	ctx.stride = 640;
 	ctx.fbuf = &vram[holly.fb_w_sof1&0x7fffff];
-	std::println("Rendered TRI! {},{}, {},{}, {},{}", v1.p[0], v1.p[1], v2.p[0], v2.p[1], v3.p[0], v3.p[1]);
+	//std::println("Rendered TRI! {},{}, {},{}, {},{}", v1.p[0], v1.p[1], v2.p[0], v2.p[1], v3.p[0], v3.p[1]);
+	//if( ta_obj_ctrl & BIT(3) )
+	//{
+	//	std::println("\t with UV ({}, {}) ({}, {}) ({}, {})", v1.t[0], v1.t[1], v2.t[0], v2.t[1], v3.t[0], v3.t[1]);
+	//	std::println("\t tex ctrl = ${:X}, twiddled = {:X}", ta_tex_ctrl, ta_tex_ctrl&BIT(26));
+	//}
 	rendbpp = (holly.fb_r_ctrl>>2)&3;
 	if( ta_clear )
 	{
@@ -131,9 +181,33 @@ void dreamcast::ta_draw_tri()
 		u32 mult = 2;
 		if( rendbpp == 2 ) mult = 3;
 		if( rendbpp == 3 ) mult = 4;
-		memset(vram+(holly.fb_w_sof1&0x7ffff0), 0, 640*480*mult);
+		memset(vram+(holly.fb_w_sof1&0x7ffffc), 0, 640*480*mult);
+		std::println("clearing vram wsof=${:X}, rsof=${:X}", holly.fb_w_sof1, holly.fb_r_sof1);
+		std::println("nml2 = ${:X}, nml4=${:X}, nml6=${:X}", holly.sb_iml2nrm, holly.sb_iml4nrm, holly.sb_iml6nrm);
 	}
-	render_tri_shaded(&ctx, v1,v2,v3 );	
+	if( ta_obj_ctrl & BIT(3) )
+	{
+		static const u32 uvsize[] = { 8, 16, 32, 64, 128, 256, 512, 1024 };
+		auto texsamp = [&](u32, float u, float v)->u32 {
+			u32 addr = ta_tex_ctrl&0xfffff;
+			addr <<= 3;
+			u32 W = uvsize[(ta_tsp_mode>>3)&7];
+			u32 H = uvsize[ta_tsp_mode&7];
+			u *= W;
+			v *= H;
+			u = std::clamp(u, 0.f, (float)W);
+			v = std::clamp(v, 0.f, (float)H);
+			u16 p = *(u16*)&vram[addr + int(v*W*2) + int(u*2)];
+			u8 r = p&15;
+			u8 g = (p>>4)&15;
+			u8 bl = (p>>8)&15;
+			return (r<<11)|(g<<6)|bl;
+		};
+		ctx.texture_sample = texsamp;
+		render_tri_tex(&ctx, v1,v2,v3);
+	} else {
+		render_tri_shaded(&ctx, v1,v2,v3 );
+	}	
 }
 
 void dreamcast::ta_vertex_in()
@@ -144,7 +218,12 @@ void dreamcast::ta_vertex_in()
 	v.x = std::bit_cast<float>(ta_q[1]);
 	v.y = std::bit_cast<float>(ta_q[2]);
 	v.z = std::bit_cast<float>(ta_q[3]);
-	std::println("vertex in {},{}", v.x, v.y);
+	//std::println("vertex in {},{}", v.x, v.y);
+	if( ta_obj_ctrl & BIT(3) )
+	{ //todo: 16bit packed
+		v.u = std::bit_cast<float>(ta_q[4]);
+		v.v = std::bit_cast<float>(ta_q[5]);
+	}
 	if( ta_col_type == 1 )
 	{
 		v.r = std::bit_cast<float>(ta_q[5]);
@@ -171,29 +250,47 @@ void dreamcast::ta_vertex_in()
 
 void dreamcast::ta_run()
 {
-	std::println("TA: got cmd = ${:X}", ta_q.front());
+	//std::println("TA: got cmd = ${:X}", ta_q.front());
 	u32 paractrl = ta_q[0];
 	u32 ptype = paractrl>>29;
 	if( ptype == 4 )
 	{
+		std::println("PRIM List ${:X}", paractrl);
 		ta_prim_type = ptype;
 		ta_col_type = (paractrl>>4)&3;
+		ta_obj_ctrl = paractrl&0xffff;
+		ta_tex_ctrl = ta_q[3];
+		ta_tsp_mode = ta_q[2];
+		ta_active_list = (paractrl>>24)&7;
 	} else if( ptype == 5 ) {
 		ta_prim_type = ptype;
 		ta_col_type = (paractrl>>4)&3;
+		ta_obj_ctrl = paractrl&0xffff;
+		ta_tex_ctrl = ta_q[3];
+		ta_tsp_mode = ta_q[2];
 	} else if( ptype == 7 ) {
 		ta_vertex_in();
 		if( paractrl & BIT(28) ) ta_vertq.clear();
 	} else if( ptype == 0 ) {
-		//todo: list types other than opaque
-		u32 endlisttype = ((paractrl>>24)&7);
+		//todo: list types other than opaque and transparent
+		u32 endlisttype = ta_active_list;
+		if( ta_active_list == -1 )
+		{
+			std::println("Ended list with no active list");
+			return;
+		}
+		std::println("End list {}", endlisttype);
 		if( endlisttype == 0 )
 		{
 			holly.sb_istnrm |= OPAQUE_LIST_CMPL_IRQ_BIT;
+		} else if( endlisttype == 2 ) {
+			holly.sb_istnrm |= TRANSP_LIST_CMPL_IRQ_BIT;
+		} else {
+			std::println("Unsupported list completion {}", endlisttype);
+			exit(1);
 		}
 	}
 	
-
 	ta_q.erase(ta_q.begin(), ta_q.begin()+8);
 }
 
@@ -208,4 +305,9 @@ void dreamcast::ta_input(u32 v)
 		ta_run();
 	}
 }
+
+
+
+
+
 

@@ -38,7 +38,11 @@ void dreamcast::cpureg_write(u32 addr, u64 v, u32 sz)
 
 u64 dreamcast::cpureg_read(u32 addr, u32 sz)
 {
-	if( debug_on ) { if( addr != 0xFF000028 && addr != 0xFF000024 ) std::println("cpureg{} <${:X}", sz, addr); }
+	if( addr >= 0xFFD80000u && addr < 0xFFD80030u )
+	{
+		return timer_read(addr, sz);
+	}
+	if( debug_on ) { if( addr != 0xFF000028 && addr != 0xFF000024 && addr != 0xFF000020 ) std::println("cpureg{} <${:X}", sz, addr); }
 	switch( addr )
 	{
 	case 0xFF000010: return 0; // MMUCR
@@ -104,12 +108,9 @@ u64 dreamcast::cpureg_read(u32 addr, u32 sz)
 	
 	default: break;
 	}
-	if( addr >= 0xFFD80000u && addr < 0xFFD80030u )
-	{
-		return timer_read(addr, sz);
-	}
-	std::println("cpureg{} <${:X}", sz, addr);
-	exit(1);
+
+	std::println("unimpl cpureg{} <${:X}", sz, addr);
+	//exit(1);
 	return 0;
 }
 
