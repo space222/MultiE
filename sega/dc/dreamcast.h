@@ -9,7 +9,13 @@ class dreamcast : public console
 {
 public:
 	dreamcast() : sched(this) {}
-	~dreamcast() { std::println("Ended @PC = ${:X}", cpu.pc); }
+	~dreamcast() 
+	{ 
+		std::println("Ended @PC = ${:X}", cpu.pc); 
+		FILE* fp = fopen("vram.data", "wb");
+		fwrite(vram, 1, 8*1024*1024, fp);
+		fclose(fp);
+	}
 	
 	u32 fb_bpp() override;
 	u8* framebuffer() override { return (u8*)&fbuf[0]; }

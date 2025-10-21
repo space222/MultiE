@@ -347,12 +347,21 @@ Status: panda.dol works. no idea whether cpu instructions or irqs or etc is wron
 
 Sega Dreamcast Todo List
 ---------------------------
-1. most kos demos run, start working through bios
-2. bios will use the cd, gonna try LLE that.
-3. probably ask on discord about interrupt priorities and video timing
-4. implement TA proper
-5. sound?
-6. Games running by this point?
+1. Implement SH4 matrix multiply instruction
+2. algorithm for rectangular texture twiddling coordinates
+3. have texture sampling return 32bit color via struct or tuple
+4. try coding up a demo to use sound from the cpu
+5. try coding up a demo to use sound from the arm7
+6. Pvr dmas?
+7. Find menu program to have multiple demos on one cd
+8. code cd tests
+9. implement lle disc access
+10. get back to working through bios
+11. implement proper TA
+12. implement ISP/Core
+Notes:
+Still should ask on discord about proper interrupt priorities and video timing
+
 
 
 

@@ -245,9 +245,8 @@ u64 dreamcast::read(u32 a, u32 sz)
 
 	if( a >= 0x4000000 && a < 0x4800000 ) 
 	{
-		a &= 0x7fffff;
-		a = (((a&0x3fffff)>>1)&~3)|((a&BIT(2))?0x400000:0)|(a&3);
-		return sized_read(vram, a&0x7fffff, sz);
+		a = ((a&0xFFFFF8)>>1)|((a&4)<<20)|(a&3);
+        	return sized_read(vram, a&0x7fffff, sz);
 	}
 	if( a >= 0x5000000 && a < 0x5800000 ) return sized_read(vram, a&0x7fffff, sz);
 	
@@ -278,9 +277,9 @@ void dreamcast::write(u32 a, u64 v, u32 sz)
 
 	if( a >= 0x4000000 && a < 0x4800000 ) 
 	{
-		a &= 0x7fffff;
-		a = (((a&0x3fffff)>>1)&~3)|((a&BIT(2))?0x400000:0)|(a&3);
-		sized_write(vram, a&0x7fffff, v, sz);
+		std::println("${:X}: VRAM write{} ${:X} = ${:X}", cpu.pc, sz, a, v);
+		a = ((a&0xFFFFF8)>>1)|((a&4)<<20)|(a&3);
+        	sized_write(vram, a&0x7fffff, v, sz);
 		return;
 	}
 	
@@ -295,8 +294,20 @@ void dreamcast::write(u32 a, u64 v, u32 sz)
 	if( a >= 0x10000000 && a <= 0x13FFFFFF )
 	{
 		if( sz < 32 ) { std::println("TA write under 32bits ignored"); return; }
-		ta_input(v);
-		if( sz == 64 ) ta_input(v>>32);
+		if( (a & 0x1FFFfff) < 0x800000 )
+		{
+			ta_input(v);
+			if( sz == 64 ) ta_input(v>>32);
+			return;
+		}
+		if( (a & 0x1FFFfff) >= 0x1000000 )
+		{
+			std::println("TA write ${:X} = ${:X}", a, v);
+			write((a&0xffFFff)|0x4000000, v, sz);
+			return;
+		}
+		std::println("TA write ${:X} = ${:X}", a, v);
+		exit(1);
 		return;
 	}
 
@@ -634,7 +645,6 @@ void dreamcast::render_opaque(u32 objlist)
 void dreamcast::start_render()
 {
 	std::println("start render");
-	//exit(1);
 	holly.sb_istnrm |= 7;
 	return;
 	

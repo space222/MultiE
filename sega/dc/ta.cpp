@@ -1,11 +1,34 @@
 #include <print>
 #include "dreamcast.h"
 
+#define V0 (V&1)
+#define V1 ((V&2)?1:0)
+#define V2 ((V&4)?1:0)
+#define V3 ((V&8)?1:0)
+#define V4 ((V&16)?1:0)
+#define V5 ((V&32)?1:0)
+#define V6 ((V&64)?1:0)
+#define V7 ((V&128)?1:0)
+#define V8 ((V&256)?1:0)
+#define V9 ((V&512)?1:0)
+#define V10 ((V&1024)?1:0)
+#define U0 (U&1)
+#define U1 ((U&2)?1:0)
+#define U2 ((U&4)?1:0)
+#define U3 ((U&8)?1:0)
+#define U4 ((U&16)?1:0)
+#define U5 ((U&32)?1:0)
+#define U6 ((U&64)?1:0)
+#define U7 ((U&128)?1:0)
+#define U8 ((U&256)?1:0)
+#define U9 ((U&512)?1:0)
+#define U10 ((U&1024)?1:0)
+
 struct rend_context
 {
 	u8* fbuf;
 	int stride; // in pixels
-	std::function<u32(u32 id, float u, float v)> texture_sample = [](u32, float, float)->u32{ return 0; };
+	std::function<u32(u32 id, float u, float v)> texture_sample;// = [](u32, float, float)->u32{ return 0; };
 	int clip_x1, clip_y1, clip_x2, clip_y2;
 };
 
@@ -120,7 +143,7 @@ void render_tri_tex(rend_context* ctx, rvertex a, rvertex b, rvertex c, u32 texi
 				float U = a.t[0] * wa + b.t[0] * wb + c.t[0] * wc;
 				float V = a.t[1] * wa + b.t[1] * wb + c.t[1] * wc;
 				
-				((u16*)ctx->fbuf)[Y*ctx->stride + X] = 0x3e0;// ctx->texture_sample(texid, U, V);
+				((u16*)ctx->fbuf)[Y*ctx->stride + X] = ctx->texture_sample(texid, U, V);
 			}
 		}
 	}
@@ -189,25 +212,39 @@ void dreamcast::ta_draw_tri()
 	{
 		static const u32 uvsize[] = { 8, 16, 32, 64, 128, 256, 512, 1024 };
 		auto texsamp = [&](u32, float u, float v)->u32 {
-			u32 addr = ta_tex_ctrl&0xfffff;
+			u32 addr = ta_tex_ctrl&0x1fffff;
 			addr <<= 3;
 			u32 W = uvsize[(ta_tsp_mode>>3)&7];
 			u32 H = uvsize[ta_tsp_mode&7];
-			u *= W;
-			v *= H;
-			u = std::clamp(u, 0.f, (float)W);
-			v = std::clamp(v, 0.f, (float)H);
-			u16 p = *(u16*)&vram[addr + int(v*W*2) + int(u*2)];
+			u32 U = std::clamp(u*W, 0.f, (float)W);
+			u32 V = std::clamp(v*H, 0.f, (float)H);
+			
+			if( ta_tex_ctrl & BIT(26) )
+			{
+				addr += V*W*2 + U*2;
+			} else {
+				if( W == H )
+				{
+					u32 r = V0|(U0<<1)|(V1<<2)|(U1<<3)|(V2<<4)|(U2<<5)|(V3<<6)|(U3<<7)|(V4<<8)|(U4<<9)|
+						(V5<<10)|(U5<<11)|(V6<<12)|(U6<<13)|(V7<<14)|(U7<<15)|(V8<<16)|(U8<<17);
+					addr += r*2;
+				}
+			}
+
+			u16 p = *(u16*)&vram[((addr&0xFFFFF8)>>1)|((addr&4)<<20)|(addr&3)];
 			u8 r = p&15;
 			u8 g = (p>>4)&15;
 			u8 bl = (p>>8)&15;
 			return (r<<11)|(g<<6)|bl;
 		};
 		ctx.texture_sample = texsamp;
+		//u32 addr = ta_tex_ctrl&0x1fffff;
+		//addr <<= 3;
+		//std::println("Texture address = ${:X}", addr); // calogo 3B6740  // bluelight 39C780
 		render_tri_tex(&ctx, v1,v2,v3);
 	} else {
 		render_tri_shaded(&ctx, v1,v2,v3 );
-	}	
+	}
 }
 
 void dreamcast::ta_vertex_in()
