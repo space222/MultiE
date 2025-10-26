@@ -30,6 +30,7 @@ cpu/gekko.cpp nintendo/gc/GameCube.cpp nintendo/gc/gc_exi.cpp nintendo/gc/gc_dsp
 nintendo/gba_io.cpp nintendo/gba_lcd.cpp nintendo/gba_dma.cpp nintendo/LCDEngine.cpp
 nintendo/gba_timer.cpp nintendo/gba_sound.cpp nintendo/gba_gpio.cpp cpu/z80_new.cpp cpu/sh4.cpp util.cpp
 sega/dc/dreamcast.cpp sega/dc/cpuregs.cpp sega/dc/timer.cpp sega/dc/maple.cpp sega/dc/disc.cpp sega/dc/ta.cpp
+sega/dc/sound.cpp cpu/arm7di.cpp
 #stub/gdb_stub.cpp
 )
 

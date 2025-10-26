@@ -238,7 +238,7 @@ u64 dreamcast::read(u32 a, u32 sz)
 	if( a >= 0x5F6000 && a < 0x5FA000 ) { return io_read(a, sz); }
 	if( a == 0x600004 ) { return 0xff; /* modem stuff? */ }
 		
-	if( a >= 0x700000 && a < 0x800000 ) { return 0; /* snd ctrl todo */ }
+	if( a >= 0x700000 && a < 0x800000 ) { return snd_read(a, sz); }
 	
 	if( a >= 0x800000 && a < 0xa00000 ) return sized_read(sndram, a&0x1fffff, sz);	
 	if( a >= 0xc000000 && a < 0x10000000 ) return sized_read(RAM, a&0xffFFff, sz);
@@ -311,7 +311,7 @@ void dreamcast::write(u32 a, u64 v, u32 sz)
 		return;
 	}
 
-	if( a >= 0x700000 && a < 0x800000 ) { return; /* snd ctrl todo */ }
+	if( a >= 0x700000 && a < 0x800000 ) { snd_write(a, v, sz); return; }
 	
 	std::println("DC: Unimpl write{} ${:X} = ${:X}", sz, a, v);
 	exit(1);

@@ -339,6 +339,10 @@ public:
 	const u32 OPAQUE_LIST_CMPL_IRQ_BIT = BIT(7);
 	const u32 TRANSP_LIST_CMPL_IRQ_BIT = BIT(9);
 	const u32 MAPLE_DMA_CMPL_IRQ_BIT = BIT(12);
+	
+	void snd_write(u32, u64, u32);
+	u32 snd_read(u32, u32);
+	
 };
 
 
