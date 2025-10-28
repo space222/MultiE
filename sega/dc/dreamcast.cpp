@@ -251,7 +251,9 @@ u64 dreamcast::read(u32 a, u32 sz)
 	if( a >= 0x5000000 && a < 0x5800000 ) return sized_read(vram, a&0x7fffff, sz);
 	
 	if( a >= 0x1E000000 && a < 0x1E001fff ) return (intern.CCR&CCR_ORA_BIT) ? sized_read(opcache,a&0x1fff,sz):0;
-	std::println("DC: Unimpl read{} <${:X}", sz, a);
+	
+	if( a == 0xBF0030 ) { std::println("${:X}: read from BF0030", cpu.pc); return 0; }
+	std::println("${:X}: Unimpl read{} <${:X}", cpu.pc, sz, a);
 	exit(1);
 }
 
@@ -313,8 +315,8 @@ void dreamcast::write(u32 a, u64 v, u32 sz)
 
 	if( a >= 0x700000 && a < 0x800000 ) { snd_write(a, v, sz); return; }
 	
-	std::println("DC: Unimpl write{} ${:X} = ${:X}", sz, a, v);
-	exit(1);
+	std::println("${:X}: Unimpl write{} ${:X} = ${:X}", cpu.pc, sz, a, v);
+	//exit(1);
 }
 
 u32 dreamcast::fb_width()
@@ -487,6 +489,9 @@ bool dreamcast::loadROM(std::string fname)
 	cpu.fetch = [&](u32 a)->u16 { return read(a,16); };
 	cpu.pref = [&](u32 a) { write_storeQ(a); };
 	cpu.init();
+	
+	aica_cpu.read = [&](u32 a, int sz, ARM_CYCLE) -> u32 { return aica_read(a,sz); };
+	aica_cpu.write= [&](u32 a, u32 v, int sz, ARM_CYCLE) { aica_write(a,v,sz); };
 
 	if( !freadall(bios, fopen("./bios/dc_boot.bin", "rb"), 2_MB) )
 	{
@@ -584,9 +589,50 @@ bool dreamcast::loadROM(std::string fname)
 		std::println("Unable to open './bios/dc_IP.BIN'");
 		return false;	
 	}
-		
-	if( !freadall(RAM+0x10000, fopen(fname.c_str(), "rb")) )
+	
+	if( fname.ends_with("elf") || fname.ends_with("ELF") )
 	{
+		std::vector<u8> fdata;
+		if( !freadall(fdata, fopen(fname.c_str(), "rb")) )
+		{
+			std::println("Unable to open dreamcast program '{}'", fname);
+			return false;
+		}
+		if( fdata[0] != 0x7f || fdata[1] != 'E' || fdata[2] != 'L' || fdata[3] != 'F' )
+		{
+			std::println("File has ELF extension but not a proper header");
+			memcpy(RAM+0x10000, fdata.data(), fdata.size());
+			return true;
+		}
+		if( *(u32*)&fdata[0x18] != 0x8c010000u )
+		{
+			std::println("Entry point of ${:X} not supported", *(u32*)&fdata[0x18]);
+			exit(1);
+		}
+		u32 entries = *(u16*)&fdata[0x2C];
+		u32 entsize = *(u16*)&fdata[0x2A];
+		u32 phoff = *(u32*)&fdata[0x1C];
+		
+		u32 ptr = phoff;
+		for(u32 i = 0; i < entries; ++i, ptr+=entsize)
+		{
+			u32 type = *(u32*)&fdata[ptr];
+			if( type == 0 ) continue; // type == PT_NULL/unused
+			u32 p_offset = *(u32*)&fdata[ptr+4];
+			u32 p_vaddr = *(u32*)&fdata[ptr+8];
+			u32 p_paddr = *(u32*)&fdata[ptr+0xc];
+			u32 p_filesz = *(u32*)&fdata[ptr+0x10];
+			u32 p_memsz = *(u32*)&fdata[ptr+0x14];
+			//u32 p_flags = *(u32*)&fdata[ptr+0x18];
+			//u32 p_align = *(u32*)&fdata[ptr+0x1c]; //todo
+			std::println("Proghead offs${:X}, v${:X}, p${:X}, fsz${:X}, msz${:X}", 
+				p_offset, p_vaddr, p_paddr, p_filesz, p_memsz);
+				
+			memset(RAM+(p_vaddr&0xffFFff), 0, p_memsz);
+			memcpy(RAM+(p_vaddr&0xffFFff), fdata.data()+p_offset, p_filesz);
+		}
+		
+	} else if( !freadall(RAM+0x10000, fopen(fname.c_str(), "rb")) ) {
 		std::println("Unable to open dreamcast program '{}'", fname);
 		return false;
 	}

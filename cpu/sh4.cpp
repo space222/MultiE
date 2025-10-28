@@ -20,8 +20,10 @@ struct sh4_instr { u16 mask,res; std::function<void(sh4&,u16)> func; std::string
 #define FRm cpu.fpu.f[(((opc>>4)&15)^1)+(cpu.fpctrl.b.FR<<4)]
 #define DRn cpu.fpu.d[((opc>>9)&7)+(cpu.fpctrl.b.FR<<3)]
 #define DRm cpu.fpu.d[((opc>>5)&7)+(cpu.fpctrl.b.FR<<3)]
-#define XRn cpu.fpu.d[((opc>>9)&7)+(cpu.fpctrl.b.FR<<3)^8]
-#define XRm cpu.fpu.d[((opc>>5)&7)+(cpu.fpctrl.b.FR<<3)^8]
+#define XRn cpu.fpu.d[((opc>>9)&7)+((cpu.fpctrl.b.FR<<3)^8)]
+#define XRm cpu.fpu.d[((opc>>5)&7)+((cpu.fpctrl.b.FR<<3)^8)]
+#define FXR(a) fpu.f[((a)^1)+((fpctrl.b.FR<<4)^0x10)]
+#define FRR(a) fpu.f[((a)^1)+(fpctrl.b.FR<<4)]
 
 sh4_instr sh4_opcodes[] = {
 	// integer movs
@@ -473,9 +475,22 @@ void sh4::fipr(u32 a, u32 b)
 
 void sh4::ftrv(u32 n)
 {
-	std::println("FTRV unimpl");
-	exit(1);
+	n += fpctrl.b.FR<<4;
 	float v[4] = { fpu.f[n+1], fpu.f[n+0], fpu.f[n+3], fpu.f[n+2] };
+	double res[4] = {0,0,0,0};
+	
+	for(u32 i = 0; i < 4; ++i)
+	{
+		for(u32 j = 0; j < 4; ++j)
+		{
+			res[i] += double(FXR(j*4+i)) * double(v[j]);
+		}
+	}
+	
+	fpu.f[n+1] = res[0];
+	fpu.f[n+0] = res[1];
+	fpu.f[n+3] = res[2];
+	fpu.f[n+2] = res[3];
 }
 
 void sh4::div1(u32 m, u32 n)

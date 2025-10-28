@@ -27,6 +27,7 @@
 struct rend_context
 {
 	u8* fbuf;
+	float* depth;
 	int stride; // in pixels
 	std::function<u32(u32 id, float u, float v)> texture_sample;// = [](u32, float, float)->u32{ return 0; };
 	int clip_x1, clip_y1, clip_x2, clip_y2;
@@ -88,6 +89,11 @@ void render_tri_shaded(rend_context* ctx, rvertex a, rvertex b, rvertex c)
 				float R = a.c[0] * wa + b.c[0] * wb + c.c[0] * wc;
 				float G = a.c[1] * wa + b.c[1] * wb + c.c[1] * wc;
 				float B = a.c[2] * wa + b.c[2] * wb + c.c[2] * wc;
+				
+				float Z = a.p[2] * wa + b.p[2] * wb + c.p[2] * wc;
+				if( Z < ctx->depth[Y*ctx->stride + X] ) continue;
+				ctx->depth[Y*ctx->stride + X] = Z;
+				
 				switch( rendbpp )
 				{
 				case 3:{
@@ -139,7 +145,11 @@ void render_tri_tex(rend_context* ctx, rvertex a, rvertex b, rvertex c, u32 texi
 				float wa = BCP/w;
 				float wb = CAP/w;
 				float wc = ABP/w;
-			
+				
+				float Z = a.p[2] * wa + b.p[2] * wb + c.p[2] * wc;
+				if( Z < ctx->depth[Y*ctx->stride + X] ) continue;
+				ctx->depth[Y*ctx->stride + X] = Z;
+				
 				float U = a.t[0] * wa + b.t[0] * wb + c.t[0] * wc;
 				float V = a.t[1] * wa + b.t[1] * wb + c.t[1] * wc;
 				
@@ -191,6 +201,7 @@ void dreamcast::ta_draw_tri()
 	ctx.clip_y2 = 480;
 	ctx.stride = 640;
 	ctx.fbuf = &vram[holly.fb_w_sof1&0x7fffff];
+	ctx.depth = depth;
 	//std::println("Rendered TRI! {},{}, {},{}, {},{}", v1.p[0], v1.p[1], v2.p[0], v2.p[1], v3.p[0], v3.p[1]);
 	//if( ta_obj_ctrl & BIT(3) )
 	//{
@@ -205,6 +216,7 @@ void dreamcast::ta_draw_tri()
 		if( rendbpp == 2 ) mult = 3;
 		if( rendbpp == 3 ) mult = 4;
 		memset(vram+(holly.fb_w_sof1&0x7ffffc), 0, 640*480*mult);
+		for(u32 i = 0; i < 640*480; ++i) depth[i] = std::bit_cast<float>(isp.backgnd_d);
 		std::println("clearing vram wsof=${:X}, rsof=${:X}", holly.fb_w_sof1, holly.fb_r_sof1);
 		std::println("nml2 = ${:X}, nml4=${:X}, nml6=${:X}", holly.sb_iml2nrm, holly.sb_iml4nrm, holly.sb_iml6nrm);
 	}
@@ -236,7 +248,7 @@ void dreamcast::ta_draw_tri()
 			u8 r = p&15;
 			u8 g = (p>>4)&15;
 			u8 bl = (p>>8)&15;
-			return (r<<11)|(g<<6)|bl;
+			return p;//(r<<11)|(g<<6)|bl;
 		};
 		ctx.texture_sample = texsamp;
 		//u32 addr = ta_tex_ctrl&0x1fffff;
@@ -323,6 +335,8 @@ void dreamcast::ta_run()
 			holly.sb_istnrm |= OPAQUE_LIST_CMPL_IRQ_BIT;
 		} else if( endlisttype == 2 ) {
 			holly.sb_istnrm |= TRANSP_LIST_CMPL_IRQ_BIT;
+		} else if( endlisttype == 4 ) {
+			holly.sb_istnrm |= BIT(21); // end list punch thru		
 		} else {
 			std::println("Unsupported list completion {}", endlisttype);
 			exit(1);

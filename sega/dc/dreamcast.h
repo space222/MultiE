@@ -3,6 +3,7 @@
 #include "console.h"
 #include "sh4.h"
 #include "util.h"
+#include "arm7di.h"
 #include "Scheduler.h"
 
 class dreamcast : public console
@@ -93,6 +94,7 @@ public:
 	} gd;
 
 	u32 fbuf[640*480];
+	float depth[640*480];
 	
 	Scheduler sched;
 	void event(u64, u32) override;
@@ -343,6 +345,9 @@ public:
 	void snd_write(u32, u64, u32);
 	u32 snd_read(u32, u32);
 	
+	arm7di aica_cpu;
+	void aica_write(u32, u32, int);
+	u32 aica_read(u32, int);
 };
 
 
