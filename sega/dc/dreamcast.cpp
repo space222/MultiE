@@ -166,7 +166,7 @@ void dreamcast::io_write(u32 a, u64 v, u32 sz)
 	if( a == HALF_OFFSET_ADDR ) { holly.half_offset = v&7; return; }
 	if( a == FPU_PERP_VAL_ADDR ) { holly.fpu_perp = v; return; }
 	if( a == Y_COEFF_ADDR ) { holly.y_coeff = v&0xffff; return; }
-	if( a == ISP_BACKGND_D_ADDR ) { isp.backgnd_d = v; return; }
+	if( a == ISP_BACKGND_D_ADDR ) { v &= ~15; isp.backgnd_d = v; std::println("isp_backgnd_d = {}", std::bit_cast<float>(u32(v))); return; }
 	if( a == ISP_BACKGND_T_ADDR ) { isp.backgnd_t = v; return; }
 	if( a == FOG_CLAMP_MAX_ADDR ) { holly.fog_clamp_max = v; return; }
 	if( a == FOG_CLAMP_MIN_ADDR ) { holly.fog_clamp_min = v; return; }
@@ -279,7 +279,7 @@ void dreamcast::write(u32 a, u64 v, u32 sz)
 
 	if( a >= 0x4000000 && a < 0x4800000 ) 
 	{
-		std::println("${:X}: VRAM write{} ${:X} = ${:X}", cpu.pc, sz, a, v);
+		//std::println("${:X}: VRAM write{} ${:X} = ${:X}", cpu.pc, sz, a, v);
 		a = ((a&0xFFFFF8)>>1)|((a&4)<<20)|(a&3);
         	sized_write(vram, a&0x7fffff, v, sz);
 		return;
@@ -304,7 +304,8 @@ void dreamcast::write(u32 a, u64 v, u32 sz)
 		}
 		if( (a & 0x1FFFfff) >= 0x1000000 )
 		{
-			std::println("TA write ${:X} = ${:X}", a, v);
+			if( a & 0x2000000 ) { std::println("TA write ${:X} = ${:X}", a, v); }
+			if( (holly.sb_lmmode0&1) || (holly.sb_lmmode1&1) ) { std::println("LMMODE = 1"); exit(1); }
 			write((a&0xffFFff)|0x4000000, v, sz);
 			return;
 		}
@@ -420,6 +421,7 @@ void dreamcast::run_frame()
 		//if( debug_on && cpu.pc > 0x8c010000u ) std::println("pc = ${:X}", cpu.pc);
 		check_irqs();
 		if( !cpu.sleeping ) cpu.step();
+		if( (stamp&3)==0 && (aica.armrst&1) == 0 ) { /*std::println("AICA PC = ${:X}", aica.cpu.r[15]-4);*/ aica.cpu.step(); }
 		if( (cpu.pc>>8) == 0xcafeba )
 		{
 			u32 bcall = cpu.pc;
@@ -490,9 +492,11 @@ bool dreamcast::loadROM(std::string fname)
 	cpu.pref = [&](u32 a) { write_storeQ(a); };
 	cpu.init();
 	
-	aica_cpu.read = [&](u32 a, int sz, ARM_CYCLE) -> u32 { return aica_read(a,sz); };
-	aica_cpu.write= [&](u32 a, u32 v, int sz, ARM_CYCLE) { aica_write(a,v,sz); };
-
+	aica.cpu.read = [&](u32 a, int sz, ARM_CYCLE) -> u32 { return aica_read(a,sz); };
+	aica.cpu.write= [&](u32 a, u32 v, int sz, ARM_CYCLE) { aica_write(a,v,sz); };
+	aica.cpu.reset();
+	aica.armrst = 1;
+	
 	if( !freadall(bios, fopen("./bios/dc_boot.bin", "rb"), 2_MB) )
 	{
 		std::println("Unable to open './bios/dc_boot.bin'");
@@ -690,7 +694,7 @@ void dreamcast::render_opaque(u32 objlist)
 
 void dreamcast::start_render()
 {
-	std::println("start render");
+	//std::println("start render");
 	holly.sb_istnrm |= 7;
 	return;
 	

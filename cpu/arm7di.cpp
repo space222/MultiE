@@ -16,11 +16,9 @@
 static auto undef_instr = [](arm& cpu, u32 opc) { std::println("${:X}: unimpl opc ${:X}", cpu.r[15]-(cpu.cpsr.b.T?4:8), opc); exit(1); };
 
 void arm7_mul(arm& cpu, u32 opc);
-void arm7_mul_long(arm& cpu, u32 opc);
 void arm7_single_swap(arm& cpu, u32 opc);
 void arm7_xfer_half(arm& cpu, u32 opc);
 void arm7_xfer_signed(arm& cpu, u32 opc);
-void arm7_bx(arm& cpu, u32 opc);
 void arm7_mrs(arm& cpu, u32 opc);
 void arm7_msr_reg(arm& cpu, u32 opc);
 void arm7_msr_imm(arm& cpu, u32 opc);
@@ -49,19 +47,16 @@ void arm7_ldst_m(arm& cpu, u32 opc);
 arm7_instr arm7di::decode_arm(u32 cc)
 {
 	if( (cc&0xfcf) == 9 ) { return arm7_mul; }
-	if( (cc&0xf8f) == 0x89 ) { return arm7_mul_long; }
 	if( (cc&0xfbf) == 0x109) { return arm7_single_swap; }
 
-	if( (cc&0xe0f) == 0xB ) { return arm7_xfer_half; }
-	if( (cc&0xe1d) == 0x1D ){ return arm7_xfer_signed; }
+	//if( (cc&0xe0f) == 0xB ) { return arm7_xfer_half; }
+	//if( (cc&0xe1d) == 0x1D ){ return arm7_xfer_signed; }
 	
 	if( (cc&0xfbf) == 0x100 ) { return arm7_mrs; }
 	if( (cc&0xfbf) == 0x120 ) { return arm7_msr_reg; }
 	if( (cc&0xfb0) == 0x320 ) { return arm7_msr_imm; }
 
-	if( (cc&0xfff) == 0x121 ) { return arm7_bx; }
-
-	if( (cc&0xfb0) == 0x300 ) { return undef_instr; } // the undef in the middle of dataproc
+	if( (cc&0xfb0) == 0x300 ) { return undef_instr; }
 	if( (cc&0xe00) == 0x000 || (cc&0xe00) == 0x200 )
 	{  // data proccessing
 		switch( (cc>>5) & 15 )

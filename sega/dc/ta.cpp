@@ -24,12 +24,17 @@
 #define U9 ((U&512)?1:0)
 #define U10 ((U&1024)?1:0)
 
+struct color4
+{
+	u8 r,g,b,a;
+};
+
 struct rend_context
 {
 	u8* fbuf;
 	float* depth;
 	int stride; // in pixels
-	std::function<u32(u32 id, float u, float v)> texture_sample;// = [](u32, float, float)->u32{ return 0; };
+	std::function<color4(u32 id, float u, float v)> texture_sample;// = [](u32, float, float)->u32{ return 0; };
 	int clip_x1, clip_y1, clip_x2, clip_y2;
 };
 
@@ -69,6 +74,10 @@ void render_tri_shaded(rend_context* ctx, rvertex a, rvertex b, rvertex c)
 	int minY = std::max((float)ctx->clip_y1, min(a.p[1], b.p[1], c.p[1]));
 	int maxX = std::min((float)ctx->clip_x2, max(a.p[0], b.p[0], c.p[0]));
 	int maxY = std::min((float)ctx->clip_y2, max(a.p[1], b.p[1], c.p[1]));
+
+	//a.p[2] = 1 / a.p[2];
+	//b.p[2] = 1 / b.p[2];
+	//c.p[2] = 1 / c.p[2];
 	
 	for(int Y = minY; Y < maxY; ++Y)
 	{
@@ -130,6 +139,16 @@ void render_tri_tex(rend_context* ctx, rvertex a, rvertex b, rvertex c, u32 texi
 	int maxX = std::min((float)ctx->clip_x2, max(a.p[0], b.p[0], c.p[0]));
 	int maxY = std::min((float)ctx->clip_y2, max(a.p[1], b.p[1], c.p[1]));
 	
+	//a.p[2] = 1 / a.p[2];
+	//b.p[2] = 1 / b.p[2];
+	//c.p[2] = 1 / c.p[2];
+	a.t[0] *= a.p[2];
+	a.t[1] *= a.p[2];
+	b.t[0] *= b.p[2];
+	b.t[1] *= b.p[2];
+	c.t[0] *= c.p[2];
+	c.t[1] *= c.p[2];
+	
 	for(int Y = minY; Y < maxY; ++Y)
 	{
 		for(int X = minX; X < maxX; ++X)
@@ -146,14 +165,19 @@ void render_tri_tex(rend_context* ctx, rvertex a, rvertex b, rvertex c, u32 texi
 				float wb = CAP/w;
 				float wc = ABP/w;
 				
-				float Z = a.p[2] * wa + b.p[2] * wb + c.p[2] * wc;
+				float Z = (a.p[2] * wa + b.p[2] * wb + c.p[2] * wc);
 				if( Z < ctx->depth[Y*ctx->stride + X] ) continue;
 				ctx->depth[Y*ctx->stride + X] = Z;
 				
 				float U = a.t[0] * wa + b.t[0] * wb + c.t[0] * wc;
 				float V = a.t[1] * wa + b.t[1] * wb + c.t[1] * wc;
-				
-				((u16*)ctx->fbuf)[Y*ctx->stride + X] = ctx->texture_sample(texid, U, V);
+				U *= 1/Z;
+				V *= 1/Z;
+				color4 C = ctx->texture_sample(texid, U, V);
+				u16 p = (C.r>>3)<<11;
+				p |= (C.g>>2)<<5;
+				p |= (C.b>>3);
+				((u16*)ctx->fbuf)[Y*ctx->stride + X] = p;
 			}
 		}
 	}
@@ -217,13 +241,12 @@ void dreamcast::ta_draw_tri()
 		if( rendbpp == 3 ) mult = 4;
 		memset(vram+(holly.fb_w_sof1&0x7ffffc), 0, 640*480*mult);
 		for(u32 i = 0; i < 640*480; ++i) depth[i] = std::bit_cast<float>(isp.backgnd_d);
-		std::println("clearing vram wsof=${:X}, rsof=${:X}", holly.fb_w_sof1, holly.fb_r_sof1);
-		std::println("nml2 = ${:X}, nml4=${:X}, nml6=${:X}", holly.sb_iml2nrm, holly.sb_iml4nrm, holly.sb_iml6nrm);
+		//std::println("clearing vram wsof=${:X}, rsof=${:X}", holly.fb_w_sof1, holly.fb_r_sof1);
 	}
 	if( ta_obj_ctrl & BIT(3) )
 	{
 		static const u32 uvsize[] = { 8, 16, 32, 64, 128, 256, 512, 1024 };
-		auto texsamp = [&](u32, float u, float v)->u32 {
+		auto texsamp = [&](u32, float u, float v)->color4 {
 			u32 addr = ta_tex_ctrl&0x1fffff;
 			addr <<= 3;
 			u32 W = uvsize[(ta_tsp_mode>>3)&7];
@@ -233,6 +256,9 @@ void dreamcast::ta_draw_tri()
 			
 			if( ta_tex_ctrl & BIT(26) )
 			{
+				//std::println("nontwiddle");
+				//exit(1);
+				if( ta_tex_ctrl & BIT(25) ) W = (holly.text_control&0x1f)*32;
 				addr += V*W*2 + U*2;
 			} else {
 				if( W == H )
@@ -240,15 +266,42 @@ void dreamcast::ta_draw_tri()
 					u32 r = V0|(U0<<1)|(V1<<2)|(U1<<3)|(V2<<4)|(U2<<5)|(V3<<6)|(U3<<7)|(V4<<8)|(U4<<9)|
 						(V5<<10)|(U5<<11)|(V6<<12)|(U6<<13)|(V7<<14)|(U7<<15)|
 						(V8<<16)|(U8<<17)|(V9<<18)|(U9<<19)|(V10<<20)|(U10<<21);
-					addr += r*2;
+					addr += r<<1;
+				} else {
+					std::println("Use of {}x{} twiddled texture.", W, H);
+					exit(1);
 				}
 			}
 
 			u16 p = *(u16*)&vram[((addr&0xFFFFF8)>>1)|((addr&4)<<20)|(addr&3)];
-			u8 r = p&15;
-			u8 g = (p>>4)&15;
-			u8 bl = (p>>8)&15;
-			return p;//(r<<11)|(g<<6)|bl;
+			color4 res;
+			
+			switch( (ta_tex_ctrl>>27) & 7 )
+			{
+			case 7:
+			case 0: // 1555
+				res.r = ((p>>10)&31)<<3;
+				res.g = ((p>>5)&31)<<3;
+				res.b = ((p&31)<<3);
+				res.a = ((p&0x8000) ? 0xff : 0);
+				break;
+			case 1: // 565
+				res.r = ((p>>11)&31)<<3;
+				res.g = ((p>>5)&63)<<2;
+				res.b = (p&31)<<3;
+				res.a = 0xff;
+				break;
+			case 2: // 4444
+				res.r = ((p>>8)&15)<<4;
+				res.g = ((p>>4)&15)<<4;
+				res.b = ((p>>0)&15)<<4;
+				res.a = ((p>>12)&15)<<4;
+				break;
+			default:
+				std::println("Unimpl tex format {}", (ta_tex_ctrl>>27)&7);
+				exit(1);
+			}
+			return res;
 		};
 		ctx.texture_sample = texsamp;
 		//u32 addr = ta_tex_ctrl&0x1fffff;
@@ -305,7 +358,7 @@ void dreamcast::ta_run()
 	u32 ptype = paractrl>>29;
 	if( ptype == 4 )
 	{
-		std::println("PRIM List ${:X}", paractrl);
+		//std::println("PRIM List ${:X}", paractrl);
 		ta_prim_type = ptype;
 		ta_col_type = (paractrl>>4)&3;
 		ta_obj_ctrl = paractrl&0xffff;
@@ -329,7 +382,7 @@ void dreamcast::ta_run()
 			std::println("Ended list with no active list");
 			return;
 		}
-		std::println("End list {}", endlisttype);
+		//std::println("End list {}", endlisttype);
 		if( endlisttype == 0 )
 		{
 			holly.sb_istnrm |= OPAQUE_LIST_CMPL_IRQ_BIT;

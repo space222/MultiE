@@ -37,7 +37,13 @@ void dreamcast::maple_port1(u32 dest, u32* msg, u32 len)
 		*(u32*)&RAM[dest] = __builtin_bswap32((8<<24)|(0x20<<16)|3);
 		*(u32*)&RAM[dest+4] = __builtin_bswap32(1);
 		*(u32*)&RAM[dest+8] = (maple_keys1());
-		*(u32*)&RAM[dest+12]= __builtin_bswap32(0xffffFFFFu);
+
+		auto keys = SDL_GetKeyboardState(nullptr);
+		u32 analog = keys[SDL_SCANCODE_S] ? 0xf0 : (keys[SDL_SCANCODE_W] ? 0x10 : 0x80);
+		analog <<= 8;
+		analog |= keys[SDL_SCANCODE_D] ? 0xf0 : (keys[SDL_SCANCODE_A] ? 0x10 : 0x80);
+		
+		*(u32*)&RAM[dest+12]= (0x80800000u|analog);
 		return;
 	}
 	
@@ -59,7 +65,7 @@ u32 dreamcast::maple_keys1()
 	if( keys[SDL_SCANCODE_LEFT] ) btn ^= BIT(6);
 	if( keys[SDL_SCANCODE_RIGHT] ) btn ^= BIT(7);
 	if( keys[SDL_SCANCODE_Z] ) btn ^= BIT(2);
-	if( keys[SDL_SCANCODE_S] ) btn ^= BIT(3);
+	if( keys[SDL_SCANCODE_RETURN] ) btn ^= BIT(3);
 
 	return btn;
 }

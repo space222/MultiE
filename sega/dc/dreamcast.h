@@ -13,8 +13,8 @@ public:
 	~dreamcast() 
 	{ 
 		std::println("Ended @PC = ${:X}", cpu.pc); 
-		FILE* fp = fopen("vram.data", "wb");
-		fwrite(vram, 1, 8*1024*1024, fp);
+		FILE* fp = fopen("snd.prog", "wb");
+		fwrite(sndram, 1, 2*1024*1024, fp);
 		fclose(fp);
 	}
 	
@@ -345,9 +345,15 @@ public:
 	void snd_write(u32, u64, u32);
 	u32 snd_read(u32, u32);
 	
-	arm7di aica_cpu;
+	
+	struct {
+		arm7di cpu;
+		u32 armrst;
+	} aica;
 	void aica_write(u32, u32, int);
 	u32 aica_read(u32, int);
+	
+	const u32 ARM_RESET_ADDR = 0x2c00;
 };
 
 

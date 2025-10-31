@@ -347,27 +347,32 @@ Status: panda.dol works. no idea whether cpu instructions or irqs or etc is wron
 
 Sega Dreamcast Todo List
 ---------------------------
-0. Rewrite FPU, doubles are currently implemented incorrectly, 
-	- need to fetch/store doubles for actual instructions respecting the word-flip
-1. try coding up a demo to use sound from the cpu
-2. try coding up a demo to use sound from the arm7
+1. some of the gfx-flies-into-space issue was analog stick, not anything to do with fpu.
+	- implement the rest of the controller buttons, maybe copy Deecy's layout on this one
+2. alter arm7di decoding to match manual rather than straight copy of -tdmi.
+3. find a kos sound demo||example and dump / disassemble sound ram, see if it matches expected kos driver
+4. attempt to have the arm7 run
+5. start implementing sound registers
+6. have event fire every 200000000/44100 cycles to output current sample (which will be zero until aica exists)
+7. try to implement basic pcm output with envelopes
+8. try coding up a demo to use sound from the cpu
+9. try coding up a demo to use sound from the arm7
 	- look into (at first glance kos starts the arm7, then just expects it to have set things up before the sh4 gets to this assert?)
 	"
 		*** ASSERTION FAILURE ***
 		Assertion "g2_read_32(qa + offsetof(aica_queue_t, valid))" failed at snd_iface.c:86 in `snd_sh4_to_aica': Queue is not yet valid
-	"
-3. algorithm for rectangular W!=H (currently only squareW==H) texture twiddling coordinates
-4. have texture sampling return 32bit color via struct or tuple
-5. Pvr dmas?
-6. Find menu program to have multiple demos on one cd
-7. code cd tests
-8. implement lle disc access
-9. get back to working through bios
-10. implement proper TA
-11. implement ISP/Core
+	" (hopefully this is gone by the time I get here)
+10. algorithm for rectangular W!=H (currently only squareW==H) texture twiddling coordinates
+11. have texture sampling return 32bit color via struct or tuple
+12. all the other DMAs on the system, find or code tests for them
+13. Find menu program to have multiple demos on one cd
+14. code cd tests
+15. implement lle disc access
+16. get back to working through bios
+17. implement proper TA
+18. implement ISP/Core
 Notes:
 Still should ask on discord about proper interrupt priorities and video timing
-Matrix multi instruction passes most of the tests, but some demos show that the fpu clearly isn't working
 
 
 
