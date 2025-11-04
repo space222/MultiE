@@ -251,8 +251,8 @@ void dreamcast::ta_draw_tri()
 			addr <<= 3;
 			u32 W = uvsize[(ta_tsp_mode>>3)&7];
 			u32 H = uvsize[ta_tsp_mode&7];
-			u32 U = std::clamp(u*W, 0.f, (float)W);
-			u32 V = std::clamp(v*H, 0.f, (float)H);
+			u32 U = std::clamp(u*W+0.5f, 0.f, (float)W);
+			u32 V = std::clamp(v*H+0.5f, 0.f, (float)H);
 			
 			if( ta_tex_ctrl & BIT(26) )
 			{
@@ -345,7 +345,7 @@ void dreamcast::ta_vertex_in()
 		if( ta_vertq.size() == 3 )
 		{
 			ta_draw_tri();
-		}	
+		}
 	} else if( ta_prim_type == 5 ) {
 		std::println("sprite vert recv");
 	}
@@ -365,6 +365,8 @@ void dreamcast::ta_run()
 		ta_tex_ctrl = ta_q[3];
 		ta_tsp_mode = ta_q[2];
 		ta_active_list = (paractrl>>24)&7;
+		
+		
 	} else if( ptype == 5 ) {
 		ta_prim_type = ptype;
 		ta_col_type = (paractrl>>4)&3;

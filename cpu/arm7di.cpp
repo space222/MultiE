@@ -94,6 +94,7 @@ arm7_instr arm7di::decode_arm(u32 cc)
 			}
 			s32 offs = s32(opc<<8)>>8;
 			cpu.r[15] += offs*4;
+			//std::println("arm7 b(l) to ${:X}", cpu.r[15]);
 			cpu.flushp();
 		};
 	}
@@ -140,6 +141,7 @@ void arm7di::step()
 	execute = decode;
 	decode = fetch;
 	r[15] += 4;
+	//std::println("ARM7DI:${:X}: opc = ${:X}", r[15]-8, execute);
 	fetch = read(r[15]&~3, 32, ARM_CYCLE::X);
 	u32 opc = execute;
 	
@@ -162,6 +164,7 @@ void arm7di::step()
 void arm7di::reset()
 {
 	//todo: copied from my old emu, need to double check
+	//std::println("arm7di::reset()");
 	cpsr.b.M = ARM_MODE_USER;
 	r[13] = 0x03007F00;
 	r13_svc = 0x03007FE0; 

@@ -166,7 +166,7 @@ void dreamcast::io_write(u32 a, u64 v, u32 sz)
 	if( a == HALF_OFFSET_ADDR ) { holly.half_offset = v&7; return; }
 	if( a == FPU_PERP_VAL_ADDR ) { holly.fpu_perp = v; return; }
 	if( a == Y_COEFF_ADDR ) { holly.y_coeff = v&0xffff; return; }
-	if( a == ISP_BACKGND_D_ADDR ) { v &= ~15; isp.backgnd_d = v; std::println("isp_backgnd_d = {}", std::bit_cast<float>(u32(v))); return; }
+	if( a == ISP_BACKGND_D_ADDR ) { v &= ~15; isp.backgnd_d = v; return; }
 	if( a == ISP_BACKGND_T_ADDR ) { isp.backgnd_t = v; return; }
 	if( a == FOG_CLAMP_MAX_ADDR ) { holly.fog_clamp_max = v; return; }
 	if( a == FOG_CLAMP_MIN_ADDR ) { holly.fog_clamp_min = v; return; }
@@ -238,7 +238,7 @@ u64 dreamcast::read(u32 a, u32 sz)
 	if( a >= 0x5F6000 && a < 0x5FA000 ) { return io_read(a, sz); }
 	if( a == 0x600004 ) { return 0xff; /* modem stuff? */ }
 		
-	if( a >= 0x700000 && a < 0x800000 ) { return snd_read(a, sz); }
+	if( a >= 0x700000 && a < 0x800000 ) { std::print("sh4-"); return snd_read(a, sz); }
 	
 	if( a >= 0x800000 && a < 0xa00000 ) return sized_read(sndram, a&0x1fffff, sz);	
 	if( a >= 0xc000000 && a < 0x10000000 ) return sized_read(RAM, a&0xffFFff, sz);
@@ -272,7 +272,10 @@ void dreamcast::write(u32 a, u64 v, u32 sz)
 	
 	if( a < 0x220000 ) return;
 	
-	if( a >= 0x800000 && a < 0xa00000 ) return sized_write(sndram, a&0x1fffff, v, sz);	
+	if( a >= 0x800000 && a < 0xa00000 ) 
+	{
+		return sized_write(sndram, a&0x1fffff, v, sz);
+	}
 	if( a >= 0xc000000 && a < 0x10000000 ) return sized_write(RAM, a&0xffFFff, v, sz);
 
 	if( a >= 0x5F6000 && a < 0x5FA000 ) { return io_write(a, v, sz); }
@@ -314,7 +317,7 @@ void dreamcast::write(u32 a, u64 v, u32 sz)
 		return;
 	}
 
-	if( a >= 0x700000 && a < 0x800000 ) { snd_write(a, v, sz); return; }
+	if( a >= 0x700000 && a < 0x800000 ) { std::print("sh4-"); snd_write(a, v, sz); return; }
 	
 	std::println("${:X}: Unimpl write{} ${:X} = ${:X}", cpu.pc, sz, a, v);
 	//exit(1);
@@ -421,7 +424,7 @@ void dreamcast::run_frame()
 		//if( debug_on && cpu.pc > 0x8c010000u ) std::println("pc = ${:X}", cpu.pc);
 		check_irqs();
 		if( !cpu.sleeping ) cpu.step();
-		if( (stamp&3)==0 && (aica.armrst&1) == 0 ) { /*std::println("AICA PC = ${:X}", aica.cpu.r[15]-4);*/ aica.cpu.step(); }
+		if( (stamp&0xff)==0 && (aica.armrst&1)==0 ) { if( aica.cpu.r[15]<0x30 ) std::println("AICA PC = ${:X}", aica.cpu.r[15]-8); aica.cpu.step(); }
 		if( (cpu.pc>>8) == 0xcafeba )
 		{
 			u32 bcall = cpu.pc;
@@ -468,6 +471,7 @@ void dreamcast::reset()
 	memset(&ta, 0, sizeof(ta));
 	memset(&intern, 0, sizeof(intern));
 	memset(&gd, 0, sizeof(gd));
+	memset(&sndram, 0, 2*1024*1024);
 	
 	holly.vo_control = 0;
 	holly.fb_r_ctrl = 0xc;
@@ -482,6 +486,7 @@ void dreamcast::reset()
 	intern.TCNT0 = intern.TCNT1 = intern.TCNT2 = 0xffffFFFFu;
 	intern.TCOR0 = intern.TCOR1 = intern.TCOR2 = 0xffffFFFFu;
 	debug_on = false;
+	aica.armrst = 1;
 }
 
 bool dreamcast::loadROM(std::string fname)

@@ -8,33 +8,40 @@ void dreamcast::aica_write(u32 addr, u32 v, int sz)
 		sized_write(sndram, addr&0x1FFfff, v, sz);
 		return;
 	}
+	//std::print("arm-");
 	snd_write(addr & 0xffff, v, sz);
 }
 
 u32 dreamcast::aica_read(u32 addr, int sz)
 {
-	if( addr < 0x800000 ) return sized_read(sndram, addr&0x1FFfff, sz);
+	//std::print("arm${:X}-", aica.cpu.r[15]-8);
+	if( addr < 0x800000 )
+	{
+		u32 got = sized_read(sndram, addr&0x1FFfff, sz);
+		//std::println("arm rd${:X} = ${:X}", addr, got);
+		return got;
+	}
 	return snd_read(addr & 0xffff, sz);
 }
 
 void dreamcast::snd_write(u32 addr, u64 v, u32 sz)
 {
 	addr &= 0xffff;
+	if( addr >= 0xffe8 ) return;
 	if( addr == ARM_RESET_ADDR )
 	{
+		if( aica.armrst && !(v&1) ) { aica.cpu.reset(); aica.cpu.cpsr.v &= ~0x1f; aica.cpu.cpsr.v |= ARM_MODE_SYSTEM; } //todo: double check reset()
 		aica.armrst = v&1;
-		if( aica.armrst ) { aica.cpu.reset(); } //todo: double check reset()
 		return;
 	}
-	std::println("snd-w{} ${:X} = ${:X}", sz, addr, v);
 }
 
 u32 dreamcast::snd_read(u32 addr, u32 sz)
 {
 	addr &= 0xffff;
+	if( addr >= 0xffe8 ) return 0;
 	if( addr == ARM_RESET_ADDR ) { return aica.armrst; }
-	std::println("snd-r{} ${:X}", sz, addr);
-	return 0;
+	return 0xffffffffu;
 }
 
 

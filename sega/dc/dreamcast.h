@@ -12,10 +12,9 @@ public:
 	dreamcast() : sched(this) {}
 	~dreamcast() 
 	{ 
-		std::println("Ended @PC = ${:X}", cpu.pc); 
-		FILE* fp = fopen("snd.prog", "wb");
-		fwrite(sndram, 1, 2*1024*1024, fp);
-		fclose(fp);
+		std::println("Ended @PC = ${:X}", cpu.pc);
+		std::println("Sndram 0 = ${:X}", *(u32*)&sndram[0]);
+		std::println("Sndram 4 = ${:X}", *(u32*)&sndram[4]);
 	}
 	
 	u32 fb_bpp() override;
@@ -64,8 +63,8 @@ public:
 	u8 vram[8_MB];
 	u8 bios[2_MB];
 	u8 flashrom[128_KB];
-	u8 sndram[2_MB];	
 	u8 opcache[8_KB];
+	u8 sndram[2_MB];	
 	
 	u64 read(u32, u32);
 	void write(u32, u64, u32);
@@ -238,7 +237,13 @@ public:
 	void key_down(int k)
 	{
 		if( k == SDL_SCANCODE_ESCAPE ) debug_on = !debug_on;
-		if( k == SDL_SCANCODE_F ) 
+		if( k == SDL_SCANCODE_P )
+		{
+			//FILE* fp = fopen("snd.prog", "wb");
+			//fwrite(sndram, 1, 2*1024*1024, fp);
+			//fclose(fp);
+		} 
+		/*if( k == SDL_SCANCODE_F ) 
 		{ 
 			intern.TCR2 |= TMR_IRQ_ACTIVE;
 			intern.TCR1 |= TMR_IRQ_ACTIVE;
@@ -288,7 +293,7 @@ public:
 		if( k == SDL_SCANCODE_F11 ) 
 		{ 
 			holly.sb_istnrm |= 0x400;
-		}
+		}*/
 	}
 	
 	struct {
