@@ -48,7 +48,7 @@ public:
 	u8 vreg[0x20];
 	u16 vdp_addr, vdp_stat;
 	u32 vdp_width;
-	u8 vdp_cd;
+	u8 vdp_cd, vdp_hcnt;
 	u8 sprbuf[320];
 	
 	void fm_write(u32, u8);

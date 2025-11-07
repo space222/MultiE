@@ -1,3 +1,4 @@
+#include <print>
 #include <cstdlib>
 #include <cstdio>
 #include <algorithm>
@@ -220,6 +221,13 @@ u32 genesis::read(u32 addr, int size)
 		return vdp_read();
 	}
 	
+	if( addr == 0xC00008 )
+	{
+		std::println("HV counter read");
+		//exit(1);
+		return 0;
+	}
+	
 	if( addr == 0xA11100 )
 	{
 		return z80_busreq;	
@@ -344,7 +352,18 @@ void genesis::run_frame()
 		}
 		last_target = target;
 		
-		if( line < 224 ) draw_line(line);
+		if( line < 224 )
+		{
+			draw_line(line);
+			vdp_hcnt -= 1;
+			if( vdp_hcnt == 0 )
+			{
+				vdp_hcnt = vreg[0xA];
+				if( (vreg[0]&BIT(4)) && cpu.pending_irq == 0  ) cpu.pending_irq = 4;
+			}
+		} else {
+			vdp_hcnt = vreg[0xA];
+		}
 		if( line == 223 ) 
 		{
 			if( (vreg[1]&BIT(5))  ) { cpu.pending_irq = 6; spu.irq_line = 1; }
