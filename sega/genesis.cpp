@@ -482,35 +482,38 @@ void genesis::reset()
 
 bool genesis::loadROM(const std::string fname)
 {
-	FILE* fp = fopen("./bios/32X_BIOS1.bin", "rb");
-	if( ! fp ) 
+	if( fname.ends_with("32x") || fname.ends_with("32X") )
 	{
-		printf("Cant find 32X SH2 bootroms\n");
-		return false;
-	}
-	fseek(fp, 0, SEEK_END);
-	auto fsz = ftell(fp);
-	fseek(fp, 0, SEEK_SET);
-	[[maybe_unused]] int u = fread(bios32xM, 1, fsz, fp);
-	fclose(fp);
+		FILE* fp = fopen("./bios/32X_BIOS1.bin", "rb");
+		if( ! fp ) 
+		{
+			printf("Cant find 32X SH2 bootroms\n");
+			return false;
+		}
+		fseek(fp, 0, SEEK_END);
+		auto fsz = ftell(fp);
+		fseek(fp, 0, SEEK_SET);
+		[[maybe_unused]] int u = fread(bios32xM, 1, fsz, fp);
+		fclose(fp);
 
-	fp = fopen("./bios/32X_BIOS2.bin", "rb");
-	if( ! fp ) 
-	{
-		printf("Cant find 32X SH2 bootroms\n");
-		return false;
+		fp = fopen("./bios/32X_BIOS2.bin", "rb");
+		if( ! fp ) 
+		{
+			printf("Cant find 32X SH2 bootroms\n");
+			return false;
+		}
+		fseek(fp, 0, SEEK_END);
+		fsz = ftell(fp);
+		fseek(fp, 0, SEEK_SET);
+		[[maybe_unused]] int u2 = fread(bios32xS, 1, fsz, fp);
+		fclose(fp);
 	}
-	fseek(fp, 0, SEEK_END);
-	fsz = ftell(fp);
-	fseek(fp, 0, SEEK_SET);
-	[[maybe_unused]] int u2 = fread(bios32xS, 1, fsz, fp);
-	fclose(fp);
-
-	fp = fopen(fname.c_str(), "rb");
+	
+	FILE* fp = fopen(fname.c_str(), "rb");
 	if(!fp) return false;
 	
 	fseek(fp, 0, SEEK_END);
-	fsz = ftell(fp);
+	auto fsz = ftell(fp);
 	fseek(fp, 0, SEEK_SET);
 	
 	ROM.resize(fsz);
