@@ -464,10 +464,10 @@ void genesis::reset()
 	{
 		*(u32*)&vecrom[(i+1)*4] = __builtin_bswap32(0x880200+i*6);
 	}
-	cpu32x[0].memread = [](u32 a, int s)->u32 { return dynamic_cast<genesis*>(sys)->sh2master_read(a,s); };
-	cpu32x[0].memwrite = [](u32 a, u32 v, int s) { dynamic_cast<genesis*>(sys)->sh2master_write(a,v,s); };
-	cpu32x[1].memread = [](u32 a, int s)->u32 { return dynamic_cast<genesis*>(sys)->sh2slave_read(a,s); };
-	cpu32x[1].memwrite = [](u32 a, u32 v, int s) { dynamic_cast<genesis*>(sys)->sh2slave_write(a,v,s); };
+	cpu32x[0].bus_read = [&](u32 a, int s)->u32 { return sh2master_read(a,s); };
+	cpu32x[0].bus_write = [&](u32 a, u32 v, int s) { sh2master_write(a,v,s); };
+	cpu32x[1].bus_read = [&](u32 a, int s)->u32 { return sh2slave_read(a,s); };
+	cpu32x[1].bus_write = [&](u32 a, u32 v, int s) { sh2slave_write(a,v,s); };
 	cpu32x[0].reset();
 	cpu32x[1].reset();
 	

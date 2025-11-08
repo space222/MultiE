@@ -15,9 +15,9 @@ struct sh2_instr { u16 mask,res; std::function<void(sh2&,u16)> func; std::string
 #define NeqM ( ((opc>>8)&15) == ((opc>>4)&15) )
 #define srT cpu.sr.b.T
 #define PRIV
-extern int cyclenum;
-#define DELAY cyclenum+=1; cpu.exec(cpu.fetch(cpu.pc))
-//#define DELAY cpu.exec(cpu.fetch(cpu.pc))
+//extern int cyclenum;
+//#define DELAY cyclenum+=1; cpu.exec(cpu.fetch(cpu.pc))
+#define DELAY cpu.exec(cpu.fetch(cpu.pc))
 
 sh2_instr sh2_opcodes[] = {
 	// integer movs
@@ -171,9 +171,10 @@ sh2_instr sh2_opcodes[] = {
 { 0xF0FF, 0x402B, INSTR { cpu.pc+=2; u32 t=Rn; DELAY; cpu.pc=t-2; }, "jmp @Rn", "0100nnnn00101011"},
 { 0xF0FF, 0x400B, INSTR { cpu.pc+=2; u32 t=Rn; DELAY; cpu.PR=cpu.pc+2; cpu.pc=t-2; }, "jsr @Rn", "0100nnnn00101011"},
 { 0xFFFF, 0x000B, INSTR { cpu.pc+=2; u32 t=cpu.PR; DELAY; cpu.pc=t-2; }, "rts", "0000000000001011" },
-{ 0xFFFF, 0x002B, INSTR { PRIV; u32 t=cpu.pc; 
+{ 0xFFFF, 0x002B, INSTR { 
 	u32 p = cpu.read(cpu.r[15],32)-2; cpu.r[15] += 4;
 	u32 s = cpu.read(cpu.r[15],32); cpu.r[15] += 4;
+	cpu.pc += 2;
 	DELAY;
 	cpu.pc = p;
 	cpu.setSR(s);

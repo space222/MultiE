@@ -5,7 +5,7 @@
 #include "z80.h"
 #include "68k.h"
 #include "SN79489.h"
-#include "SH2.h"
+#include "sh2.h"
 #include "ym3438.h"
 
 class genesis : public console
@@ -84,7 +84,7 @@ public:
 	u32 fbuf[320*224];
 
 	// 32X stuff
-	SH2 cpu32x[2];
+	sh2 cpu32x[2];
 	u8 fb32x[256*1024];
 	u8 sdram[256*1024];
 	u8 vecrom[256];

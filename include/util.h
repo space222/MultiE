@@ -16,7 +16,7 @@ inline u64 sized_read(u8* data, u32 addr, u32 size)
 	if( size == 32 ) return *(u32*)&data[addr];
 	if( size == 16 ) return *(u16*)&data[addr];
 	if( size == 8 ) return data[addr];
-	std::println("error in sized_read, size={}", size);
+	std::printf("error in sized_read, size=%i\n", size);
 	exit(1);
 }
 
@@ -27,7 +27,7 @@ inline void sized_write(u8* data, u32 addr, u64 v, u32 size)
 	else if( size == 16 ) { *(u16*)&data[addr] = v; }
 	else if( size == 8 ) { data[addr] = v; }
 	else {
-		std::println("error in sized_write, size={}", size);
+		std::printf("error in sized_write, size=%i\n", size);
 		exit(1);
 	}
 }
@@ -38,7 +38,7 @@ inline u64 sized_read_be(u8* data, u32 addr, u32 size)
 	if( size == 32 ) return __builtin_bswap32(*(u32*)&data[addr]);
 	if( size == 16 ) return __builtin_bswap16(*(u16*)&data[addr]);
 	if( size == 8 ) return data[addr];
-	std::println("error in sized_read_be, size={}", size);
+	std::printf("error in sized_read_be, size=%i\n", size);
 	exit(1);
 }
 
@@ -49,7 +49,7 @@ inline void sized_write_be(u8* data, u32 addr, u64 v, u32 size)
 	else if( size == 16 ) { *(u16*)&data[addr] = __builtin_bswap16(u16(v)); }
 	else if( size == 8 ) { data[addr] = v; }
 	else {
-		std::println("error in sized_write_be, size={}", size);
+		std::printf("error in sized_write_be, size=%i\n", size);
 		exit(1);
 	}
 }
