@@ -129,37 +129,16 @@ void genesis::write(u32 addr, u32 val, int size)
 	
 	if( addr == 0xA10009 || addr == 0xA1000B ) return;
 	
+	if( adapter_ctrl & 1 ) { write32x(addr, val, size); return; }
+	
 	if( addr == 0xA15100 || addr == 0xA15101 )
 	{
-		printf("ADEN =$%X\n", val);
-		if( !ADEN ) 
+		if( addr & 1 )
 		{
-			ADEN = val&1;
-			if( !ADEN ) return;
-			/*
-			// was going to HLE the 32X boot, but maybe that should wait
-			u32 cartaddr = __builtin_bswap32(*(u32*)&ROM[0x3D4]);
-			u32 ramaddr  = __builtin_bswap32(*(u32*)&ROM[0x3D8]);
-			u32 bytelen =  __builtin_bswap32(*(u32*)&ROM[0x3DC]);
-			printf("cartaddr = $%X, ramaddr = $%X, len = %i\n", cartaddr, ramaddr, bytelen);
-			for(u32 i = 0; i < bytelen; ++i) sdram[ramaddr+i] = ROM[cartaddr+i];
-			cpu32x[0].pc = __builtin_bswap32(*(u32*)&ROM[0x3E0]);
-			cpu32x[1].pc = __builtin_bswap32(*(u32*)&ROM[0x3E4]);
-			cpu32x[0].vbr= __builtin_bswap32(*(u32*)&ROM[0x3E8]);
-			cpu32x[1].vbr= __builtin_bswap32(*(u32*)&ROM[0x3EC]);
-			cpu32x[0].gbr = cpu32x[1].gbr = 0x20004000;
-			*(u32*)&comms[0] = __builtin_bswap32(0x4D5F4F4B);
-			*(u32*)&comms[4] = __builtin_bswap32(0x535F4F4B);
-			*/
+			adapter_ctrl = (adapter_ctrl&0xff00)|val|(adapter_ctrl&3);
+		} else {
+			adapter_ctrl = val|(adapter_ctrl&3);
 		}
-		if( !RES  ) RES = val&2;
-		if( size == 16 ) FM = val&0x8000;
-		return;
-	}
-	
-	if( ADEN )
-	{
-		write32x(addr, val, size);
 		return;
 	}
 	
@@ -175,7 +154,8 @@ u32 genesis::read(u32 addr, int size)
 		exit(1);
 	}
 	addr &= 0xffFFff;
-	if( ADEN && addr < 0x400000 ) return read32x(addr, size);	
+	if( adapter_ctrl&1 ) return read32x(addr, size);
+	
 	if( addr < ROM.size() ) return __builtin_bswap16(*(u16*)&ROM[addr]);
 	if( ROM.size() <= 2*1024*1024 && addr > 0x200000 && addr <= 0x20FFFF )
 	{
@@ -186,7 +166,6 @@ u32 genesis::read(u32 addr, int size)
 	
 	if( addr >= 0xA00000 && addr < 0xA02000 )
 	{
-		//ZRAM[addr&0x1fff] ^= 0xff;
 		return __builtin_bswap16(*(u16*)&ZRAM[addr&0x1fff]);
 	}
 	
@@ -240,10 +219,12 @@ u32 genesis::read(u32 addr, int size)
 	
 	if( addr == 0xA130EC ) return ('M'<<8)|'A';
 	if( addr == 0xA130EE ) return ('R'<<8)|'S';
-	if( addr == 0xA15100 ) return 0x80|RES|ADEN;
-	if( ADEN ) return read32x(addr, size);
+	//if( addr == 0xA15100 ) return 0x80|RES|ADEN;
+	//if( ADEN ) return read32x(addr, size);
 
 	printf("%X: read%i <$%X\n", cpu.pc-2, size, addr);
+	
+	if( addr == 0xA15100 ) return 0x80;
 	return 0;
 }
 
@@ -299,7 +280,7 @@ void genesis::run_frame()
 
 	vdp_width = (vreg[12]&1) ? 320 : 256;
 	vdp_stat = 0;
-	fb_ctrl &= ~0x8000;
+	//fb_ctrl &= ~0x8000;
 	
 	for(u32 line = 0; line < 262; ++line)
 	{
@@ -307,6 +288,7 @@ void genesis::run_frame()
 		while( stamp < target )
 		{
 			// run the 68k
+			std::println("68k-pc = ${:X}", cpu.pc);
 			cpu.step();
 			u64 mc = cpu.icycles * 7;
 			stamp += mc;
@@ -341,8 +323,9 @@ void genesis::run_frame()
 			}
 			
 			// run the 32X
-			if( ADEN && RES )
+			if( (adapter_ctrl&3) == 3 )
 			{
+				//std::println("SH2s PC = ${:X}", cpu32x[1].pc);
 				for(u32 i = 0; i < cpu.icycles*3; ++i)
 				{
 					cpu32x[0].step();
@@ -368,38 +351,12 @@ void genesis::run_frame()
 		{
 			if( (vreg[1]&BIT(5))  ) { cpu.pending_irq = 6; spu.irq_line = 1; }
 			vdp_stat |= 8;
-			fb_ctrl |= 0x8000;
-			fb_ctrl &= ~1;
-			fb_ctrl |= (fb_ctrl_fsnext&1);
+			//fb_ctrl |= 0x8000;
+			//fb_ctrl &= ~1;
+			//fb_ctrl |= (fb_ctrl_fsnext&1);
 		}
 		if( line == 224 ) { spu.irq_line = 0; }
 	}
-}
-
-void genwrite8(u32 addr, u8 val) { dynamic_cast<genesis*>(sys)->write(addr, val, 8); }
-void genwrite16(u32 addr, u16 val) { dynamic_cast<genesis*>(sys)->write(addr, val, 16); }
-void genwrite32(u32 addr, u32 val)
-{
-	dynamic_cast<genesis*>(sys)->write(addr, val>>16, 16);
-	dynamic_cast<genesis*>(sys)->write(addr+2, val&0xffff, 16);
-}
-
-u8 genread8(u32 addr)
-{
-	return 0xff & (dynamic_cast<genesis*>(sys)->read(addr&~1, 16) >> (((addr&1)^1)*8));
-}
-
-u16 genread16(u32 addr) 
-{
-	//printf("genread16 $%X\n", addr); 
-	return dynamic_cast<genesis*>(sys)->read(addr, 16); 
-}
-
-u32 genread32(u32 addr)
-{
-	u32 res = dynamic_cast<genesis*>(sys)->read(addr, 16)<<16;
-	res |= dynamic_cast<genesis*>(sys)->read(addr+2, 16);
-	return res;
 }
 
 u8 z80read(u16 addr) { return dynamic_cast<genesis*>(sys)->z80_read(addr); }
@@ -408,7 +365,7 @@ void z80write(u16 addr, u8 v) { dynamic_cast<genesis*>(sys)->z80_write(addr,v); 
 void genesis::reset()
 {
 	memset(&spu, 0, sizeof(spu));
-	memset(&cpu, 0, sizeof(cpu));
+	//memset(&cpu, 0, sizeof(cpu));
 	memset(&vreg, 0, 0x20);
 	
 	spu.reset();
@@ -422,12 +379,16 @@ void genesis::reset()
 		cpu.sr.raw = 0x2700;	
 	}
 	
-	cpu.mem_read8 = genread8;
-	cpu.read_code16 = cpu.mem_read16 = genread16;
-	cpu.mem_read32 = genread32;
-	cpu.mem_write8 = genwrite8;
-	cpu.mem_write16 = genwrite16;
-	cpu.mem_write32 = genwrite32;
+	cpu.mem_read8 = [&](u32 a) -> u8 { return read(a&~1, 16) >> (((a&1)^1)*8); };
+	cpu.read_code16 = cpu.mem_read16 = [&](u32 a) -> u16 { return read(a, 16); };
+	cpu.mem_read32 = [&](u32 a) -> u32 { 
+			u32 res = read(a, 16)<<16;
+			res |= read(a+2, 16);
+			return res;
+		};
+	cpu.mem_write8 = [&](u32 a, u8 v) { write(a, v, 8); };
+	cpu.mem_write16 = [&](u32 a, u16 v) { write(a, v, 16); };
+	cpu.mem_write32 = [&](u32 a, u32 v) { write(a, v>>16, 16); write(a+2, v&0xffff, 16); };
 	cpu.intack = []{};
 	
 	spu.write = z80write;
@@ -457,17 +418,25 @@ void genesis::reset()
 	fm_total = 0;
 	fm_out = 0;
 	
-	ADEN = bank9 = RES = bmpmode = fb_ctrl = 0;
-	RV = 0;
 	*(u32*)&vecrom[0] = 0;
-	for(u32 i = 0; i < 63; ++i)
+	for(u32 i = 1; i < 0x30; ++i)
 	{
-		*(u32*)&vecrom[(i+1)*4] = __builtin_bswap32(0x880200+i*6);
+		*(u32*)&vecrom[i*4] = __builtin_bswap32(0x880200+(i-1)*6);
+	}
+	static u32 vechigh[16] = { 0x08F90000, 0x00A15107, 0x128008B9, 0xA1, 
+				 0x51074E75, 0x48E70140, 0x08F90000, 0x00A15107,
+				 0x43F900A1, 0x30F17E07, 0x1298D2FC, 0x000251CF,
+				 0xFFF808B9, 0xA1, 0x51074CDF, 0x02804E75 };
+	for(u32 i = 0; i < 16; ++i)
+	{
+		*(u32*)&vecrom[(0x30+i)*4] =__builtin_bswap32(vechigh[i]);
 	}
 	cpu32x[0].bus_read = [&](u32 a, int s)->u32 { return sh2master_read(a,s); };
 	cpu32x[0].bus_write = [&](u32 a, u32 v, int s) { sh2master_write(a,v,s); };
 	cpu32x[1].bus_read = [&](u32 a, int s)->u32 { return sh2slave_read(a,s); };
 	cpu32x[1].bus_write = [&](u32 a, u32 v, int s) { sh2slave_write(a,v,s); };
+	cpu32x[0].init();
+	cpu32x[1].init();
 	cpu32x[0].reset();
 	cpu32x[1].reset();
 	
@@ -477,6 +446,8 @@ void genesis::reset()
 	cpu32x[0].r[15] = __builtin_bswap32(*(u32*)&bios32xM[4]);
 	cpu32x[1].r[15] = __builtin_bswap32(*(u32*)&bios32xS[4]);
 	
+	adapter_ctrl = fbctrl = bmp_mode = 0;
+	next_frame = current_frame = 0;
 	return;
 }
 

@@ -403,7 +403,7 @@ void AES::run_frame()
 
 void AES::reset()
 {
-	memset(&cpu, 0, sizeof(cpu));
+	//memset(&cpu, 0, sizeof(cpu));
 	cpu.mem_read8 = [](u32 addr)->u8 {return dynamic_cast<AES*>(sys)->read(addr, 8); };
 	cpu.mem_read16 =[](u32 addr)->u16{return dynamic_cast<AES*>(sys)->read(addr, 16); };
 	cpu.read_code16 = cpu.mem_read16;

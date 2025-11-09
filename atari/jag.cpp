@@ -147,7 +147,7 @@ bool jaguar::loadROM(const std::string fname)
 
 void jaguar::reset()
 {
-	memset(&cpu, 0, sizeof(cpu));
+	//memset(&cpu, 0, sizeof(cpu));
 	if( !ROM.empty() )
 	{
 		cpu.r[15] = *(u32*)&bootrom[0];
@@ -158,14 +158,14 @@ void jaguar::reset()
 	}
 	cpu.autovector = 0x100;
 
-	cpu.mem_read8 = [](u32 addr)->u8 { u16 v = dynamic_cast<jaguar*>(sys)->read(addr&~1, 16); return v >> (((addr&1)^1)*8); };
-	cpu.mem_read16=cpu.read_code16=[](u32 addr)->u16{return dynamic_cast<jaguar*>(sys)->read(addr, 16); };
-	cpu.mem_read32=[](u32 addr)->u32
-		{ u32 v = dynamic_cast<jaguar*>(sys)->read(addr,16)<<16;return v|dynamic_cast<jaguar*>(sys)->read(addr+2, 16); };
+	cpu.mem_read8 = [&](u32 addr)->u8 { u16 v = read(addr&~1, 16); return v >> (((addr&1)^1)*8); };
+	cpu.mem_read16=cpu.read_code16=[&](u32 addr)->u16{return read(addr, 16); };
+	cpu.mem_read32=[&](u32 addr)->u32
+		{ u32 v = read(addr,16)<<16;return v|read(addr+2, 16); };
 		
-	cpu.mem_write8 = [](u32 addr, u8 val) { dynamic_cast<jaguar*>(sys)->write(addr, val, 8); };
-	cpu.mem_write16= [](u32 addr,u16 val) { dynamic_cast<jaguar*>(sys)->write(addr, val, 16);};
-	cpu.mem_write32= [](u32 addr,u32 val) 
+	cpu.mem_write8 = [&](u32 addr, u8 val) { write(addr, val, 8); };
+	cpu.mem_write16= [&](u32 addr,u16 val) { write(addr, val, 16);};
+	cpu.mem_write32= [&](u32 addr,u32 val) 
 	{ 
 		dynamic_cast<jaguar*>(sys)->write(addr, val>>16, 16);
 		dynamic_cast<jaguar*>(sys)->write(addr+2, val&0xffff, 16);

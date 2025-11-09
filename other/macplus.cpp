@@ -99,7 +99,7 @@ u32 macplus::read(u32 addr, int size)
 
 void macplus::reset()
 {
-	memset(&cpu, 0, sizeof(cpu));
+	//memset(&cpu, 0, sizeof(cpu));
 	cpu.read_code16 = cpu.mem_read16 = [](u32 a)->u16 { return dynamic_cast<macplus*>(sys)->read(a, 16); };
 	cpu.mem_read8 = [](u32 a) -> u8 
 	{ 

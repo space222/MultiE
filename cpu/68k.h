@@ -1,4 +1,5 @@
 #pragma once
+#include <functional>
 #include "itypes.h"
 
 union flags
@@ -48,15 +49,16 @@ struct m68k
 	
 	//bool hip, vip;
 	u32 pending_irq;
-	m68k_intack intack;
+	std::function<void()> intack;
 	
-	m68k_write8 mem_write8;
-	m68k_write16 mem_write16;
-	m68k_write32 mem_write32;
-	m68k_read8 mem_read8;
-	m68k_read16 mem_read16;
-	m68k_read16 read_code16;
-	m68k_read32 mem_read32;
+	std::function<void(u32, u8)> mem_write8;
+	std::function<void(u32, u16)> mem_write16;
+	std::function<void(u32, u32)> mem_write32;
+	std::function<u8(u32)> mem_read8;
+	std::function<u16(u32)> mem_read16;
+	std::function<u16(u32)> read_code16;
+	std::function<u32(u32)> mem_read32;
+
 	
 	u32 icycles;
 	u64 stamp;

@@ -92,14 +92,17 @@ public:
 	u8 comms[16];
 	u8 bios32xS[0x800];
 	u8 bios32xM[0x800];
+	u8 pal32x[0x200];
 	void write32x(u32, u32, int);
 	u32 read32x(u32, int);
 	void sh2master_write(u32,u32,int);
 	void sh2slave_write(u32,u32,int);
 	u32 sh2master_read(u32,int);
 	u32 sh2slave_read(u32,int);
-	u32 ADEN, RES, RV, FM, bank9, autofill_len, autofill_addr, autofill_val;
-	u16 bmpmode, fb_ctrl, fb_ctrl_fsnext;
+	
+	u16 adapter_ctrl, bmp_mode, fbctrl;
+	u16 intctrlM, intctrlS;
+	u32 current_frame, next_frame;
 };
 
 #define PAD_DATA_DEFAULT 0x40
