@@ -88,7 +88,6 @@ public:
 	u8 fb32x[256*1024];
 	u8 sdram[256*1024];
 	u8 vecrom[256];
-	u8 uppercache[0x1000];
 	u8 comms[16];
 	u8 bios32xS[0x800];
 	u8 bios32xM[0x800];
@@ -100,9 +99,11 @@ public:
 	u32 sh2master_read(u32,int);
 	u32 sh2slave_read(u32,int);
 	
-	u16 adapter_ctrl, bmp_mode, fbctrl;
+	u16 adapter_ctrl, bmp_mode, fbctrl, bank9;
 	u16 intctrlM, intctrlS;
 	u32 current_frame, next_frame;
+	u8 cacheM[0x800];
+	u8 cacheS[0x800];
 };
 
 #define PAD_DATA_DEFAULT 0x40

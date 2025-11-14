@@ -288,7 +288,7 @@ void genesis::run_frame()
 		while( stamp < target )
 		{
 			// run the 68k
-			std::println("68k-pc = ${:X}", cpu.pc);
+			//std::println("68k-pc = ${:X}", cpu.pc);
 			cpu.step();
 			u64 mc = cpu.icycles * 7;
 			stamp += mc;

@@ -9,14 +9,14 @@ u32 genesis::sh2master_read(u32 addr, int size)
 	if( addr >= 0xF0000000u )
 	{
 		std::println("sh2m internal reg rd ${:X}", addr);
-		exit(1);
+		//exit(1);
 		return 0;
 	}
 	if( addr >= 0xC0000000u )
 	{
 		std::println("sh2m cache scratchpad rd ${:X}", addr);
-		exit(1);
-		return 0;
+		if( addr >= 0xC0000800u ) { exit(1); }
+		return sized_read_be(cacheM, addr&0x7ff, size);;
 	}
 	addr &= ~0x20000000;
 	if( addr >= 0x6000000 && addr < 0x6040000 ) { return sized_read_be(sdram, addr&0x3ffff, size); }
@@ -31,12 +31,13 @@ u32 genesis::sh2master_read(u32 addr, int size)
 		if( size == 8 ) return r>>8;
 		return r; 
 	}
-	
+	if( addr == 0x4005 ) { return bank9; }
+	if( addr == 0x4034 ) { return 0; }
 	if( addr == 0x410A || addr == 0x410B ) return fbctrl;
 
 	std::println("SH2m: read{} ${:X}", size, addr);
-	exit(1);
-	return 0xcafe;
+	//exit(1);
+	return 0;
 }
 
 u32 genesis::sh2slave_read(u32 addr, int size)
@@ -45,14 +46,14 @@ u32 genesis::sh2slave_read(u32 addr, int size)
 	if( addr >= 0xF0000000u )
 	{
 		std::println("sh2s internal reg rd ${:X}", addr);
-		exit(1);
+		//exit(1);
 		return 0;
 	}
 	if( addr >= 0xC0000000u )
 	{
 		std::println("sh2s cache scratchpad rd ${:X}", addr);
-		exit(1);
-		return 0;
+		if( addr >= 0xC0000800u ) { exit(1); }
+		return sized_read_be(cacheS, addr&0x7ff, size);
 	}
 	addr &= ~0x20000000;
 	if( addr >= 0x6000000 && addr < 0x6040000 ) { return sized_read_be(sdram, addr&0x3ffff, size); }
@@ -67,9 +68,10 @@ u32 genesis::sh2slave_read(u32 addr, int size)
 		if( size == 8 ) return r>>8;
 		return r;
 	}
+	if( addr == 0x4005 ) { return bank9; }
 	
 	std::println("SH2s: read{} ${:X}", size, addr);
-	exit(1);
+	//exit(1);
 	return 0xbabe;
 }
 
@@ -83,11 +85,14 @@ void genesis::sh2master_write(u32 addr, u32 val, int size)
 	if( addr >= 0xC0000000u )
 	{
 		std::println("SH2m: cache scratchpad write?{} ${:X} = ${:X}", size, addr, val);
+		if( addr >= 0xC0000800u ) { exit(1); }
+		sized_write_be(cacheM, addr&0x7ff, val, size);
 		return;
 	}
 	addr &= ~0x20000000;
 	if( addr >= 0x6000000 && addr < 0x6040000 ) { sized_write_be(sdram, addr&0x3ffff, val, size); return; }
-	if( addr >= 0x4020 && addr < 0x4030 ) { sized_write_be(comms, addr&0xf, val, size); }
+	if( addr >= 0x4020 && addr < 0x4030 ) { sized_write_be(comms, addr&0xf, val, size); return; }
+	if( addr == 0x4005 ) { bank9 = val&3; return; }
 
 	std::println("SH2m: write{} ${:X} = ${:X}", size, addr, val);
 }
@@ -96,17 +101,21 @@ void genesis::sh2slave_write(u32 addr, u32 val, int size)
 {
 	if( addr >= 0xF0000000u )
 	{
-		std::println("SH2m: internal write{} ${:X}= ${:X}", size, addr, val);
+		std::println("SH2s: internal write{} ${:X}= ${:X}", size, addr, val);
 		return;
 	}
 	if( addr >= 0xC0000000u )
 	{
-		std::println("SH2m: cache scratchpad write?{} ${:X} = ${:X}", size, addr, val);
+		std::println("SH2s: cache scratchpad write?{} ${:X} = ${:X}", size, addr, val);
+		if( addr >= 0xC0000800u ) { exit(1); }
+		sized_write_be(cacheS, addr&0x7ff, val, size);
 		return;
 	}
 	addr &= ~0x20000000;
 	if( addr >= 0x6000000 && addr < 0x6040000 ) { sized_write_be(sdram, addr&0x3ffff, val, size); return; }
 	if( addr >= 0x4020 && addr < 0x4030 ) { sized_write_be(comms, addr&0xf, val, size); return; }
+	
+	if( addr == 0x4005 ) { bank9 = val&3; return; }
 	
 	std::println("SH2s: write{} ${:X} = ${:X}", size, addr, val);
 }
@@ -118,9 +127,9 @@ u32 genesis::read32x(u32 addr, int size)
 	if( addr >= 0xFF0000 ) return sized_read_be(RAM, addr&0xffff, size);
 
 	if( addr >= 0x880000 && addr < 0x900000 ) return sized_read_be(ROM.data(), addr-0x880000, size);
-
-	std::println("32X-68k:${:X}: read{} <${:X}", cpu.pc-2 , size, addr);
-
+	if( addr >= 0x900000 && addr < 0xA00000 ) return sized_read_be(ROM.data()+(bank9*0x100000), addr&0xfFFFf, size);
+	
+	
 	if( addr == 0xA15180 ) return bmp_mode|0x8000; //todo: bit15 is 1=NTSC/0=PAL
 
 	if( addr == 0xA1518A ) return fbctrl|current_frame;
@@ -128,7 +137,7 @@ u32 genesis::read32x(u32 addr, int size)
 	if( addr >= 0xA15120 && addr < 0xA15130 ) 
 	{
 		u16 r = sized_read_be(comms, addr&0xf, size);
-		std::println("68k: rd comms[${:X}] = ${:X}", addr&0xf, r);
+		//std::println("68k: rd comms[${:X}] = ${:X}", addr&0xf, r);
 		return r;
 	}
 
@@ -179,9 +188,10 @@ u32 genesis::read32x(u32 addr, int size)
 
 	if( addr < 0x400000 )
 	{
-		exit(1);
+		//exit(1);
 		return sized_read_be(ROM.data(), addr, size);
 	}
+	std::println("32X-68k:${:X}: read{} <${:X}", cpu.pc-2 , size, addr);
 	
 	return 0;
 }
