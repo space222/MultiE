@@ -1,5 +1,7 @@
 #pragma once
+#include <vector>
 #include <cstdio>
+#include "itypes.h"
 
 // fsize - returns the size of the file, maintains current seek position
 u32 fsize(FILE* fp);
@@ -30,6 +32,23 @@ inline void sized_write(u8* data, u32 addr, u64 v, u32 size)
 		std::printf("error in sized_write, size=%i\n", size);
 		exit(1);
 	}
+}
+
+inline void sized_write128(u8* data, u32 addr, __uint128_t v, u32 size)
+{
+	if( size < 128 )
+	{
+		return sized_write(data, addr, v, size);
+	}
+	memcpy(&data[addr], &v, 16);
+}
+
+inline __uint128_t sized_read128(u8* data, u32 addr, u32 size)
+{
+	if( size < 128 ) return sized_read(data, addr, size);
+	__uint128_t v = 0;
+	memcpy(&v, &data[addr], 16);
+	return v;
 }
 
 inline u64 sized_read_be(u8* data, u32 addr, u32 size)

@@ -1,6 +1,6 @@
 #pragma once
 #include "console.h"
-#include "80286.h"
+#include "8086.h"
 
 class WonderSwan : public console
 {
@@ -20,7 +20,7 @@ public:
 	
 	void eeprom_run();
 	
-	c80286 cpu;
+	c8086 cpu;
 	
 	u16 rom_bank0, rom_bank1, rom_linear;
 	u16 sram_bank;

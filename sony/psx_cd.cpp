@@ -159,6 +159,12 @@ void psx::cd_write_1803(u8 val)
 {
 	switch( cd_index & 3 )
 	{
+	case 0:
+		if( !(val & BIT(7)) )
+		{
+			//cd_offset = 0;
+		}
+		break;
 	case 1:
 		cd_if = 0;
 		if( !cd_irqq.empty() /*&& (cd_ie&7)*/ )

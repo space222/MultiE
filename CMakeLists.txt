@@ -6,17 +6,17 @@ find_package(SDL2)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 #set(CMAKE_CXX_FLAGS "-g -fabi-version=16 -fsanitize=address -ftree-vectorize -march=native -Wall -Wpedantic -Wextra -Wshadow -Wimplicit-fallthrough")
-set(CMAKE_CXX_FLAGS "-O2 -ftree-vectorize -march=native -Wall -Wpedantic -Wextra -Wshadow -Wimplicit-fallthrough")
-#set(CMAKE_CXX_COMPILER g++)
+set(CMAKE_CXX_FLAGS "-O3 -ftree-vectorize -march=native -Wall -Wpedantic -Wextra -Wshadow -Wimplicit-fallthrough")
+set(CMAKE_CXX_COMPILER g++)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
 
 add_executable(test main.cpp imgui/backends/imgui_impl_sdl2.cpp progopt.cpp commodore/c64.cpp commodore/TAPFile.cpp 
 atari/a26.cpp atari/a52.cpp atari/antic.cpp atari/tia.cpp cpu/6502.cpp
 cpu/sm83.cpp nintendo/nes.cpp nintendo/nes_ppu.cpp nintendo/nes_apu.cpp nintendo/nes_mappers.cpp 
-mattel/intellivision.cpp cpu/cp1600.cpp cpu/z80.cpp ibm/ibmpc.cpp cpu/80286.cpp sony/psx_mdec.cpp sony/psx_timer.cpp
-ibm/ibmpc_fdc.cpp  imgui/backends/imgui_impl_sdlrenderer2.cpp ibm/ibmpc_pit.cpp ibm/ibmpc_pic.cpp ibm/ibmpc_vga.cpp 
-cpu/68k.cpp sony/psx_pad.cpp sony/psx_spu.cpp sega/sms.cpp sony/psx.cpp cpu/r3000.cpp cpu/r3000_gte.cpp 
-Scheduler.cpp sony/psx_gpu.cpp sony/psx_cd.cpp imgui/imgui.cpp imgui/imgui_draw.cpp imgui/imgui_tables.cpp 
+mattel/intellivision.cpp cpu/cp1600.cpp cpu/z80.cpp sony/psx_mdec.cpp sony/psx_timer.cpp
+imgui/backends/imgui_impl_sdlrenderer2.cpp cpu/68k.cpp sony/psx_pad.cpp sony/psx_spu.cpp 
+sega/sms.cpp sony/psx.cpp cpu/r3000.cpp cpu/r3000_gte.cpp Scheduler.cpp sony/psx_gpu.cpp sony/psx_cd.cpp 
+imgui/imgui.cpp imgui/imgui_draw.cpp imgui/imgui_tables.cpp 
 imgui/imgui_widgets.cpp other/SN79489.cpp sega/genesis.cpp sega/gen_vdp.cpp sega/gen_snd.cpp 
 other/casio_pv1k.cpp sega/gen_pad.cpp Settings.cpp cpu/sh2.cpp sega/gen_32x.cpp atari/jag.cpp
 coleco/colecovision.cpp other/TMS9918A.cpp other/msx.cpp other/AY-3-8910.cpp
@@ -30,7 +30,8 @@ cpu/gekko.cpp nintendo/gc/GameCube.cpp nintendo/gc/gc_exi.cpp nintendo/gc/gc_dsp
 nintendo/gba_io.cpp nintendo/gba_lcd.cpp nintendo/gba_dma.cpp nintendo/LCDEngine.cpp
 nintendo/gba_timer.cpp nintendo/gba_sound.cpp nintendo/gba_gpio.cpp cpu/z80_new.cpp cpu/sh4.cpp util.cpp
 sega/dc/dreamcast.cpp sega/dc/cpuregs.cpp sega/dc/timer.cpp sega/dc/maple.cpp sega/dc/disc.cpp sega/dc/ta.cpp
-sega/dc/sound.cpp cpu/arm7di.cpp
+sega/dc/sound.cpp cpu/arm7di.cpp cpu/8086.cpp cpu/286.cpp ibm/ibmpc.cpp ibm/ibmpc_pit.cpp sony/ps2/ps2.cpp 
+sony/ps2/iop.cpp cpu/EEngine.cpp
 #stub/gdb_stub.cpp
 )
 

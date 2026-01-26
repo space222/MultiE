@@ -15,7 +15,7 @@ bios = "GLABIOS_0.2.5_8T.ROM"
 bios = "./bios/PSX.BIOS"
 cd = "./roms/psx/Crash1.bin"
 #exp1 = "./roms/psx/unirom/stuff/unirom_withcaetla.rom"
-#exp1 = "./roms/psx/Caetla/EXPROM.BIN"
+exp1 = "./roms/psx/Caetla/EXPROM.BIN"
 
 
 [n64]

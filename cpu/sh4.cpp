@@ -4,7 +4,7 @@
 #include "sh4.h"
 
 struct sh4_instr { u16 mask,res; std::function<void(sh4&,u16)> func; std::string name, decode; };
-#define INSTR [](sh4& cpu, u16 opc) 
+#define INSTR [](sh4& cpu, u16 opc) static
 #define Rn cpu.r[(opc>>8)&15]
 #define Rm cpu.r[(opc>>4)&15]
 #define R0 cpu.r[0]

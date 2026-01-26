@@ -1,5 +1,6 @@
 #include <cstdio>
 #include <cstdlib>
+//#include <print>
 #include "r3000.h"
 
 #define LOAD(R, V) ld_r[1] = (R); ld_v[1] = (V)
@@ -104,8 +105,8 @@ void r3000::exec(u32 opc)
 	
 	switch( opc>>26 )
 	{
-	case 2: nnpc = (pc&0xf0000000u)|((opc&0x3ffffffu)<<2); in_delay = 2; break;
-	case 3: temp = nnpc; nnpc = (pc&0xf0000000u)|((opc&0x3ffffffu)<<2); r[31] = temp; DEST(31); in_delay = 2; break;
+	case 2: nnpc = (npc&0xf0000000u)|((opc&0x3FFffffu)<<2); in_delay = 2; break;
+	case 3: temp = nnpc; nnpc = (npc&0xf0000000u)|((opc&0x3FFffffu)<<2); r[31] = temp; DEST(31); in_delay = 2; break;
 	case 4: if( r[S] == r[T] ) { nnpc = npc + (simm16<<2); in_delay = 2; } break;
 	case 5: if( r[S] != r[T] ) { nnpc = npc + (simm16<<2); in_delay = 2; } break;
 	case 6: if( s32(r[S]) <= 0 ) { nnpc = npc + (simm16<<2); in_delay = 2; } break;
@@ -233,7 +234,7 @@ void r3000::cop0(u32 opc)
 void r3000::step()
 {
 	u32 opc = read(pc&~3, 32);
-	//printf("pc = $%X\n", pc);
+	//std::println("opc = ${:X}", opc);
 	
 	if( ((pc&0x1ffffff) == 0x00000A0 || (pc&0x1ffffff) == 0x00000B0) )
 	{

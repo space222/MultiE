@@ -464,9 +464,9 @@ void psx::write(u32 addr, u32 val, int size)
 	
 	if( addr == 0x1F8010F4 )
 	{
-		if( size == 16 )
+		if( size == 16 || size == 8 )
 		{
-			printf("16bit DICR write 10F4!\n");
+			printf("%ibit DICR write 10F4!\n", size);
 			exit(1);		
 		}
 		DICR = (DICR&(1u<<31)) | ((DICR&~val&0x7f000000u)) | (val&0xffFFff);
@@ -477,13 +477,22 @@ void psx::write(u32 addr, u32 val, int size)
 	
 	if( addr == 0x1F8010F6 )
 	{
+		if( size == 8 )
+		{
+			DICR &= 0xff00FFFFu;
+			DICR |= (val&0xff)<<16;
+			DICR &= ~(1u<<31);
+			DICR |= ( (DICR&(1u<<15)) || ((DICR&(1u<<23))&&(((DICR>>16)&(DICR>>24)&0x7f))) ) ? (1u<<31) : 0;
+			return;
+		}
+	
 		u32 lo = DICR&0xffff;
 		val <<= 16;
 		DICR = (DICR&(1u<<31)) | ((DICR&~val&0x7f000000u)) | (val&0xffFFff);
 		DICR &= ~(1u<<31);
 		DICR |= ( (DICR&(1u<<15)) || ((DICR&(1u<<23))&&(((DICR>>16)&(DICR>>24)&0x7f))) ) ? (1u<<31) : 0;
 		DICR = (DICR&0xffff0000)|lo;
-		printf("16bit DICR write to 10F6 = $%X!\n", val);
+		printf("%ibit DICR write to 10F6 = $%X!\n", size, val);
 		//exit(1);
 		return;
 	}
@@ -659,7 +668,21 @@ u32 psx::read(u32 addr, int size)
 		//would be cd data fifo. most thing use DMA (hopefully?)?
 		printf("CD: Data fifo usage\n");
 		if( curloc.LBA < 150 ) return 0;
-		return CDDATA[((curloc.LBA-150)*0x930) + ((cd_mode&0x20)?0x0C:0x18) + (cd_offset++)];		
+		if( size == 8 )
+		{
+			return CDDATA[((curloc.LBA-150)*0x930) + ((cd_mode&0x20)?0x0C:0x18) + (cd_offset++)];
+		}
+		if( size == 16 )
+		{
+			u16 retval = CDDATA[((curloc.LBA-150)*0x930) + ((cd_mode&0x20)?0x0C:0x18) + (cd_offset++)];
+			retval |= CDDATA[((curloc.LBA-150)*0x930) + ((cd_mode&0x20)?0x0C:0x18) + (cd_offset++)]<<8;
+			return retval;
+		}
+		u32 retval = CDDATA[((curloc.LBA-150)*0x930) + ((cd_mode&0x20)?0x0C:0x18) + (cd_offset++)];
+		retval |= CDDATA[((curloc.LBA-150)*0x930) + ((cd_mode&0x20)?0x0C:0x18) + (cd_offset++)]<<8;
+		retval |= CDDATA[((curloc.LBA-150)*0x930) + ((cd_mode&0x20)?0x0C:0x18) + (cd_offset++)]<<16;
+		retval |= CDDATA[((curloc.LBA-150)*0x930) + ((cd_mode&0x20)?0x0C:0x18) + (cd_offset++)]<<24;
+		return retval;	
 	}
 	
 	if( addr == 0x1F801803 )

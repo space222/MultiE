@@ -1,7 +1,7 @@
 #include <cstdio>
 #include <cstdlib>
-#include "80286.h"
-#include "modrm.h"
+#include "8086.h"
+//#include "modrm.h"
 
 #define PREFIX_ES 1
 #define PREFIX_CS 2
@@ -29,7 +29,7 @@
 #define SS seg[2]
 #define DS seg[3]
 
-u64 c80286::step()
+u64 c8086::step()
 {
 	u8 temp8 = 0;
 	u16 temp16 = 0;
@@ -1615,20 +1615,20 @@ u64 c80286::step()
 	return 0;
 }
 
-void c80286::push(u16 v)
+void c8086::push(u16 v)
 {
 	SP -= 2;
 	write16(SS, SP, v);
 }
 
-u16 c80286::pop()
+u16 c8086::pop()
 {
 	u16 res = read16(SS, SP);
 	SP += 2;
 	return res;
 }
 
-u8 c80286::add8(u8 a, u8 b, u8 c)
+u8 c8086::add8(u8 a, u8 b, u8 c)
 {
 	u16 res = a;
 	res += b;
@@ -1640,7 +1640,7 @@ u8 c80286::add8(u8 a, u8 b, u8 c)
 	return res;
 }
 
-u8 c80286::sub8(u8 a, u8 b, u8 c)
+u8 c8086::sub8(u8 a, u8 b, u8 c)
 {
 	u8 res = add8(a, b^0xff, c^1);
 	F.b.A ^= 1;
@@ -1648,7 +1648,7 @@ u8 c80286::sub8(u8 a, u8 b, u8 c)
 	return res;
 }
 
-u16 c80286::add16(u16 a, u16 b, u16 c)
+u16 c8086::add16(u16 a, u16 b, u16 c)
 {
 	u32 res = a;
 	res += b;
@@ -1660,7 +1660,7 @@ u16 c80286::add16(u16 a, u16 b, u16 c)
 	return res;
 }
 
-u16 c80286::sub16(u16 a, u16 b, u16 c)
+u16 c8086::sub16(u16 a, u16 b, u16 c)
 {
 	u16 res = add16(a, b^0xffff, c^1);
 	F.b.A ^= 1;
@@ -1668,13 +1668,13 @@ u16 c80286::sub16(u16 a, u16 b, u16 c)
 	return res;
 }
 
-void c80286::reset()
+void c8086::reset()
 {
 	IP = 0;
 	CS = 0xffff;
 }
 
-bool c80286::is_prefix(u8 p)
+bool c8086::is_prefix(u8 p)
 {
 	switch( p )
 	{
@@ -1690,7 +1690,7 @@ bool c80286::is_prefix(u8 p)
 	return false;
 }
 
-u8 c80286::seg_override(u8 index)
+u8 c8086::seg_override(u8 index)
 {
 	if( prefix & 0xf )
 	{

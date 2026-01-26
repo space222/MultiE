@@ -98,12 +98,7 @@ IBM PC Todo List
 
 Sony PS1 Todo List
 ---------------------
-1. Integrate CD library to isolate remaining failures.
-2. Analog controllers, mouse
-3. Support more of the timer modes. better timing?
-4. SPU envelope and interpolation
-5. MDEC Rewrite?
-6. Better gpu?
+* Full rewrite (except maybe cpu) is planned (better timing, etc)
 Status: Playable (as in they get to gameplay where a character can move): 
 		Mortal Kombat 2, Crash1&2, Ridge Racer (+Revolution via Caetla), CyberSled, Battle Arena Toshinden,
 		Spyro 1, Resident Evil 2, Metal Gear Solid, Final Fantasy 8, Duke Nukem: Time to Kill, THPS2&3
@@ -129,15 +124,16 @@ Sega SMS Todo List
 2. Wrong tiles in 3dcity.sms (just sometimes? UB or forgot to initialize something?)
 3. cart ram + support other vram nt layouts
 Status: Bad Apple still has some garbage tiles. 
-	Possibly bad tiles elsewhere, UB or (more likely) missed an initialization somewhere.
 	Most things (that I've tried) are playable.
 
 
 
 Genesis Todo List
 --------------------
-1. vdp line count interrupt
-2. shadow/highlight
+1. shadow/highlight
+2. better timing in the 68k (maybe just go microcode?)
+3. cycle-stepped z80
+4. my own fm synth based on jsgroth blogs
 Status: YM2612 uses the Nuken OPN library... Poorly? Fantastic Dizzy and UMK3 lack sound.
 	Only a few games with graphical bugs left, not including lack of shadow/highlight.
 	Did the SH2 for the 32X, but nowhere near working yet.
@@ -349,30 +345,30 @@ Sega Dreamcast Todo List
 ---------------------------
 1. some of the gfx-flies-into-space issue was analog stick, not anything to do with fpu.
 	- implement the rest of the controller buttons, maybe copy Deecy's layout on this one
-2. alter arm7di decoding to match manual rather than straight copy of -tdmi.
-3. find a kos sound demo||example and dump / disassemble sound ram, see if it matches expected kos driver
-4. attempt to have the arm7 run
-5. start implementing sound registers
-6. have event fire every 200000000/44100 cycles to output current sample (which will be zero until aica exists)
-7. try to implement basic pcm output with envelopes
-8. try coding up a demo to use sound from the cpu
-9. try coding up a demo to use sound from the arm7
-	- look into (at first glance kos starts the arm7, then just expects it to have set things up before the sh4 gets to this assert?)
-	"
-		*** ASSERTION FAILURE ***
-		Assertion "g2_read_32(qa + offsetof(aica_queue_t, valid))" failed at snd_iface.c:86 in `snd_sh4_to_aica': Queue is not yet valid
-	" (hopefully this is gone by the time I get here)
-10. algorithm for rectangular W!=H (currently only squareW==H) texture twiddling coordinates
-11. have texture sampling return 32bit color via struct or tuple
-12. all the other DMAs on the system, find or code tests for them
-13. Find menu program to have multiple demos on one cd
-14. code cd tests
-15. implement lle disc access
-16. get back to working through bios
-17. implement proper TA
-18. implement ISP/Core
+2. start implementing sound registers
+3. have event fire every 200000000/44100 cycles to output current sample (which will be zero until aica exists)
+4. try to implement basic pcm output with envelopes
+5. try coding up a demo to use sound from the cpu
+6. try coding up a demo to use sound from the arm7
+7. algorithm for rectangular W!=H (currently only squareW==H) texture twiddling coordinates
+8. all the other DMAs on the system, find or code tests for them
+9. Find menu program to have multiple demos on one cd
+10. code cd tests
+11. implement lle disc access
+12. get back to working through bios
+13. implement proper TA
+14. implement ISP/Core
 Notes:
-Still should ask on discord about proper interrupt priorities and video timing
+Still should ask on discord about proper video timing
+
+
+Sony Playstation 2
+---------------------
+1. Start the IOP
+2. SIF mailbox regs
+3. EE Timers?
+4. SIF DMA?
+
 
 
 

@@ -34,7 +34,6 @@ static u16 dmcrate[] = {
 428, 380, 340, 320, 286, 254, 226, 214, 190, 160, 142, 128, 106,  84,  72,  54
 };
 
-static std::vector<float> sdl_samples;
 static std::vector<float> nes_samples;
 
 void nes::apu_clock_env_lincnt()
@@ -209,7 +208,7 @@ void nes::apu_clock()
 		} else if( apu_stamp == 37281 ) {
 			apu_clock_env_lincnt();
 			apu_clock_len_sweep();
-		} else if( apu_stamp >= 37282 ) {
+		//} else if( apu_stamp >= 37282 ) {
 			apu_stamp = 0;
 		}
 	} else {
@@ -225,7 +224,7 @@ void nes::apu_clock()
 		} else if( apu_stamp == 29829 ) {
 			apu_clock_env_lincnt();
 			apu_clock_len_sweep();
-		} else if( apu_stamp >= 29830 ) {
+		//} else if( apu_stamp >= 29830 ) {
 			apu_stamp = 0;
 		}
 	}
@@ -317,14 +316,7 @@ void nes::apu_clock()
 		float total = 0;
 		for(int i = 0; i < 40; ++i) total += nes_samples[i];
 		nes_samples.clear();
-		/*
-		sdl_samples.push_back(Settings::mute ? 0 : ((total / 40.f)*2 - 1));
-		if( sdl_samples.size() >= 44100/60 )
-		{
-			SDL_QueueAudio(audio_dev, sdl_samples.data(), sdl_samples.size()*4);
-			sdl_samples.clear();
-		}
-		*/
+		
 		float sm = ((total / 40.f)*2 - 1);
 		audio_add(sm, sm);
 	}
@@ -403,9 +395,7 @@ void nes::apu_write(u16 addr, u8 val)
 
 void nes::apu_reset()
 {
-	sdl_samples.reserve(44100/60);
 	nes_samples.reserve(40);
-	SDL_ClearQueuedAudio(audio_dev);
 }
 
 

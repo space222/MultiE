@@ -1,8 +1,9 @@
 #pragma once
+#include <functional>
 #include "itypes.h"
 
-typedef void (*r3000_write)(u32, u32, int);
-typedef u32 (*r3000_read)(u32, int);
+//typedef void (*r3000_write)(u32, u32, int);
+//typedef u32 (*r3000_read)(u32, int);
 
 struct r3000
 {
@@ -27,8 +28,26 @@ struct r3000
 	void gte_load_c(u32 r, u32 val);
 	u32 gte_get_d(u32);
 	u32 gte_get_c(u32);
-	r3000_read read;
-	r3000_write write;
+	//r3000_read read;
+	//r3000_write write;
+	
+	void check_irqs()
+	{
+		auto& cpu = *this;
+		if( (cpu.c[13]&BIT(10)) && (cpu.c[12] & (1u<<10)) && (cpu.c[12]&1) && !cpu.in_delay )
+		{
+			cpu.c[14] = cpu.pc;
+			cpu.pc = 0x80000080;
+			cpu.npc = cpu.pc + 4;
+			cpu.nnpc = cpu.npc + 4;
+			cpu.c[12] = ((cpu.c[12]&~0xff)|((cpu.c[12]&0xf)<<2));
+			cpu.c[13] &= ~0xff;
+			cpu.advance_load();
+		}
+	}
+	
+	std::function<u32(u32, int)> read;
+	std::function<void(u32, u32, int)> write;
 	
 	//giant pile of GTE regs
 	s16 ZSF3, ZSF4, VX0, VY0, VX1, VY1, VX2, VY2, VZ0, VZ1, VZ2, DQA;

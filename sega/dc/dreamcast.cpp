@@ -424,7 +424,7 @@ void dreamcast::run_frame()
 		//if( debug_on && cpu.pc > 0x8c010000u ) std::println("pc = ${:X}", cpu.pc);
 		check_irqs();
 		if( !cpu.sleeping ) cpu.step();
-		if( (stamp&0xff)==0 && (aica.armrst&1)==0 ) { if( aica.cpu.r[15]<0x30 ) std::println("AICA PC = ${:X}", aica.cpu.r[15]-8); aica.cpu.step(); }
+		if( (stamp&0xff)==0 && (aica.armrst&1)==0 ) { aica.cpu.step(); }
 		if( (cpu.pc>>8) == 0xcafeba )
 		{
 			u32 bcall = cpu.pc;

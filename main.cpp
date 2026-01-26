@@ -52,6 +52,7 @@
 #include "rca_studio_ii.h"
 #include "gc/GameCube.h"
 #include "dc/dreamcast.h"
+#include "ps2/ps2.h"
 void try_kirq();
 void gdb_start();
 extern std::atomic<int> gdb_active;
@@ -535,6 +536,22 @@ void imgui_run()
 			}
 			if( ImGui::BeginMenu("Alpha") )
 			{
+				if( ImGui::MenuItem("Sony PS2") )
+				{
+					std::string f = getOpenFile("Sony PS2");
+					if( !f.empty() )
+					{
+						delete sys;
+						sys = new ps2;
+						if( ! sys->loadROM(f) ) 
+						{
+							printf("unable to load ROM\n");
+							exit(1);
+						}
+						else newinstance = true;
+						crt_scale = 1.f;
+					}				
+				}
 				if( ImGui::MenuItem("Sega Dreamcast") )
 				{
 					std::string f = getOpenFile("Sega Dreamcast");

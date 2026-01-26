@@ -269,7 +269,6 @@ public:
 	u8 memcard_read(u32,u8);
 	u8 memcard_write(u32,u8);
 	
-	
 	struct mb
 	{
 		u8 quant;
