@@ -40,9 +40,10 @@ static EEInstr decode_COP1(u32 opcode)
 {
 	if( !(opcode & BIT(25)) ) switch( (opcode>>21) & 0x1F )
 	{
+	case 0x02: INSTR_NARG { std::println("CFC1"); }; //todo: CFC1	
 	case 0x04: INSTR { cpu.fpr[D] = std::bit_cast<float>((u32)RT); }; // MTC1
 	
-	case 0x06: INSTR_NARG { std::println("CTC1"); }; //CTC1
+	case 0x06: INSTR_NARG { std::println("CTC1"); }; //todo: CTC1
 	default:
 		std::println("EE: Unimpl cop1 opc = ${:X}", (opcode>>21)&0x1F);
 		return nullptr;
@@ -50,7 +51,8 @@ static EEInstr decode_COP1(u32 opcode)
 	
 	if( ((opcode>>21)&0x1F) == 0x10 ) switch( opcode & 0x3F )
 	{
-	case 0x18: INSTR_NARG { std::println("ADDA.S"); }; // ADDA.S
+	case 0x18: INSTR_NARG { std::println("ADDA.S"); }; //todo: ADDA.S
+	case 0x1C: INSTR_NARG { std::println("MADD.S"); }; //todo: MADD.S
 	default:
 		std::println("EE: Unipml FPU.S, bot6=${:X}", opcode&0x3F);
 		return nullptr;

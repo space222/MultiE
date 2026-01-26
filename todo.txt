@@ -364,11 +364,10 @@ Still should ask on discord about proper video timing
 
 Sony Playstation 2
 ---------------------
-1. Start the IOP
-2. SIF mailbox regs
-3. EE Timers?
-4. SIF DMA?
-
+1. Continue thru BIOS, implementing EE instructions along the way
+2. EE Timers?
+3. SIF DMA?
+Status: EE send SIF RPC Bind for LOADFILE
 
 
 

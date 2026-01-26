@@ -248,13 +248,8 @@ void ps2::ee_dma_chain(u32 c, std::function<void(u32)> where)
 			TADR += 16;
 			QWC = tag&0xffff;
 			std::println("xfer start, M=${:X}, Q=${:X}", MADR, QWC);
-			std::println("T now ${:X}", TADR);
 			for(; QWC>0; --QWC, MADR+=16) 
 			{
-				std::println("DMA sending ${:X}", *(u32*)&RAM[MADR]);
-				std::println("DMA sending ${:X}", *(u32*)&RAM[MADR+4]);
-				std::println("DMA sending ${:X}", *(u32*)&RAM[MADR+8]);
-				std::println("DMA sending ${:X}", *(u32*)&RAM[MADR+12]);
 				where(*(u32*)&RAM[MADR]);
 				where(*(u32*)&RAM[MADR+4]);
 				where(*(u32*)&RAM[MADR+8]);
@@ -273,27 +268,36 @@ void ps2::ee_sif_dest_chain()
 {
 	bool end = false;
 	bool do_irq = false;
-	//while( !end )
+	while( !end )
 	{
 		u64 tag = eedma.popd();
+		u32 id = (tag>>28)&7;
+		end = end || (id==7);
 		std::println("EE TAG ${:X}", tag);
 		u32 addr = tag>>32;
 		u32 size = tag&0xffff;
 		eedma.chan[5][1] = addr+size*16;
-
+		
+		//eedma.popd();
+		std::println("xfer is {} bytes, fifo has {} bytes", size*16, eedma.sif_fifo.size()*4);
+		
 		do_irq = tag & BIT(31);
 		end = end || (do_irq && (eedma.chan[5][0]&BIT(7)));
 		for(u32 i = 0; i < size; ++i)
 		{
 			*(u128*)&RAM[addr + i*16] = eedma.popq();
 		}
+		if( eedma.sif_fifo.empty() ) break;
 	}
-	eedma.chan[5][0] &= ~BIT(8);
+	if( end )
+	{
+		eedma.chan[5][0] &= ~BIT(8);
+	}
 	eedma.chan[5][2] = 0;
 	
 	if( do_irq && (eedma.chan[5][0]&BIT(7)) )
 	{
-		
+		//this actually do anything other than end the xfer?
 	}
 	
 	eedma.D_STAT.b.stat |= BIT(5);

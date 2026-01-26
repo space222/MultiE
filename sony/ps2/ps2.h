@@ -87,10 +87,8 @@ public:
 
 		u128 popq()
 		{
-			u128 v = pop_fifo();
-			v |= u128(pop_fifo())<<32;
-			v |= u128(pop_fifo())<<64;
-			v |= u128(pop_fifo())<<96;
+			u128 v = popd();
+			v |= u128(popd())<<64;
 			return v;
 		}
 		

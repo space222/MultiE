@@ -143,16 +143,17 @@ void ps2::iop_dma_ctrl(u32 c,u32 v)
 				iop_dma.chan[9][0] = start + len*4;
 				if( iop_dma.chan[9][2] & BIT(8) )
 				{
-					std::println("xfer ${:X}", *(u32*)&iop_ram[(TADR& 0x1fffff)+8]);
+					//std::println("xfer ${:X}", *(u32*)&iop_ram[(TADR& 0x1fffff)+8]);
 					eedma.sif_fifo.push_front(*(u32*)&iop_ram[(TADR& 0x1fffff)+8]);
-					std::println("xfer ${:X}", *(u32*)&iop_ram[(TADR& 0x1fffff)+12]);
+					//std::println("xfer ${:X}", *(u32*)&iop_ram[(TADR& 0x1fffff)+12]);
 					eedma.sif_fifo.push_front(*(u32*)&iop_ram[(TADR& 0x1fffff)+12]);
+					TADR += 8;
 				}
-				TADR += 16;
+				TADR += 8;
 				for(u32 i = 0; i < len; ++i)
 				{
 					u32 p = *(u32*)&iop_ram[(start&0x1fffff)+i*4];
-					std::println("xfer ${:X}", p);
+					//std::println("xfer ${:X}", p);
 					eedma.sif_fifo.push_front(p);
 				}
 			}
