@@ -1,6 +1,7 @@
 #pragma once
 #include <print>
 #include <deque>
+#include "Scheduler.h"
 #include "console.h"
 #include "EEngine.h"
 #include "r3000.h"
@@ -10,6 +11,7 @@ extern bool logall;
 class ps2 : public console
 {
 public:
+	ps2() : sched(this) {}
 	u32 fb_width() override { return 640; }
 	u32 fb_height() override { return 480; }
 	u32 fb_bpp() override { return 32; }
@@ -20,14 +22,14 @@ public:
 	bool loadROM(std::string) override;
 	void reset() override;
 	
+	void event(u64, u32) override;
+		
+	bool loaded_elf = false;
+	u32 elf_entry = 0xbad0e1f;
+	
 	void key_down(int f)
 	{ 
-		if( f == SDL_SCANCODE_ESCAPE ) logall = !logall; 
-		if( f == SDL_SCANCODE_F )
-		{
-			std::println("ee INTC_MASK = ${:X}", eeint.INTC_MASK);
-			
-		}
+		if( f == SDL_SCANCODE_ESCAPE ) logall = !logall;
 	}
 	
 	//bool logall = false;
@@ -41,6 +43,7 @@ public:
 	u64 global_stamp=0, iop_stamp=0;
 	u64 last_target=0;
 
+	Scheduler sched;
 	EEngine cpu;
 	r3000 iop;
 
@@ -54,32 +57,31 @@ public:
 	
 	u32 fbuf[640*480];
 	
+	const u32 EVENT_VBLANK = 1;
+	
+	
+	const u32 CSR_VBINT = BIT(3);
+	const u32 CSR_FIELD = BIT(13);
+	struct {
+		u32 CSR=0;
+		
+		std::deque<u128> fifo;
+	} gs;
+	void gs_run_fifo();	
+		
 	struct {
 		u32 INTC_STAT=0;
 		u32 INTC_MASK=0;
 	} eeint;
 	
 	struct {
-		u32 D_CTRL=0, D_PCR=0, D_SQWC=0;
-		union {
-			struct {
-				unsigned int stat : 10;
-				unsigned int pad0 : 3;
-				unsigned int dma_stall : 1;
-				unsigned int mfifo_empty : 1;
-				unsigned int buserr : 1;
-				unsigned int mask : 10;
-				unsigned int pad1 : 3;
-				unsigned int dma_stall_mask : 1;
-				unsigned int mfifo_empty_mask : 1;
-				unsigned int pad2 : 1;
-			} PACKED b;
-			u32 v;
-		} PACKED D_STAT = {.v=0};
-	
-		u32 chan[10][15] = {0};
+		u32 D_STAT=0, D_CTRL=0, D_PCR=0, D_SQWC=0, D_STADR=0;
+		u32 D_RBSR=0, D_RBOR=0, D_ENABLE=0x1201;
 		
-		u32 D_RBSR=0, D_RBOR=0;
+		struct {
+			u32 chcr, madr, tadr, qwc, asr0, asr1, sadr;		
+		} chan[10] = {};
+		
 		
 		std::deque<u32> sif_fifo;
 		u32 last_fifo=0;

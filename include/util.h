@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include <functional>
 #include <cstdio>
 #include "itypes.h"
 
@@ -73,5 +74,22 @@ inline void sized_write_be(u8* data, u32 addr, u64 v, u32 size)
 	}
 }
 
+template<typename T>
+T freadb(FILE* fp)
+{
+	T value{};
+	[[maybe_unused]] int unu = fread(&value, 1, sizeof(T), fp);
+	return value;
+}
 
+template<typename T>
+T freadb_offs(FILE* fp, int offset)
+{
+	T value{};
+	fseek(fp, offset, SEEK_SET);
+	[[maybe_unused]] int unu = fread(&value, 1, sizeof(T), fp);
+	return value;
+}
+
+u32 loadELF(FILE* fp, std::function<void(u32 addr, u8 v)> writer);
 

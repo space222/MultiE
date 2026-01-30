@@ -122,64 +122,20 @@ u32 ps2::iop_read(u32 a, int sz)
 	return 0;
 }
 
-void ps2::iop_dma_ctrl(u32 c,u32 v) 
+void ps2::iop_dma_ctrl(u32 c, u32 v) 
 {
 	switch( c )
 	{
 	case 9:
 		if( v & BIT(24) )
 		{
-			std::println("IOP->EE SIF0 DMA Start! ctrl=${:X}", v);
-			u32 &TADR = iop_dma.chan[9][3];
-			std::println("TADR = ${:X}", TADR);
-			bool end = false;
-			bool do_irq = false;
-			while( !end )
-			{
-				u32 start = *(u32*)&iop_ram[TADR & 0x1fffff];
-				u32 len =   *(u32*)&iop_ram[(TADR& 0x1fffff)+4];
-				end = start & BIT(31);
-				start &= 0x3fffFFFFu;
-				iop_dma.chan[9][0] = start + len*4;
-				if( iop_dma.chan[9][2] & BIT(8) )
-				{
-					//std::println("xfer ${:X}", *(u32*)&iop_ram[(TADR& 0x1fffff)+8]);
-					eedma.sif_fifo.push_front(*(u32*)&iop_ram[(TADR& 0x1fffff)+8]);
-					//std::println("xfer ${:X}", *(u32*)&iop_ram[(TADR& 0x1fffff)+12]);
-					eedma.sif_fifo.push_front(*(u32*)&iop_ram[(TADR& 0x1fffff)+12]);
-					TADR += 8;
-				}
-				TADR += 8;
-				for(u32 i = 0; i < len; ++i)
-				{
-					u32 p = *(u32*)&iop_ram[(start&0x1fffff)+i*4];
-					//std::println("xfer ${:X}", p);
-					eedma.sif_fifo.push_front(p);
-				}
-			}
-			if( eedma.chan[5][0] & BIT(8) )
-			{
-				ee_sif_dest_chain();
-			}
-			iop_dma.chan[9][2] &= ~BIT(24);
-			if( iop_dma.DICR.b.ie && (iop_dma.DICR2.b.mask & BIT(2)) ) { iop_dma.DICR2.b.flag |= BIT(2); }
-			if( do_irq ) { iop_dma.DICR2.b.tag |= BIT(9); iop_int.I_STAT |= BIT(3); }
-			if( iop_dma.DICR.b.ie )
-			{
-				auto oldflag = iop_dma.DICR.b.mflag;
-				iop_dma.DICR.b.mflag = iop_dma.DICR.b.ie && (iop_dma.DICR.b.flag || iop_dma.DICR2.b.flag);
-				if( oldflag==0 && iop_dma.DICR.b.mflag==1 ) iop_int.I_STAT |= BIT(3);
-			}
+			
 		}
 		return;
 	case 10:
 		if( v & BIT(24) )
 		{
-			std::println("IOP SIF1 DMA Active! ctrl=${:X}", v);
-			if( !iop_dma.sif_fifo.empty() )
-			{
-				iop_sif_dest_chain();
-			}
+			
 		}	
 		return;
 	}
@@ -188,36 +144,7 @@ void ps2::iop_dma_ctrl(u32 c,u32 v)
 
 void ps2::iop_sif_dest_chain()
 {
-	bool end = false;
-	bool do_irq = false;
-	while( !end )
-	{
-		u32 start = iop_dma.sif_fifo.back();
-		end = start & BIT(31);
-		do_irq = do_irq || (start & BIT(30));
-		start &= 0xFFffFF;
-		iop_dma.sif_fifo.pop_back();
-		u32 size = iop_dma.sif_fifo.back();
-		iop_dma.sif_fifo.pop_back();
-		iop_dma.sif_fifo.pop_back();
-		iop_dma.sif_fifo.pop_back();
-		for(u32 i = 0; i < size; ++i)
-		{
-			u32 p = iop_dma.sif_fifo.back(); iop_dma.sif_fifo.pop_back();
-			std::println("IOP SIF writing ${:X} = ${:X}", start, p);
-			*(u32*)&iop_ram[start] = p;
-			start += 4;
-		}
-	}
-	iop_dma.chan[10][2] &= ~BIT(24);
-	if( do_irq ) { iop_int.I_STAT |= BIT(3); }
-	if( iop_dma.DICR.b.ie && (iop_dma.DICR2.b.mask & BIT(3)) ) { iop_dma.DICR2.b.flag |= BIT(3); }
-	if( iop_dma.DICR.b.ie )
-	{
-		auto oldflag = iop_dma.DICR.b.mflag;
-		iop_dma.DICR.b.mflag = iop_dma.DICR.b.ie && (iop_dma.DICR.b.flag || iop_dma.DICR2.b.flag);
-		if( oldflag==0 && iop_dma.DICR.b.mflag==1 ) iop_int.I_STAT |= BIT(3);
-	}
+
 }
 
 
