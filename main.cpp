@@ -249,6 +249,7 @@ void resize_screen()
 	else if( sys->fb_bpp() == 17 ) format = SDL_PIXELFORMAT_RGB565;
 	else if( sys->fb_bpp() == 24 ) format = SDL_PIXELFORMAT_BGR24;
 	else if( sys->fb_bpp() == 33 ) format = SDL_PIXELFORMAT_XRGB8888;
+	else if( sys->fb_bpp() == 34 ) format = SDL_PIXELFORMAT_ABGR8888;
 	oldbpp = sys->fb_bpp();
 	oldwidth = sys->fb_width();
 	oldheight = sys->fb_height();

@@ -13,10 +13,14 @@ class ps2 : public console
 public:
 	ps2() : sched(this) {}
 	u32 fb_width() override { return 640; }
-	u32 fb_height() override { return 480; }
-	u32 fb_bpp() override { return 32; }
+	u32 fb_height() override { return 224; }
+	u32 fb_bpp() override { return 34; }
 	
-	u8* framebuffer() override { return (u8*)fbuf; }
+	u8* framebuffer() override 
+	{ 
+		u64 frame = gs.regs[0x4C + ((gs.regs[0]&BIT(9))?1:0)];
+		return (u8*)&vram[(frame & 0x1ff)*2048]; 
+	}
 	
 	void run_frame() override;
 	bool loadROM(std::string) override;
@@ -63,12 +67,31 @@ public:
 	const u32 CSR_VBINT = BIT(3);
 	const u32 CSR_FIELD = BIT(13);
 	struct {
-		u32 CSR=0;
+		u32 PMODE=0, SMODE2=0, DISPFB1=0, DISPLAY1=0, DISPFB2=0, DISPLAY2=0;
+		u32 EXTBUF=0, EXTDATA=0, EXTWRITE=0, BGCOLOR=0, CSR=0;
+		u32 IMR=0, BUSDIR=0, SIGLBLID=0;
+		
+		u32 dx=0, dy=0;
 		
 		std::deque<u128> fifo;
+		u64 regs[256];
 	} gs;
+	struct vertex
+	{
+		u32 color;
+		float z;
+		float x, y;
+		float s, t, q;
+		u8 fog;
+	};
+
 	void gs_run_fifo();	
-		
+	void gs_vertex_out(u64 vert, bool kick);
+	void gs_draw_sprite(vertex& a, vertex& b);
+	void gs_draw_triangle(vertex& a, vertex& b, vertex& c);
+	void gs_set_pixel(u32 x, u32 y, u32 c);
+	void gs_hwreg_poke(u64);
+	
 	struct {
 		u32 INTC_STAT=0;
 		u32 INTC_MASK=0;

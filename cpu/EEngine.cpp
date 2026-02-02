@@ -142,6 +142,12 @@ static EEInstr decode_MMI3(u32 opcode)
 	case 0x0E: INSTR { cpu.r[D].q = (u128(cpu.r[T].ud[1])<<64) | u128(cpu.r[S].ud[1]); }; // PCPYUD
 	
 	case 0x12: INSTR { cpu.r[D].q = cpu.r[T].q | cpu.r[S].q; }; // POR
+	
+	case 0x1B: INSTR {
+			u16 A0 = cpu.r[T].ud[0]; u16 A1 = cpu.r[T].ud[1];
+			cpu.r[D].h[0] = cpu.r[D].h[1] = cpu.r[D].h[2] = cpu.r[D].h[3] = A0;
+			cpu.r[D].h[4] = cpu.r[D].h[5] = cpu.r[D].h[6] = cpu.r[D].h[7] = A1;
+		}; // PCPYH
 	default:
 		std::println("Unimpl MMI3, func=${:X}", (opcode>>6)&0x1F);
 		return nullptr;
@@ -307,6 +313,10 @@ static const u64 SDR_MASK[8] =
 {	0x0000000000000000ULL, 0x00000000000000ffULL, 0x000000000000ffffULL, 0x0000000000ffffffULL,
 	0x00000000ffffffffULL, 0x000000ffffffffffULL, 0x0000ffffffffffffULL, 0x00ffffffffffffffULL
 };
+static const u32 LWL_MASK[4] = { 0xffffff, 0x0000ffff, 0x000000ff, 0x00000000 };
+static const u32 LWR_MASK[4] = { 0x000000, 0xff000000, 0xffff0000, 0xffffff00 };
+static const u32 SWL_MASK[4] = { 0xffffff00, 0xffff0000, 0xff000000, 0x00000000 };
+static const u32 SWR_MASK[4] = { 0x00000000, 0x000000ff, 0x0000ffff, 0x00ffffff };
 
 static EEInstr decode(u32 opcode)
 {
@@ -361,16 +371,32 @@ static EEInstr decode(u32 opcode)
 	
 	case 0x20: INSTR { RT = (s8)cpu.read(BASE, 8); }; // LB
 	case 0x21: INSTR { RT = (s16)cpu.read(BASE, 16); }; // LH
-	//case 0x22 LWL
+	case 0x22: INSTR {
+		u32 addr = BASE;
+		u32 shift = addr & 3;
+		u32 mem = cpu.read(addr & ~3, 32);
+		RT = s32((RT & LWL_MASK[shift]) | (mem << ((shift^3)<<3)));
+		}; // LWL
 	case 0x23: INSTR { RT = (s32)cpu.read(BASE, 32); }; // LW
 	case 0x24: INSTR { RT = (u8)cpu.read(BASE, 8); }; // LBU
 	case 0x25: INSTR { RT = (u16)cpu.read(BASE, 16); }; // LHU
-	//case 0x26: LWR
+	case 0x26: INSTR {
+		u32 addr = BASE;
+		u32 shift = addr & 3;
+		u32 mem = cpu.read(addr & ~3, 32);
+		RT = s32((RT & LWR_MASK[shift]) | (mem >> (shift<<3)));
+		}; // LWR
 	case 0x27: INSTR { RT = (u32)cpu.read(BASE, 32); }; // LWU
 
 	case 0x28: INSTR { cpu.write(BASE, RT, 8); }; // SB
 	case 0x29: INSTR { cpu.write(BASE, RT, 16); }; // SH
-	//case 0x2A SWL
+	case 0x2A: INSTR {
+		u32 addr = BASE;
+		u32 shift = addr & 3;
+		u32 mem = cpu.read(addr & ~3, 32);
+		mem = (RT >> ((shift^3)<<3)) | (mem & SWL_MASK[shift]);
+		cpu.write(addr & ~3, mem, 32);
+		}; // SWL
 	case 0x2B: INSTR { cpu.write(BASE, RT, 32); }; // SW
 	case 0x2C: INSTR {
 		u32 addr = BASE;
@@ -386,7 +412,13 @@ static EEInstr decode(u32 opcode)
 		mem = (RT << (shift<<3)) | (mem & SDR_MASK[shift]);
 		cpu.write(addr & ~7, mem, 64);
 		}; // SDR
-	//case 0x2E SWR
+	case 0x2E: INSTR {
+		u32 addr = BASE;
+		u32 shift = addr & 3;
+		u32 mem = cpu.read(addr & ~3, 32);
+		mem = (RT << (shift<<3)) | (mem & SWR_MASK[shift]);
+		cpu.write(addr & ~3, mem, 32);
+		}; // SWR
 	case 0x2F: INSTR_NARG {}; // CACHE
 	
 	case 0x31: INSTR { cpu.fpr[T] = std::bit_cast<float>((u32)cpu.read(BASE, 32)); };//LWC1

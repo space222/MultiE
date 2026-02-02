@@ -182,9 +182,12 @@ void ps2::write(u32 addr, u128 v, int sz)
 	
 	if( (addr & 0xffFFff00u) == 0x1000A000 )
 	{ // GIF dma
-		assert32;
+		if( sz != 64 )
+		{
+			assert32;
+		}
 		u32 reg = (addr>>4)&15;
-		std::println("EE GIF dma reg{} = ${:X}", reg, v);
+		//std::println("EE GIF dma reg{} = ${:X}", reg, v);
 		switch( reg )
 		{
 		case 0: {
@@ -195,14 +198,56 @@ void ps2::write(u32 addr, u128 v, int sz)
 			}
 			if( ((v>>2)&3) == 1 )
 			{ // chain mode.. yay.
-				std::println("GIF Chain xfer");
-				exit(1);
+				eedma.chan[2].chcr = v & ~BIT(8);
+				bool end = false;
+				while( !end )
+				{
+					u32 tadr = eedma.chan[2].tadr & (32_MB-1);
+					u128 tag = *(u128*)&RAM[tadr];
+					u32 id = ((tag>>28)&7);
+					if( eedma.chan[2].chcr & BIT(6) )
+					{
+						std::println("ee DMA2 TTE active!, chcr=${:X}", eedma.chan[2].chcr);
+						exit(1);
+					}
+					switch( id )
+					{
+					case 1: // cnt
+						eedma.chan[2].madr = tadr+16;
+						eedma.chan[2].qwc = tag&0xffff;
+						for(; eedma.chan[2].qwc > 0; --eedma.chan[2].qwc, eedma.chan[2].madr+=16)
+						{
+							u128 F = *(u64*)&RAM[eedma.chan[2].madr];
+							F |= u128(*(u64*)&RAM[eedma.chan[2].madr+8])<<64;
+							gs.fifo.push_front(F);
+						}
+						eedma.chan[2].tadr = eedma.chan[2].madr;
+						break;
+					case 0: // refe
+					case 3: // ref
+						eedma.chan[2].madr = (tag>>32)&(32_MB-1);
+						eedma.chan[2].qwc = tag&0xffff;
+						for(; eedma.chan[2].qwc > 0; --eedma.chan[2].qwc, eedma.chan[2].madr+=16)
+						{
+							u128 F = *(u64*)&RAM[eedma.chan[2].madr];
+							F |= u128(*(u64*)&RAM[eedma.chan[2].madr+8])<<64;
+							gs.fifo.push_front(F);
+						}
+						eedma.chan[2].tadr += 16;
+						if( id == 0 ) { end = true; }
+						break;
+					default:
+						std::println("ee dma2: id = {}", id);
+						exit(1);
+					}
+				}
+				gs_run_fifo();
 				return;
 			}
 			if( ((v>>2)&3) == 0 )
 			{
 				eedma.chan[2].chcr = v & ~BIT(8);
-				std::println("xfer with qwc = ${:X}", eedma.chan[2].qwc);
+				//std::println("xfer with qwc = ${:X}", eedma.chan[2].qwc);
 				for(; eedma.chan[2].qwc > 0; --eedma.chan[2].qwc)
 				{
 					u128 F = *(u64*)&RAM[eedma.chan[2].madr];
