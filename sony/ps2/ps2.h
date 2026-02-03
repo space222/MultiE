@@ -19,7 +19,7 @@ public:
 	u8* framebuffer() override 
 	{ 
 		u64 frame = gs.regs[0x4C + ((gs.regs[0]&BIT(9))?1:0)];
-		return (u8*)&vram[(frame & 0x1ff)*2048]; 
+		return (u8*)&vram[(frame & 0x1ff)*2048*4]; 
 	}
 	
 	void run_frame() override;
@@ -98,6 +98,7 @@ public:
 	} eeint;
 	
 	struct {
+		bool sif_active = false;
 		u32 D_STAT=0, D_CTRL=0, D_PCR=0, D_SQWC=0, D_STADR=0;
 		u32 D_RBSR=0, D_RBOR=0, D_ENABLE=0x1201;
 		
@@ -162,6 +163,7 @@ public:
 
 		u32 DPCR=0, DPCR2=0;
 		u32 DMACEN=0, DMACINTEN=0;
+		bool sif_active = false;
 		
 		std::deque<u32> sif_fifo;
 		u32 last_fifo=0;

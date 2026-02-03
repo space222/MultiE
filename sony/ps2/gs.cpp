@@ -65,11 +65,12 @@ void ps2::gs_draw_sprite(vertex& a, vertex& b)
 	u32 test = gs.regs[0x47 + ((gs.regs[0]&BIT(9))?1:0)];
 	if( (test & BIT(16)) && ((test>>17)&3) == 1 )
 	{
-		std::println("Depth test ALWAYS passes");
-		exit(1);
+		//std::println("Depth test ALWAYS passes");
+		//exit(1);
 	}
 
 	//std::println("sprite from {},{} to {},{}", a.x, a.y, b.x, b.y);
+	
 	
 	for(u32 Y = a.y; Y < b.y; ++Y)
 	{

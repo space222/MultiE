@@ -241,11 +241,7 @@ void ps2::write(u32 addr, u128 v, int sz)
 						exit(1);
 					}
 				}
-				gs_run_fifo();
-				return;
-			}
-			if( ((v>>2)&3) == 0 )
-			{
+			} else if( ((v>>2)&3) == 0 ) {
 				eedma.chan[2].chcr = v & ~BIT(8);
 				//std::println("xfer with qwc = ${:X}", eedma.chan[2].qwc);
 				for(; eedma.chan[2].qwc > 0; --eedma.chan[2].qwc)
@@ -256,14 +252,14 @@ void ps2::write(u32 addr, u128 v, int sz)
 					gs.fifo.push_front(F);
 					eedma.chan[2].madr += 16;
 				}
-				gs_run_fifo();
-				eedma.D_STAT |= BIT(2);
-				if( (eedma.D_STAT>>16) & (eedma.D_STAT&0xffff) )
-				{
-					cpu.cop0[13] |= BIT(11);
-				} else {
-					cpu.cop0[13] &=~BIT(11);
-				}
+			}
+			gs_run_fifo();
+			eedma.D_STAT |= BIT(2);
+			if( (eedma.D_STAT>>16) & (eedma.D_STAT&0xffff) )
+			{
+				cpu.cop0[13] |= BIT(11);
+			} else {
+				cpu.cop0[13] &=~BIT(11);
 			}
 			}return;
 		case 1: eedma.chan[2].madr = v; return;
@@ -284,7 +280,12 @@ void ps2::write(u32 addr, u128 v, int sz)
 		switch( reg )
 		{
 		case 0: 
-		
+			eedma.chan[5].chcr = v;
+			eedma.sif_active = v&BIT(8);
+			if( eedma.sif_active && !eedma.sif_fifo.empty() ) 
+			{
+				ee_sif_dest_chain(); 
+			} 
 			return;
 		case 1: eedma.chan[5].madr = v; return;
 		case 2: eedma.chan[5].qwc = v; return;
@@ -297,14 +298,94 @@ void ps2::write(u32 addr, u128 v, int sz)
 	}
 	
 	if( (addr & 0xffFFff00u) == 0x1000C400 )
-	{ // SIF1 dma
+	{ // SIF1 (to IOP) dma
 		assert32;
 		u32 reg = (addr>>4)&15;
 		std::println("EE SIF1 dma ${:X} = ${:X}", addr, v);
 		switch( reg )
 		{
 		case 0: 
-		
+		{
+			if( !(v & BIT(8)) )
+			{
+				eedma.chan[6].chcr = v;
+				return;
+			}
+			if( ((v>>2)&3) == 1 )
+			{ // chain mode.. yay.
+				eedma.chan[6].chcr = v & ~BIT(8);
+				bool end = false;
+				while( !end )
+				{
+					u32 tadr = eedma.chan[6].tadr & (32_MB-1);
+					u128 tag = *(u128*)&RAM[tadr];
+					u32 id = ((tag>>28)&7);
+					if( eedma.chan[6].chcr & BIT(6) )
+					{
+						std::println("ee DMA6 TTE active!, chcr=${:X}", eedma.chan[6].chcr);
+						exit(1);
+					}
+					switch( id )
+					{
+					case 1: // cnt
+						eedma.chan[6].madr = tadr+16;
+						eedma.chan[6].qwc = tag&0xffff;
+						for(; eedma.chan[6].qwc > 0; --eedma.chan[6].qwc, eedma.chan[6].madr+=16)
+						{
+							iop_dma.sif_fifo.push_front(*(u32*)&RAM[eedma.chan[6].madr]);
+							iop_dma.sif_fifo.push_front(*(u32*)&RAM[eedma.chan[6].madr+4]);
+							iop_dma.sif_fifo.push_front(*(u32*)&RAM[eedma.chan[6].madr+8]);
+							iop_dma.sif_fifo.push_front(*(u32*)&RAM[eedma.chan[6].madr+12]);
+						}
+						eedma.chan[6].tadr = eedma.chan[6].madr;
+						break;
+					case 0: // refe
+					case 3: // ref
+						eedma.chan[6].madr = (tag>>32)&(32_MB-1);
+						eedma.chan[6].qwc = tag&0xffff;
+						for(; eedma.chan[6].qwc > 0; --eedma.chan[6].qwc, eedma.chan[6].madr+=16)
+						{
+							iop_dma.sif_fifo.push_front(*(u32*)&RAM[eedma.chan[6].madr]);
+							iop_dma.sif_fifo.push_front(*(u32*)&RAM[eedma.chan[6].madr+4]);
+							iop_dma.sif_fifo.push_front(*(u32*)&RAM[eedma.chan[6].madr+8]);
+							iop_dma.sif_fifo.push_front(*(u32*)&RAM[eedma.chan[6].madr+12]);
+						}
+						eedma.chan[6].tadr += 16;
+						if( id == 0 ) { end = true; }
+						break;
+					default:
+						std::println("ee dma6: id = {}", id);
+						exit(1);
+					}
+				}
+			} else if( ((v>>2)&3) == 0 ) {
+				std::println("EE SIF1to_IOP DMA normal mode!");
+				exit(1);
+				eedma.chan[6].chcr = v & ~BIT(8);
+				//std::println("xfer with qwc = ${:X}", eedma.chan[2].qwc);
+				for(; eedma.chan[6].qwc > 0; --eedma.chan[6].qwc)
+				{
+					iop_dma.sif_fifo.push_front(*(u32*)&RAM[eedma.chan[6].madr]);
+					iop_dma.sif_fifo.push_front(*(u32*)&RAM[eedma.chan[6].madr+4]);
+					iop_dma.sif_fifo.push_front(*(u32*)&RAM[eedma.chan[6].madr+8]);
+					iop_dma.sif_fifo.push_front(*(u32*)&RAM[eedma.chan[6].madr+12]);
+					eedma.chan[6].madr += 16;
+				}
+			}
+			}
+			//if IOP dma active, run iop_sif_dest_chain()
+			if( iop_dma.sif_active && !iop_dma.sif_fifo.empty() )
+			{
+				iop_sif_dest_chain();
+			}
+			//completion irq
+			eedma.D_STAT |= BIT(6);
+			if( (eedma.D_STAT>>16) & (eedma.D_STAT&0xffff) )
+			{
+				cpu.cop0[13] |= BIT(11);
+			} else {
+				cpu.cop0[13] &=~BIT(11);
+			}
 			return;
 		case 1: eedma.chan[6].madr = v; return;
 		case 2: eedma.chan[6].qwc = v; return;
@@ -319,14 +400,44 @@ void ps2::write(u32 addr, u128 v, int sz)
 	std::println("EE Wr{} ${:X} = ${:X}", sz, addr, v);
 }
 
-void ps2::ee_dma_chain(u32 c, std::function<void(u32)> where)
+void ps2::ee_dma_chain(u32 /*channel*/, std::function<void(u32)> /*where*/)
 {
-
+	// not currently used, currently c/p'ing the same src chain 
+	// code around until it's solid then will refactor into a func like this
 }
 
 void ps2::ee_sif_dest_chain()
 {
-
+	bool end = false;
+	while( !end )
+	{
+		// if we're at loop start and there's not enough data (or empty), return
+		if( eedma.sif_fifo.empty() || eedma.sif_fifo.size() < ((eedma.sif_fifo.back()&0xffff)+1) ) return;
+		u128 tag = eedma.sif_fifo.back(); eedma.sif_fifo.pop_back();
+		u32 id = (tag>>28)&7;
+		u32 addr = (tag>>32);
+		// id 7 ends the xfer, as well as the IRQ bit being enabled (in chcr) and set
+		// all ids otherwise work the same(?) as far as madr coming from the tag addr field
+		end = end || (id==7) || ((tag&BIT(31)) && (eedma.chan[5].chcr&BIT(7)));
+		eedma.chan[5].qwc = tag&0xffff;
+		eedma.chan[5].madr = addr & 0x7fffFFFFu; //todo: from scratchpad
+		for(; eedma.chan[5].qwc > 0; --eedma.chan[5].qwc, eedma.chan[5].madr+=16)
+		{
+			u128 v = eedma.sif_fifo.back(); eedma.sif_fifo.pop_back();
+			*(u64*)&RAM[eedma.chan[5].madr] = v;
+			*(u64*)&RAM[eedma.chan[5].madr+8] = v>>64;
+		}
+	}
+	
+	// if we get here, dma xfer is legit complete
+	eedma.chan[5].chcr &= ~BIT(8);
+	eedma.D_STAT |= BIT(5);
+	if( (eedma.D_STAT>>16) & (eedma.D_STAT&0xffff) )
+	{
+		cpu.cop0[13] |= BIT(11);
+	} else {
+		cpu.cop0[13] &=~BIT(11);
+	}
 }
 
 bool logall = false;
