@@ -22,7 +22,6 @@
 
 u128 ps2::read(u32 addr, int sz)
 {
-	if( logall && addr != cpu.pc ) { std::println("EE Rd{} ${:X}", sz, addr); }
 	if( addr >= 0x70000000u && addr < 0x80000000u ) return sized_read128(spad, addr&0x3fff, sz);	
 	if( addr >= 0xFFFF8000u ) { addr = 0x78000 | (addr & 0x7fff); }	
 	addr &= 0x1FFFffffu;	
@@ -38,6 +37,9 @@ u128 ps2::read(u32 addr, int sz)
 	
 	if( sz > 32 ) { std::println("EE IO Rd{} ${:X}!!", sz, addr);  }
 
+
+if( logall && addr != cpu.pc ) { std::println("EE Rd{} ${:X}", sz, addr); }
+	
 	switch( addr )
 	{
 	case 0x12001000: return gs.CSR;
@@ -285,7 +287,7 @@ void ps2::write(u32 addr, u128 v, int sz)
 			if( eedma.sif_active && !eedma.sif_fifo.empty() ) 
 			{
 				ee_sif_dest_chain(); 
-			} 
+			}
 			return;
 		case 1: eedma.chan[5].madr = v; return;
 		case 2: eedma.chan[5].qwc = v; return;
@@ -313,6 +315,7 @@ void ps2::write(u32 addr, u128 v, int sz)
 			}
 			if( ((v>>2)&3) == 1 )
 			{ // chain mode.. yay.
+				std::println("Doing SIF1to_iop chain mode");
 				eedma.chan[6].chcr = v & ~BIT(8);
 				bool end = false;
 				while( !end )
@@ -338,6 +341,18 @@ void ps2::write(u32 addr, u128 v, int sz)
 							iop_dma.sif_fifo.push_front(*(u32*)&RAM[eedma.chan[6].madr+12]);
 						}
 						eedma.chan[6].tadr = eedma.chan[6].madr;
+						break;
+					case 2: // next
+						eedma.chan[6].madr = tadr+16;
+						eedma.chan[6].qwc = tag&0xffff;
+						for(; eedma.chan[6].qwc > 0; --eedma.chan[6].qwc, eedma.chan[6].madr+=16)
+						{
+							iop_dma.sif_fifo.push_front(*(u32*)&RAM[eedma.chan[6].madr]);
+							iop_dma.sif_fifo.push_front(*(u32*)&RAM[eedma.chan[6].madr+4]);
+							iop_dma.sif_fifo.push_front(*(u32*)&RAM[eedma.chan[6].madr+8]);
+							iop_dma.sif_fifo.push_front(*(u32*)&RAM[eedma.chan[6].madr+12]);
+						}
+						eedma.chan[6].tadr = (tag>>32)&(32_MB-1);
 						break;
 					case 0: // refe
 					case 3: // ref
@@ -374,6 +389,7 @@ void ps2::write(u32 addr, u128 v, int sz)
 			}
 			}
 			//if IOP dma active, run iop_sif_dest_chain()
+			std::println("\tiop_dma.sif_active = {}", iop_dma.sif_active);
 			if( iop_dma.sif_active && !iop_dma.sif_fifo.empty() )
 			{
 				iop_sif_dest_chain();
@@ -414,6 +430,7 @@ void ps2::ee_sif_dest_chain()
 		// if we're at loop start and there's not enough data (or empty), return
 		if( eedma.sif_fifo.empty() || eedma.sif_fifo.size() < ((eedma.sif_fifo.back()&0xffff)+1) ) return;
 		u128 tag = eedma.sif_fifo.back(); eedma.sif_fifo.pop_back();
+		std::println("EE Recv tag = ${:X}", tag);
 		u32 id = (tag>>28)&7;
 		u32 addr = (tag>>32);
 		// id 7 ends the xfer, as well as the IRQ bit being enabled (in chcr) and set
@@ -424,6 +441,7 @@ void ps2::ee_sif_dest_chain()
 		for(; eedma.chan[5].qwc > 0; --eedma.chan[5].qwc, eedma.chan[5].madr+=16)
 		{
 			u128 v = eedma.sif_fifo.back(); eedma.sif_fifo.pop_back();
+			std::println("EE Recv [${:X}] = ${:X}", eedma.chan[5].madr, v);
 			*(u64*)&RAM[eedma.chan[5].madr] = v;
 			*(u64*)&RAM[eedma.chan[5].madr+8] = v>>64;
 		}
@@ -446,14 +464,14 @@ void ps2::run_frame()
 {
 	u64 target = last_target + 18740*262;
 	sched.add_event(last_target + 18740*240, EVENT_VBLANK);
+	iop_int.I_STAT |= BIT(11);
 	while( global_stamp < target )
 	{
 		while( cpu.stamp < global_stamp )
 		{
-			if( (cpu.pc&0x7FFFFF) == 0xb1fc0 )
+			if( (cpu.pc&0x7FFFFF) == 0x81fc0 )
 			{
-				std::println("EE reached B1FC0(EENULL)");
-				exit(1);
+				//std::println("EE reached B1FC0(EENULL)");
 			}
 			//if( logall ) std::println("ee pc ${:X}", cpu.pc);
 			cpu.step();
@@ -481,6 +499,8 @@ void ps2::run_frame()
 				iop.c[13] &=~BIT(10);
 			}
 			iop.check_irqs();
+			if( logall ) std::println("iop pc ${:X}", iop.pc);
+			
 			iop.step();
 			iop_stamp += 8;
 		}
@@ -503,6 +523,7 @@ void ps2::event(u64 old_stamp, u32 code)
 	if( code == EVENT_VBLANK )
 	{
 		gs.CSR |= CSR_VBINT;
+		iop_int.I_STAT |= BIT(0);
 		return;
 	}
 
@@ -555,6 +576,7 @@ void ps2::reset()
 	cpu.npc = cpu.pc + 4;
 	cpu.nnpc = cpu.npc + 4;
 	cpu.cop0[15] = 0x59;
+	iop.c[15] = 0x1F;
 	if( loaded_elf ) return;
 	iop.reset();
 	iop.c[15] = 0x1F;

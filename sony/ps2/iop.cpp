@@ -126,17 +126,66 @@ void ps2::iop_dma_ctrl(u32 c, u32 v)
 {
 	switch( c )
 	{
-	case 9:
+	case 9: // SIF0 (IOP->EE)
+		std::println("SIF0 ctrl = ${:X}", v);
 		if( v & BIT(24) )
 		{
+			bool end = false;
+			bool irq = false;
+			while( !end )
+			{
+				u32 addr = *(u32*)&iop_ram[iop_dma.chan[9][3]&0x1fffff];
+				iop_dma.chan[9][3] += 4;
+				u32 size = *(u32*)&iop_ram[iop_dma.chan[9][3]&0x1fffff];
+				size &= 0xffFFff;
+				std::println("SIF0 size = {} words", size);
+				end = end || addr & BIT(31);
+				irq = irq || addr & BIT(30);
+				addr &= 0x1fffff;
+				iop_dma.chan[9][3] += 4;
+				if( iop_dma.chan[9][2] & BIT(8) )
+				{
+					u128 F = *(u32*)&iop_ram[iop_dma.chan[9][3]&0x1fffff];
+					iop_dma.chan[9][3] += 4;
+					F |= u64(*(u32*)&iop_ram[iop_dma.chan[9][3]&0x1fffff])<<32;
+					iop_dma.chan[9][3] += 4;
+					std::println("IOP->EE SIF tte ${:X}", F);
+					eedma.sif_fifo.push_front(F);
+				}
+				for(u32 i = 0; i < (size+3)/4; ++i, addr+=16)
+				{
+					u128 F = *(u32*)&iop_ram[addr];
+					F |= u128(*(u32*)&iop_ram[addr+4])<<32;
+					F |= u128(*(u32*)&iop_ram[addr+8])<<64;
+					F |= u128(*(u32*)&iop_ram[addr+12])<<96;
+					std::println("IOP->EE SIF ${:X}", F);
+					eedma.sif_fifo.push_front(F);
+				}
+			}
+			if( eedma.sif_active ) { ee_sif_dest_chain(); }
+			iop_dma.sif_active = false;
+			iop_dma.chan[9][2] &= ~BIT(24);
 			
+			if( irq ) 
+			{
+				iop_dma.DICR2.b.tag |= BIT(9);
+				iop_int.I_STAT |= BIT(3);
+			}
+			if( iop_dma.DICR.b.ie && (iop_dma.DICR2.b.mask&BIT(2)) ) iop_dma.DICR2.b.flag |= BIT(3);
+			u32 oldflag = iop_dma.DICR.b.mflag;
+			iop_dma.DICR.b.mflag = iop_dma.DICR.b.ie && (iop_dma.DICR.b.flag || iop_dma.DICR2.b.flag);
+			if( oldflag == 0 && iop_dma.DICR.b.mflag == 1 )
+			{
+				iop_int.I_STAT |= BIT(3);
+			}
 		}
 		return;
-	case 10:
+	case 10: // SIF1 (EE->IOP)
 		if( v & BIT(24) )
 		{
-			
-		}	
+			iop_dma.sif_active = true;
+			if( !iop_dma.sif_fifo.empty() ) iop_sif_dest_chain();
+		}
 		return;
 	}
 	std::println("iop dma {} ctrl = ${:X}", c, v);
@@ -144,7 +193,42 @@ void ps2::iop_dma_ctrl(u32 c, u32 v)
 
 void ps2::iop_sif_dest_chain()
 {
-
+	bool end = false;
+	bool irq = false;
+	while( !end )
+	{
+		if( iop_dma.sif_fifo.size() < 2 ) return;
+		if( iop_dma.sif_fifo.size() < ((iop_dma.sif_fifo[iop_dma.sif_fifo.size()-2]&0xffFFff)+1) ) return;
+		u32 tag = iop_dma.sif_fifo.back(); iop_dma.sif_fifo.pop_back();
+		irq = irq || (tag&BIT(30));
+		end = end || (tag&BIT(31));
+		u32 size = iop_dma.sif_fifo.back(); iop_dma.sif_fifo.pop_back();
+		iop_dma.sif_fifo.pop_back();
+		iop_dma.sif_fifo.pop_back(); //todo: IOP dest tags always a QWORD, but top 64bits is junk?
+		for(u32 i = 0; i < size; ++i)
+		{
+			std::println("iop sif dest [${:X}] = ${:X}", tag&0x1fffff, iop_dma.sif_fifo.back());
+			*(u32*)&iop_ram[(tag&0x1fffff)] = iop_dma.sif_fifo.back();
+			iop_dma.sif_fifo.pop_back();
+			tag+=4;
+		}
+	}
+	iop_dma.sif_active = false;
+	iop_dma.chan[10][2] &= ~BIT(24);
+	
+	if( irq ) 
+	{
+		iop_int.I_STAT |= BIT(3);
+		std::println("iop sif dma irq bit");
+	}
+	if( iop_dma.DICR.b.ie && (iop_dma.DICR2.b.mask&BIT(3)) ) iop_dma.DICR2.b.flag |= BIT(3);
+	u32 oldflag = iop_dma.DICR.b.mflag;
+	iop_dma.DICR.b.mflag = iop_dma.DICR.b.ie && (iop_dma.DICR.b.flag || iop_dma.DICR2.b.flag);
+	if( oldflag == 0 && iop_dma.DICR.b.mflag == 1 )
+	{
+		iop_int.I_STAT |= BIT(3);
+		std::println("iop sif dma compl. irq");
+	}
 }
 
 

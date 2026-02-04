@@ -34,6 +34,7 @@ public:
 	void key_down(int f)
 	{ 
 		if( f == SDL_SCANCODE_ESCAPE ) logall = !logall;
+		if( f == SDL_SCANCODE_F ) { std::println("I_MASK = ${:X}", iop_int.I_MASK); }
 	}
 	
 	//bool logall = false;
@@ -107,7 +108,7 @@ public:
 		} chan[10] = {};
 		
 		
-		std::deque<u32> sif_fifo;
+		std::deque<u128> sif_fifo;
 		u32 last_fifo=0;
 		u32 pop_fifo() { if( !sif_fifo.empty() ) { last_fifo = sif_fifo.back(); sif_fifo.pop_back(); } return last_fifo; }
 
