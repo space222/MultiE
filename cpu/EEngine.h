@@ -43,6 +43,7 @@ public:
 		u16 h[8];
 		s32 sw[4];
 		s16 sh[8];
+		u8 ub[16];
 		EEReg& operator=(u64 v)
 		{
 			d = v;

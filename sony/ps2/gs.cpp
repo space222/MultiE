@@ -76,8 +76,8 @@ void ps2::gs_draw_sprite(vertex& a, vertex& b)
 	{
 		for(u32 X = a.x; X < b.x; ++X)
 		{
-			gs_set_pixel(X, Y, a.color);
-			*(u32*)&vram[zaddr + fbwidth*4*Y + X*4] = 0;
+			gs_set_pixel(X, Y, b.color);
+			//*(u32*)&vram[zaddr + fbwidth*4*Y + X*4] = 0;
 		}
 	}
 }
@@ -160,6 +160,90 @@ void ps2::gs_draw_triangle(vertex& a, vertex& b, vertex& c)
 	//exit(1);
 }
 
+void ps2::gs_draw_line(vertex& a, vertex& b)
+{
+	{
+		u64 offset = gs.regs[0x18 + ((gs.regs[0]&BIT(9))?1:0)];
+		float offset_x = ((offset&0xffff)/16.f);
+		float offset_y = ((offset>>32)/16.f);
+		a.x -= offset_x;
+		a.y -= offset_y;
+		b.x -= offset_x;
+		b.y -= offset_y;
+	}
+	if( a.x == b.x )
+	{
+		if( a.y > b.y ) std::swap(a, b);
+		for(float Y = a.y; Y < b.y; ++Y) gs_set_pixel(a.x, Y, a.color);
+		return;
+	}
+	if( a.y == b.y )
+	{
+		if( a.x > b.x ) std::swap(a, b);
+		for(float X = a.x; X < b.x; ++X) gs_set_pixel(X, a.y, a.color);
+		return;	
+	}
+	if(0){float xdiff = (b.x - a.x);
+	float ydiff = (b.y - a.y);
+	if(fabs(a.x-b.x) > fabs(a.y-b.y)) {
+		float xmin, xmax;
+
+		// set xmin to the lower x value given
+		// and xmax to the higher value
+		if(a.x < b.x) {
+			xmin = a.x;
+			xmax = b.x;
+		} else {
+			xmin = b.x;
+			xmax = a.x;
+		}
+
+		// draw line in terms of y slope
+		float slope = ydiff / xdiff;
+		for(float x = xmin; x <= xmax; x += 1.0f) {
+			float y = a.y + ((x - a.x) * slope);
+			//Color color = color1 + ((color2 - color1) * ((x - x1) / xdiff));
+			gs_set_pixel(x, y, a.color);
+		}
+	} else {
+		float ymin, ymax;
+
+		// set ymin to the lower y value given
+		// and ymax to the higher value
+		if(a.y < b.y) {
+			ymin = a.y;
+			ymax = b.y;
+		} else {
+			ymin = b.y;
+			ymax = a.y;
+		}
+
+		// draw line in terms of x slope
+		float slope = xdiff / ydiff;
+		for(float y = ymin; y <= ymax; y += 1.0f) {
+			float x = a.x + ((y - a.y) * slope);
+			//Color color = color1 + ((color2 - color1) * ((y - y1) / ydiff));
+			gs_set_pixel(x, y, a.color);
+		}
+	}}
+	if( abs(a.y-b.y) > abs(a.x-b.x) )
+	{
+		if( a.y > b.y ) std::swap(a, b);
+		for(float Y = a.y; Y < b.y; ++Y)
+		{
+			float p = ((Y-a.y)/(b.y-a.y));
+			gs_set_pixel(a.x + p*(b.x-a.x), Y, a.color);
+		}
+	} else {
+		if( a.x > b.x ) std::swap(a, b);
+		for(float X = a.x; X < b.x; ++X)
+		{
+			float p = ((X-a.x)/(b.x-a.x));
+			gs_set_pixel(X, a.y + p*(b.y-a.y), a.color);
+		}
+	}
+}
+
 static std::deque<ps2::vertex> VQ;
 
 void ps2::gs_vertex_out(u64 vtx, bool kick)
@@ -190,8 +274,29 @@ void ps2::gs_vertex_out(u64 vtx, bool kick)
 	case 0: // point
 		V = VQ.back(); VQ.pop_back();
 		if( !kick ) return;
+		{
+			u64 offset = gs.regs[0x18 + ((gs.regs[0]&BIT(9))?1:0)];
+			float offset_x = ((offset&0xffff)/16.f);
+			float offset_y = ((offset>>32)/16.f);
+			V.x -= offset_x;
+			V.y -= offset_y;
+		}
 		gs_set_pixel(V.x, V.y, V.color);
 		break;
+	case 1:{ // line
+		if( VQ.size() < 2 ) return;
+		vertex a = VQ.back(); VQ.pop_back();
+		vertex b = VQ.back(); VQ.pop_back();
+		if( !kick ) return;
+		gs_draw_line(a, b);
+		}break;
+	case 2:{ // line strip
+		if( VQ.size() < 2 ) return;
+		vertex a = VQ.back(); VQ.pop_back();
+		vertex b = VQ.back(); //VQ.pop_back();
+		if( !kick ) return;
+		gs_draw_line(a, b);	
+		}break;
 	case 3:{ // triangle
 		if( VQ.size() < 3 ) return;
 		vertex a, b, c;
@@ -259,10 +364,11 @@ void ps2::gs_run_fifo()
 					u32 dest = (regs >> (r*4)) & 15;
 					switch( dest )
 					{
-					case 0: 
+					case 0: // PRIM
+						//VQ.clear(); // PRIM clears vertex queue?
 						gs.regs[0] = value&0x7ff;
 						break;
-					case 1: 
+					case 1:
 						gs.regs[1] &= ~0xffffFFFFull; 
 						gs.regs[1] |= (value&0xff);
 						gs.regs[1] |= ((value>>24)&0xff00);

@@ -12,8 +12,8 @@ class ps2 : public console
 {
 public:
 	ps2() : sched(this) {}
-	u32 fb_width() override { return 640; }
-	u32 fb_height() override { return 224; }
+	u32 fb_width() override { return 512; }
+	u32 fb_height() override { return 256; }
 	u32 fb_bpp() override { return 34; }
 	
 	u8* framebuffer() override 
@@ -34,7 +34,7 @@ public:
 	void key_down(int f)
 	{ 
 		if( f == SDL_SCANCODE_ESCAPE ) logall = !logall;
-		if( f == SDL_SCANCODE_F ) { std::println("I_MASK = ${:X}", iop_int.I_MASK); }
+		if( f == SDL_SCANCODE_F ) { std::println("IOP Stat = ${:X}", iop.c[12]); }
 	}
 	
 	//bool logall = false;
@@ -64,7 +64,6 @@ public:
 	
 	const u32 EVENT_VBLANK = 1;
 	
-	
 	const u32 CSR_VBINT = BIT(3);
 	const u32 CSR_FIELD = BIT(13);
 	struct {
@@ -88,10 +87,18 @@ public:
 
 	void gs_run_fifo();	
 	void gs_vertex_out(u64 vert, bool kick);
+	void gs_draw_line(vertex& a, vertex& b);
 	void gs_draw_sprite(vertex& a, vertex& b);
 	void gs_draw_triangle(vertex& a, vertex& b, vertex& c);
 	void gs_set_pixel(u32 x, u32 y, u32 c);
 	void gs_hwreg_poke(u64);
+	
+	struct {
+		std::deque<u8> Sparam;
+		std::deque<u8> Sres;
+		
+	
+	} cdvd;
 	
 	struct {
 		u32 INTC_STAT=0;

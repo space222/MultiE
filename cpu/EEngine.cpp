@@ -11,6 +11,9 @@ typedef std::function<void(EEngine&, u32)> EEInstr;
 #define RD cpu.r[D].d
 #define RT cpu.r[T].d
 #define RS cpu.r[S].d
+#define FS cpu.fpr[(opc>>11)&0x1f]
+#define FD cpu.fpr[(opc>>6)&0x1f]
+#define FT cpu.fpr[(opc>>16)&0x1f]
 
 #define SIMM16 ((s16)(opc&0xffff))
 #define UIMM16 ((u16)(opc&0xffff))
@@ -40,6 +43,7 @@ static EEInstr decode_COP1(u32 opcode)
 {
 	if( !(opcode & BIT(25)) ) switch( (opcode>>21) & 0x1F )
 	{
+	case 0x00: INSTR { RT = (s32)std::bit_cast<u32>(FS); }; // MFC1
 	case 0x02: INSTR_NARG { std::println("CFC1"); }; //todo: CFC1	
 	case 0x04: INSTR { cpu.fpr[D] = std::bit_cast<float>((u32)RT); }; // MTC1
 	
@@ -51,13 +55,27 @@ static EEInstr decode_COP1(u32 opcode)
 	
 	if( ((opcode>>21)&0x1F) == 0x10 ) switch( opcode & 0x3F )
 	{
+	case 0x02: INSTR { FD = FS * FT; }; // MUL.S
+	case 0x03: INSTR { FD = FS / FT; }; // DIV.S
+	case 0x06: INSTR { FD = FS; }; // MOV.S
+	
 	case 0x18: INSTR_NARG { std::println("ADDA.S"); }; //todo: ADDA.S
 	case 0x1C: INSTR_NARG { std::println("MADD.S"); }; //todo: MADD.S
+	
+	
+	case 0x24: INSTR { FD = std::bit_cast<float>(s32(FS)); }; // CVT.W
 	default:
-		std::println("EE: Unipml FPU.S, bot6=${:X}", opcode&0x3F);
+		std::println("EE: Unimpl FPU.S, bot6=${:X}", opcode&0x3F);
 		return nullptr;
 	}
-	std::println("EE: Unimpl FPU opc");
+	
+	if( ((opcode>>21)&0x1F) == 0x14 && (opcode&0x3F)==0x20 )
+	{
+		//std::println("EE: Unimpl FPU.W: cvt.s");
+		INSTR { FD = float(std::bit_cast<s32>(FS)); };
+	}
+	
+	std::println("EE: Unimpl FPU opc>>21=${:X}", ((opcode>>21)&0x1F));
 	return nullptr;
 }
 
@@ -71,6 +89,15 @@ static EEInstr decode_COP0(u32 opcode)
 	if( ((opcode>>21)&0x1F) == 4 )
 	{
 		INSTR { cpu.write_cop0(D, RT); }; // MTC0	
+	}
+	if( ((opcode>>21)&0x1F) == 8 )
+	{
+		switch( (opcode>>16)&0x1f )
+		{
+		default:
+			std::println("Unimpl COP0 branch = ${:X}", (opcode>>16)&0x1f);
+			INSTR_NARG {};
+		}	
 	}
 	if( ((opcode>>21)&0x1F) == 0x10 )
 	{
@@ -95,6 +122,8 @@ static EEInstr decode_MMI0(u32 opcode)
 {
 	switch( (opcode>>6) & 0x1F )
 	{
+	case 0x09: INSTR { for(u32 i = 0; i < 16; ++i) { cpu.r[D].ub[i] = cpu.r[S].ub[i] - cpu.r[T].ub[i]; } }; // PSUBB
+	
 	case 0x12: INSTR 
 		{ 
 			auto d = cpu.r[D]; 
@@ -127,6 +156,8 @@ static EEInstr decode_MMI2(u32 opcode)
 	{
 	case 0x08: INSTR { cpu.r[D].q = (u128(cpu.hi1)<<64)|cpu.hi; }; // PMFHI
 	case 0x09: INSTR { cpu.r[D].q = (u128(cpu.lo1)<<64)|cpu.lo; }; // PMFLO
+	case 0x12: INSTR { cpu.r[D].q = cpu.r[T].q & cpu.r[S].q; }; // PAND
+	case 0x13: INSTR { cpu.r[D].q = cpu.r[T].q ^ cpu.r[S].q; }; // PXOR
 	
 	case 0x0E: INSTR { cpu.r[D].q = (u128(cpu.r[S].ud[0])<<64)|RT; }; //PCPYLD
 	default:
@@ -142,6 +173,7 @@ static EEInstr decode_MMI3(u32 opcode)
 	case 0x0E: INSTR { cpu.r[D].q = (u128(cpu.r[T].ud[1])<<64) | u128(cpu.r[S].ud[1]); }; // PCPYUD
 	
 	case 0x12: INSTR { cpu.r[D].q = cpu.r[T].q | cpu.r[S].q; }; // POR
+	case 0x13: INSTR { cpu.r[D].q = ~(cpu.r[T].q | cpu.r[S].q); }; // PNOR
 	
 	case 0x1B: INSTR {
 			u16 A0 = cpu.r[T].ud[0]; u16 A1 = cpu.r[T].ud[1];
@@ -186,6 +218,15 @@ static EEInstr decode_MMI(u32 opcode)
 	case 0x13: INSTR { cpu.lo1 = RS; }; // MTLO1
 
 	case 0x18: INSTR { s64 a =s32(RT); a*=s32(RS); cpu.hi1=s32(a>>32); RD=cpu.lo1=s32(a); }; // MULT1
+	case 0x1A: INSTR {
+			if( RT == 0 )
+			{
+			
+			} else {
+				cpu.lo1 = s32(RS)/s32(RT);
+				cpu.hi1 = s32(RS)%s32(RT);
+			}
+		}; // DIV1
 	case 0x1B: INSTR {
 			if( RT == 0 )
 			{

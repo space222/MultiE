@@ -12,6 +12,8 @@ void ps2::iop_write(u32 a, u32 v, int sz)
 
 	switch( a )
 	{
+	case 0x1F402016: std::println("CDVD S Command = ${:X}", (u8)v); exit(1); return;
+	
 	case 0x1F801070: iop_int.I_STAT &= v; return;
 	case 0x1F801074: iop_int.I_MASK = v; return;
 	case 0x1F801078: iop_int.I_CTRL = v&1; return;
@@ -77,6 +79,7 @@ u32 ps2::iop_read(u32 a, int sz)
 
 	switch( a )
 	{
+	
 	case 0x1F801074: return iop_int.I_MASK;
 	case 0x1F801070: return iop_int.I_STAT;
 	case 0x1F801078: { u32 temp = iop_int.I_CTRL; iop_int.I_CTRL&=~1; return temp; }
@@ -94,8 +97,12 @@ u32 ps2::iop_read(u32 a, int sz)
 	case 0x1D000030: return sifmb.SIF_SMFLG;
 	case 0x1D000060: return 0xff;
 
-
-	case 0x1F402005: return 0x40; // CDVD drive status = READY
+	//case 0x1F8014A4: return BIT(11);
+	case 0x1F900744: return 0x80;
+	
+	case 0x1F402005: return 0x40; // N cmd stat ready. $4C causes very early OpenConfig. just $40 results in ForbidDVD after OSDSND late
+	case 0x1F402017: return 0x40; // S command status = READY
+	case 0x1F402018: return 0x05;
 	
 	//undoc
 	case 0x1F801450: return 0;
@@ -117,7 +124,7 @@ u32 ps2::iop_read(u32 a, int sz)
 	}
 	
 	if( a >= 0x1E000000u && a < 0x1EFF0000u ) return 0; //undoc?
-	
+		
 	std::println("IOP Unimpl Rd{} ${:X}", sz, a);
 	return 0;
 }
@@ -126,6 +133,39 @@ void ps2::iop_dma_ctrl(u32 c, u32 v)
 {
 	switch( c )
 	{
+	case 4:{ // SPU1
+		iop_dma.chan[4][2] &= ~BIT(24);
+		if( 0 ) 
+		{
+			iop_dma.DICR2.b.tag |= BIT(9);
+			iop_int.I_STAT |= BIT(3);
+		}
+		if( iop_dma.DICR.b.ie && (iop_dma.DICR.b.mask&BIT(4)) ) iop_dma.DICR.b.flag |= BIT(4);
+		u32 oldflag = iop_dma.DICR.b.mflag;
+		iop_dma.DICR.b.mflag = iop_dma.DICR.b.ie && (iop_dma.DICR.b.flag || iop_dma.DICR2.b.flag);
+		if( oldflag == 0 && iop_dma.DICR.b.mflag == 1 )
+		{
+			iop_int.I_STAT |= BIT(3);
+		}
+	
+		}return;
+	case 7:{ // SPU2
+		iop_dma.chan[7][2] &= ~BIT(24);
+			
+		if( 0 ) 
+		{
+			iop_dma.DICR2.b.tag |= BIT(9);
+			iop_int.I_STAT |= BIT(3);
+		}
+		if( iop_dma.DICR.b.ie && (iop_dma.DICR2.b.mask&BIT(0)) ) iop_dma.DICR2.b.flag |= BIT(0);
+		u32 oldflag = iop_dma.DICR.b.mflag;
+		iop_dma.DICR.b.mflag = iop_dma.DICR.b.ie && (iop_dma.DICR.b.flag || iop_dma.DICR2.b.flag);
+		if( oldflag == 0 && iop_dma.DICR.b.mflag == 1 )
+		{
+			iop_int.I_STAT |= BIT(3);
+		}
+	
+		}return;
 	case 9: // SIF0 (IOP->EE)
 		std::println("SIF0 ctrl = ${:X}", v);
 		if( v & BIT(24) )
@@ -189,6 +229,7 @@ void ps2::iop_dma_ctrl(u32 c, u32 v)
 		return;
 	}
 	std::println("iop dma {} ctrl = ${:X}", c, v);
+	if( v & BIT(24) ) exit(1);
 }
 
 void ps2::iop_sif_dest_chain()
