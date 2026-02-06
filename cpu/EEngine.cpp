@@ -59,8 +59,8 @@ static EEInstr decode_COP1(u32 opcode)
 	case 0x03: INSTR { FD = FS / FT; }; // DIV.S
 	case 0x06: INSTR { FD = FS; }; // MOV.S
 	
-	case 0x18: INSTR_NARG { std::println("ADDA.S"); }; //todo: ADDA.S
-	case 0x1C: INSTR_NARG { std::println("MADD.S"); }; //todo: MADD.S
+	case 0x18: INSTR { cpu.ACC = FT + FS; }; // ADDA.S
+	case 0x1C: INSTR { FD = cpu.ACC + FT * FS; }; // MADD.S
 	
 	
 	case 0x24: INSTR { FD = std::bit_cast<float>(s32(FS)); }; // CVT.W

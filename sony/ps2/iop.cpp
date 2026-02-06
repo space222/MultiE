@@ -12,7 +12,6 @@ void ps2::iop_write(u32 a, u32 v, int sz)
 
 	switch( a )
 	{
-	case 0x1F402016: std::println("CDVD S Command = ${:X}", (u8)v); exit(1); return;
 	
 	case 0x1F801070: iop_int.I_STAT &= v; return;
 	case 0x1F801074: iop_int.I_MASK = v; return;
@@ -24,7 +23,7 @@ void ps2::iop_write(u32 a, u32 v, int sz)
 		iop_dma.DICR.b.mask = v>>16;
 		iop_dma.DICR.b.ie = v>>23;
 		iop_dma.DICR.b.flag &= ~(v>>24);
-		iop_dma.DICR.b.mflag = iop_dma.DICR.b.ie && (iop_dma.DICR.b.flag || iop_dma.DICR2.b.flag);
+		iop_dma.DICR.b.mflag = (iop_dma.DICR.b.flag || iop_dma.DICR2.b.flag);
 		return;
 	
 	case 0x1F801574:
@@ -32,15 +31,18 @@ void ps2::iop_write(u32 a, u32 v, int sz)
 		iop_dma.DICR2.b.tag = v;
 		iop_dma.DICR2.b.mask = (v>>16);
 		iop_dma.DICR2.b.flag &= ~(v>>24);
-		iop_dma.DICR.b.mflag = iop_dma.DICR.b.ie && (iop_dma.DICR.b.flag || iop_dma.DICR2.b.flag);
+		iop_dma.DICR.b.mflag = (iop_dma.DICR.b.flag || iop_dma.DICR2.b.flag);
 		return;
 	case 0x1F801570: iop_dma.DPCR2 = v; return;
 	case 0x1F801578: iop_dma.DMACEN = v; return;
-	case 0x1F80157C: iop_dma.DMACINTEN = v; return;
+	case 0x1F80157C: std::println("IOP dma DMACINTEN=${:X}", v); iop_dma.DMACINTEN = v; return;
 	
 	case 0x1D000010: std::println("IOP SMCOM = ${:X}", v); sifmb.SIF_SMCOM = v; return;
 	case 0x1D000020: std::println("IOP MSFLG &=~${:X}", v); sifmb.SIF_MSFLG &= ~v; return;
 	case 0x1D000030: std::println("IOP SMFLG |= ${:X}", v); sifmb.SIF_SMFLG |= v; return;
+
+	case 0x1F402017: cdvd.Sparam.push_front(u8(v)); return;
+	case 0x1F402016: cdvd_cmd(u8(v)); return;
 
 	//undoc
 	case 0x1F801450: return;
@@ -97,12 +99,16 @@ u32 ps2::iop_read(u32 a, int sz)
 	case 0x1D000030: return sifmb.SIF_SMFLG;
 	case 0x1D000060: return 0xff;
 
-	//case 0x1F8014A4: return BIT(11);
 	case 0x1F900744: return 0x80;
 	
-	case 0x1F402005: return 0x40; // N cmd stat ready. $4C causes very early OpenConfig. just $40 results in ForbidDVD after OSDSND late
-	case 0x1F402017: return 0x40; // S command status = READY
-	case 0x1F402018: return 0x05;
+	case 0x1F402005: return 0x40; // N cmd stat ready. 
+		// $4C causes very early OpenConfig + same as just $40
+		// $40 results in ForbidDVD after OSDSND late
+		// either way, after handling ForbidDVD, a few more SIF xfers then spin
+	case 0x1F402017: return (cdvd.Sres.empty() ? 0x40:0); // S command status
+	case 0x1F402018: if( !cdvd.Sres.empty() ) { u8 t = cdvd.Sres.back(); cdvd.Sres.pop_back(); return t; } return 0;
+	
+	case 0x1F8014A4: return BIT(11);
 	
 	//undoc
 	case 0x1F801450: return 0;
@@ -135,11 +141,7 @@ void ps2::iop_dma_ctrl(u32 c, u32 v)
 	{
 	case 4:{ // SPU1
 		iop_dma.chan[4][2] &= ~BIT(24);
-		if( 0 ) 
-		{
-			iop_dma.DICR2.b.tag |= BIT(9);
-			iop_int.I_STAT |= BIT(3);
-		}
+		
 		if( iop_dma.DICR.b.ie && (iop_dma.DICR.b.mask&BIT(4)) ) iop_dma.DICR.b.flag |= BIT(4);
 		u32 oldflag = iop_dma.DICR.b.mflag;
 		iop_dma.DICR.b.mflag = iop_dma.DICR.b.ie && (iop_dma.DICR.b.flag || iop_dma.DICR2.b.flag);
@@ -151,12 +153,7 @@ void ps2::iop_dma_ctrl(u32 c, u32 v)
 		}return;
 	case 7:{ // SPU2
 		iop_dma.chan[7][2] &= ~BIT(24);
-			
-		if( 0 ) 
-		{
-			iop_dma.DICR2.b.tag |= BIT(9);
-			iop_int.I_STAT |= BIT(3);
-		}
+		
 		if( iop_dma.DICR.b.ie && (iop_dma.DICR2.b.mask&BIT(0)) ) iop_dma.DICR2.b.flag |= BIT(0);
 		u32 oldflag = iop_dma.DICR.b.mflag;
 		iop_dma.DICR.b.mflag = iop_dma.DICR.b.ie && (iop_dma.DICR.b.flag || iop_dma.DICR2.b.flag);
@@ -177,12 +174,12 @@ void ps2::iop_dma_ctrl(u32 c, u32 v)
 				u32 addr = *(u32*)&iop_ram[iop_dma.chan[9][3]&0x1fffff];
 				iop_dma.chan[9][3] += 4;
 				u32 size = *(u32*)&iop_ram[iop_dma.chan[9][3]&0x1fffff];
+				iop_dma.chan[9][3] += 4;
 				size &= 0xffFFff;
 				std::println("SIF0 size = {} words", size);
 				end = end || addr & BIT(31);
-				irq = irq || addr & BIT(30);
+				//irq = irq || addr & BIT(30);
 				addr &= 0x1fffff;
-				iop_dma.chan[9][3] += 4;
 				if( iop_dma.chan[9][2] & BIT(8) )
 				{
 					u128 F = *(u32*)&iop_ram[iop_dma.chan[9][3]&0x1fffff];
@@ -203,28 +200,23 @@ void ps2::iop_dma_ctrl(u32 c, u32 v)
 				}
 			}
 			if( eedma.sif_active ) { ee_sif_dest_chain(); }
-			iop_dma.sif_active = false;
 			iop_dma.chan[9][2] &= ~BIT(24);
 			
-			if( irq ) 
-			{
-				iop_dma.DICR2.b.tag |= BIT(9);
-				iop_int.I_STAT |= BIT(3);
-			}
-			if( iop_dma.DICR.b.ie && (iop_dma.DICR2.b.mask&BIT(2)) ) iop_dma.DICR2.b.flag |= BIT(3);
+			if( iop_dma.DICR.b.ie && (iop_dma.DICR2.b.mask&BIT(2)) ) iop_dma.DICR2.b.flag |= BIT(2);
 			u32 oldflag = iop_dma.DICR.b.mflag;
-			iop_dma.DICR.b.mflag = iop_dma.DICR.b.ie && (iop_dma.DICR.b.flag || iop_dma.DICR2.b.flag);
+			iop_dma.DICR.b.mflag = (iop_dma.DICR.b.flag || iop_dma.DICR2.b.flag);
 			if( oldflag == 0 && iop_dma.DICR.b.mflag == 1 )
 			{
+				std::println("iop sif0 dma compl. irq");
 				iop_int.I_STAT |= BIT(3);
 			}
 		}
 		return;
 	case 10: // SIF1 (EE->IOP)
-		if( v & BIT(24) )
+		iop_dma.sif_active = v & BIT(24);
+		if( iop_dma.sif_active )
 		{
-			iop_dma.sif_active = true;
-			if( !iop_dma.sif_fifo.empty() ) iop_sif_dest_chain();
+			iop_sif_dest_chain();
 		}
 		return;
 	}
@@ -257,10 +249,10 @@ void ps2::iop_sif_dest_chain()
 	iop_dma.sif_active = false;
 	iop_dma.chan[10][2] &= ~BIT(24);
 	
-	if( irq ) 
+	if( (iop_dma.DICR2.b.tag & BIT(10)) && irq ) 
 	{
 		iop_int.I_STAT |= BIT(3);
-		std::println("iop sif dma irq bit");
+		std::println("iop sif1 dma irq bit");
 	}
 	if( iop_dma.DICR.b.ie && (iop_dma.DICR2.b.mask&BIT(3)) ) iop_dma.DICR2.b.flag |= BIT(3);
 	u32 oldflag = iop_dma.DICR.b.mflag;
@@ -268,9 +260,48 @@ void ps2::iop_sif_dest_chain()
 	if( oldflag == 0 && iop_dma.DICR.b.mflag == 1 )
 	{
 		iop_int.I_STAT |= BIT(3);
-		std::println("iop sif dma compl. irq");
+		std::println("iop sif1 dma compl. irq");
 	}
 }
+
+void ps2::cdvd_cmd(u8 cmd)
+{
+	switch( cmd )
+	{
+	case 0x15: // ForbidDVD
+		std::println("CDVD: ForbidDVD({})", cdvd.Sparam);
+		cdvd.Sparam.clear();
+		cdvd.Sres.push_front(5);
+		break;
+	case 0x40: // OpenConfig
+		std::println("CDVD: OpenConfig({})", cdvd.Sparam);
+		cdvd.Sparam.clear();
+		cdvd.Sres.push_front(0);
+		break;
+	case 0x41: // ReadConfig
+		std::println("CDVD: ReadConfig({})", cdvd.Sparam);
+		cdvd.Sparam.clear();
+		for(u32 i = 0; i < 2; ++i)
+		{
+				cdvd.Sres.push_front(0);
+		}
+		break;
+	case 0x43: // CloseConfig
+		std::println("CDVD: CloseConfig({})", cdvd.Sparam);
+		cdvd.Sparam.clear();
+		cdvd.Sres.push_front(0);
+		break;
+	default:
+		std::println("CDVD: Unimpl cmd = ${:X}", cmd);
+		exit(1);
+	}
+
+
+}
+
+
+
+
 
 
 

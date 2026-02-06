@@ -38,7 +38,7 @@ u128 ps2::read(u32 addr, int sz)
 	if( sz > 32 ) { std::println("EE IO Rd{} ${:X}!!", sz, addr);  }
 
 
-if( logall && addr != cpu.pc ) { std::println("EE Rd{} ${:X}", sz, addr); }
+	if( logall && addr != cpu.pc ) { std::println("EE Rd{} ${:X}", sz, addr); }
 	
 	switch( addr )
 	{
@@ -284,7 +284,7 @@ void ps2::write(u32 addr, u128 v, int sz)
 		case 0: 
 			eedma.chan[5].chcr = v;
 			eedma.sif_active = v&BIT(8);
-			if( eedma.sif_active && !eedma.sif_fifo.empty() ) 
+			if( eedma.sif_active ) 
 			{
 				ee_sif_dest_chain(); 
 			}
@@ -302,7 +302,7 @@ void ps2::write(u32 addr, u128 v, int sz)
 	if( (addr & 0xffFFff00u) == 0x1000C400 )
 	{ // SIF1 (to IOP) dma
 		assert32;
-		u32 reg = (addr>>4)&15;
+		u32 reg = (addr>>4)&15;	
 		std::println("EE SIF1 dma ${:X} = ${:X}", addr, v);
 		switch( reg )
 		{
@@ -316,6 +316,11 @@ void ps2::write(u32 addr, u128 v, int sz)
 			if( ((v>>2)&3) == 1 )
 			{ // chain mode.. yay.
 				std::println("Doing SIF1to_iop chain mode");
+				if( eedma.chan[6].qwc )
+				{
+					std::println("eedma chan6 qwc = ${:X}", eedma.chan[6].qwc);
+					exit(1);
+				}
 				eedma.chan[6].chcr = v & ~BIT(8);
 				bool end = false;
 				while( !end )
@@ -390,7 +395,7 @@ void ps2::write(u32 addr, u128 v, int sz)
 			}
 			//if IOP dma active, run iop_sif_dest_chain()
 			std::println("\tiop_dma.sif_active = {}", iop_dma.sif_active);
-			if( iop_dma.sif_active && !iop_dma.sif_fifo.empty() )
+			if( iop_dma.sif_active )
 			{
 				iop_sif_dest_chain();
 			}
@@ -425,6 +430,7 @@ void ps2::ee_dma_chain(u32 /*channel*/, std::function<void(u32)> /*where*/)
 void ps2::ee_sif_dest_chain()
 {
 	bool end = false;
+	bool irq = false;
 	while( !end )
 	{
 		// if we're at loop start and there's not enough data (or empty), return
@@ -435,9 +441,11 @@ void ps2::ee_sif_dest_chain()
 		u32 addr = (tag>>32);
 		// id 7 ends the xfer, as well as the IRQ bit being enabled (in chcr) and set
 		// all ids otherwise work the same(?) as far as madr coming from the tag addr field
-		end = end || (id==7) || ((tag&BIT(31)) && (eedma.chan[5].chcr&BIT(7)));
+		irq = irq || ((tag&BIT(31)) && (eedma.chan[5].chcr&BIT(7)));
+		end = end || (id==7) || irq;
 		eedma.chan[5].qwc = tag&0xffff;
-		eedma.chan[5].madr = addr & 0x7fffFFFFu; //todo: from scratchpad
+		eedma.chan[5].madr = addr & 0x7fffFFFFu; //todo: to scratchpad
+		if( addr & BIT(31) ) { std::println("EE SIF dest chain to scratchpad"); exit(1); }
 		for(; eedma.chan[5].qwc > 0; --eedma.chan[5].qwc, eedma.chan[5].madr+=16)
 		{
 			u128 v = eedma.sif_fifo.back(); eedma.sif_fifo.pop_back();
@@ -448,6 +456,7 @@ void ps2::ee_sif_dest_chain()
 	}
 	
 	// if we get here, dma xfer is legit complete
+	eedma.sif_active = false;
 	eedma.chan[5].chcr &= ~BIT(8);
 	eedma.D_STAT |= BIT(5);
 	if( (eedma.D_STAT>>16) & (eedma.D_STAT&0xffff) )
@@ -473,7 +482,7 @@ void ps2::run_frame()
 			{
 				//std::println("EE reached B1FC0(EENULL)");
 			}
-			//if( logall ) std::println("ee pc ${:X}", cpu.pc);
+			if( logall ) std::println("ee pc ${:X}", cpu.pc);
 			cpu.step();
 		}
 		

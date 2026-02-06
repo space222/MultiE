@@ -34,7 +34,8 @@ public:
 	void key_down(int f)
 	{ 
 		if( f == SDL_SCANCODE_ESCAPE ) logall = !logall;
-		if( f == SDL_SCANCODE_F ) { std::println("IOP Stat = ${:X}", iop.c[12]); }
+		if( f == SDL_SCANCODE_F ) { std::println("IOP stat/mask = S${:X}/M${:X}", iop_int.I_STAT, iop_int.I_MASK); }
+		if( f == SDL_SCANCODE_T ) { iop_int.I_STAT |= BIT(5); }
 	}
 	
 	//bool logall = false;
@@ -99,6 +100,7 @@ public:
 		
 	
 	} cdvd;
+	void cdvd_cmd(u8 cmd);
 	
 	struct {
 		u32 INTC_STAT=0;

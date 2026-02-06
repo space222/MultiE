@@ -20,6 +20,7 @@ public:
 	u32 pc, npc, nnpc;
 	u64 hi1, hi, lo1, lo;
 	u32 sa;
+	float ACC;
 	
 	void branch(u32 addr)
 	{
