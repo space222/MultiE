@@ -27,6 +27,8 @@ public:
 
 	void write(u16 a, u8 v);
 	u8 read(u16 a);
+	
+	u8 keyboard_state();
 
 	bool rom_enabled = true;
 	
