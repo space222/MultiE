@@ -53,6 +53,7 @@
 #include "gc/GameCube.h"
 #include "dc/dreamcast.h"
 #include "ps2/ps2.h"
+#include "other/trs80cc3.h"
 void try_kirq();
 void gdb_start();
 extern std::atomic<int> gdb_active;
@@ -537,6 +538,22 @@ void imgui_run()
 			}
 			if( ImGui::BeginMenu("Alpha") )
 			{
+				if( ImGui::MenuItem("Radio Shack TRS-80 CC3") )
+				{
+					std::string f = getOpenFile("TRS-80 CC3");
+					if( !f.empty() )
+					{
+						delete sys;
+						sys = new trs80cc3;
+						if( ! sys->loadROM(f) ) 
+						{
+							printf("unable to load ROM\n");
+							exit(1);
+						}
+						else newinstance = true;
+						crt_scale = 1.f;
+					}				
+				}
 				if( ImGui::MenuItem("Sony PS2") )
 				{
 					std::string f = getOpenFile("Sony PS2");

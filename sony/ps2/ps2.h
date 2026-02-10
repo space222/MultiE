@@ -35,7 +35,7 @@ public:
 	{ 
 		if( f == SDL_SCANCODE_ESCAPE ) logall = !logall;
 		if( f == SDL_SCANCODE_F ) { std::println("IOP stat/mask = S${:X}/M${:X}", iop_int.I_STAT, iop_int.I_MASK); }
-		if( f == SDL_SCANCODE_T ) { iop_int.I_STAT |= BIT(5); }
+		if( f == SDL_SCANCODE_T ) { iop_int.I_STAT |= BIT(9); }
 	}
 	
 	//bool logall = false;

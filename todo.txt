@@ -366,8 +366,34 @@ Sony Playstation 2
 ---------------------
 1. Continue thru BIOS, implementing EE instructions along the way
 2. EE Timers?
-3. SIF DMA?
-Status: EE send SIF RPC Bind for LOADFILE
+Status: Much of IOP modules load, then:
+	loadmodule: fname rom0:OSDSND args 0 arg 
+	loadmodule: id 30, ret 0
+	SPU:T/O [wait (reset)]
+	SPU:T/O [wait (reset)]
+	_spu_rev_offsetaddr 19021
+	### addr = 51215  size = 28640
+	_spu_rev_offsetaddr 19021
+	### addr = 51215  size = 28640
+Then BIOS sends CDVD command ForbidDVD (dunno if it's supposed to, Discord#emudev suggests no?)
+After responding to that, a bit more SIF traffic and then everything spins waiting for I know not what.
+
+
+
+Radio Shack TRS-80 Color Computer 3
+--------------------------------------
+1. Start the many graphics modes. First one needs to be whatever the BASIC starts in.
+2. Keyboard, then timer.
+3. Carts, then tape
+4. Sound
+Status: Solved enough cpu issues to boot to BASIC (can see copyright msg and 'OK' printed to $70400)
+
+
+
+Vectrex
+----------
+1. Everything
+Status: not started
 
 
 

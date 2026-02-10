@@ -81,7 +81,7 @@ u32 ps2::iop_read(u32 a, int sz)
 
 	switch( a )
 	{
-	
+
 	case 0x1F801074: return iop_int.I_MASK;
 	case 0x1F801070: return iop_int.I_STAT;
 	case 0x1F801078: { u32 temp = iop_int.I_CTRL; iop_int.I_CTRL&=~1; return temp; }
@@ -112,7 +112,14 @@ u32 ps2::iop_read(u32 a, int sz)
 	
 	//undoc
 	case 0x1F801450: return 0;
-	default: break;
+	default: 
+		if( sz < 32 )
+		{
+			u32 v = iop_read(a&~3, 32);
+			if( sz == 8 ) return (v>>((a&3)*8));
+			return (v>>((a&1)*16));
+		}
+		break;
 	}
 	
 	if( (a >= 0x1F801080 && a < 0x1F8010F0) || (a >= 0x1F801500 && a < 0x1F801560) )
@@ -145,7 +152,7 @@ void ps2::iop_dma_ctrl(u32 c, u32 v)
 		if( iop_dma.DICR.b.ie && (iop_dma.DICR.b.mask&BIT(4)) ) iop_dma.DICR.b.flag |= BIT(4);
 		u32 oldflag = iop_dma.DICR.b.mflag;
 		iop_dma.DICR.b.mflag = iop_dma.DICR.b.ie && (iop_dma.DICR.b.flag || iop_dma.DICR2.b.flag);
-		if( oldflag == 0 && iop_dma.DICR.b.mflag == 1 )
+		if( iop_dma.DICR.b.mflag == 1 )
 		{
 			iop_int.I_STAT |= BIT(3);
 		}
@@ -157,7 +164,7 @@ void ps2::iop_dma_ctrl(u32 c, u32 v)
 		if( iop_dma.DICR.b.ie && (iop_dma.DICR2.b.mask&BIT(0)) ) iop_dma.DICR2.b.flag |= BIT(0);
 		u32 oldflag = iop_dma.DICR.b.mflag;
 		iop_dma.DICR.b.mflag = iop_dma.DICR.b.ie && (iop_dma.DICR.b.flag || iop_dma.DICR2.b.flag);
-		if( oldflag == 0 && iop_dma.DICR.b.mflag == 1 )
+		if( iop_dma.DICR.b.mflag == 1 )
 		{
 			iop_int.I_STAT |= BIT(3);
 		}
@@ -205,7 +212,7 @@ void ps2::iop_dma_ctrl(u32 c, u32 v)
 			if( iop_dma.DICR.b.ie && (iop_dma.DICR2.b.mask&BIT(2)) ) iop_dma.DICR2.b.flag |= BIT(2);
 			u32 oldflag = iop_dma.DICR.b.mflag;
 			iop_dma.DICR.b.mflag = (iop_dma.DICR.b.flag || iop_dma.DICR2.b.flag);
-			if( oldflag == 0 && iop_dma.DICR.b.mflag == 1 )
+			if( iop_dma.DICR.b.mflag == 1 )
 			{
 				std::println("iop sif0 dma compl. irq");
 				iop_int.I_STAT |= BIT(3);
@@ -257,7 +264,7 @@ void ps2::iop_sif_dest_chain()
 	if( iop_dma.DICR.b.ie && (iop_dma.DICR2.b.mask&BIT(3)) ) iop_dma.DICR2.b.flag |= BIT(3);
 	u32 oldflag = iop_dma.DICR.b.mflag;
 	iop_dma.DICR.b.mflag = iop_dma.DICR.b.ie && (iop_dma.DICR.b.flag || iop_dma.DICR2.b.flag);
-	if( oldflag == 0 && iop_dma.DICR.b.mflag == 1 )
+	if( iop_dma.DICR.b.mflag == 1 )
 	{
 		iop_int.I_STAT |= BIT(3);
 		std::println("iop sif1 dma compl. irq");
