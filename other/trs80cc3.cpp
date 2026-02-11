@@ -94,20 +94,20 @@ u8 trs80cc3::keyboard_state()
 
 u8 trs80cc3::read_io(u8 a)
 {
+	if( (a&0xf0) == 0x40 ) { return disk_io_read(a); }
 	switch( a )
 	{
 	case 0x00: return keyboard_state();
 //	case 0x02: return 0xff;
-	
 	default: break;
 	}
-	//std::println("${:X}: IO Rd ${:X}", cpu.pc, a);
+	if( (a&0xf0) == 0x40 ) std::println("${:X}: IO Rd ${:X}", cpu.pc, a);
 	return io[a];
 }
 
 void trs80cc3::write_io(u8 a, u8 v)
 {
-	//std::println("${:X}: IO Wr ${:X} = ${:X}", cpu.pc, a, v);
+	if( (a&0xf0) == 0x40 ) { disk_io_write(a, v); return; }
 	switch( a )
 	{
 	case 0xA0:
@@ -150,7 +150,14 @@ u8 trs80cc3::read(u16 a)
 	if( a >= 0xfe00 && (!MMU_ENABLED || RAM_VECTORS) ) return ram[0x7fe00 | (a&0xff)];
 	u32 phys_index = (MMU_ENABLED ? io[0xA0 + (a>>13) + ((io[0x91]&1)<<4)] : (0x38+(a>>13)));
 	u32 paddr = (phys_index<<13)|(a&0x1fff);
-	if( rom_enabled && paddr >= 0x78000 && paddr < 0x7fe00 ) return bios[paddr&0x7fff];
+	if( rom_enabled && paddr >= 0x78000 && paddr < 0x7fe00 ) 
+	{
+		u32 romtype = io[0x90]&3;
+		if( romtype == 3 ) return cart[paddr&0x7fff];
+		if( romtype == 2 ) return bios[paddr&0x7fff];
+		if( paddr >= 0x7C000 && paddr < 0x7E000 ) return cart[paddr&0x7fff];
+		return bios[paddr&0x7fff];
+	}
 	return ram[paddr];
 }
 
@@ -172,7 +179,6 @@ void trs80cc3::run_frame()
 	u64 target = last_target + 29833;
 	while( stamp < target )
 	{
-		//if( cpu.pc >= 0xA000 && cpu.pc < 0xb000 ) { char a; std::cin >> a; }
 		stamp += cpu.step();
 	}
 	last_target = target;
@@ -215,6 +221,25 @@ bool trs80cc3::loadROM(std::string fname)
 		std::println("Need a TRS-80 CoCo3 BIOS");
 		return false;
 	}
+	
+	FILE* fp = fopen(fname.c_str(), "rb");
+	if( !fp )
+	{
+		std::println("Unable to open '{}'", fname.c_str());
+		return false;
+	}
+	
+	auto fsz = fsize(fp);
+	if( fsz < 32_KB )
+	{
+		[[maybe_unused]] int unu = fread(cart, 1, 8_KB, fp);
+		memcpy(cart+8_KB, cart, 8_KB);
+		memcpy(cart+16_KB, cart, 8_KB);
+		memcpy(cart+24_KB, cart, 8_KB); 
+	} else {
+		[[maybe_unused]] int unu = fread(cart, 1, 32_KB, fp);
+	}
+	fclose(fp);
 	return true;
 }
 

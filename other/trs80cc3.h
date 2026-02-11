@@ -22,6 +22,9 @@ public:
 	void reset() override;
 	bool loadROM(std::string) override;
 	
+	u8 disk_io_read(u8 a);
+	void disk_io_write(u8 a, u8 v);
+	
 	u8 read_io(u8 a);
 	void write_io(u8 a, u8 v);
 
@@ -38,6 +41,7 @@ public:
 	c6809 cpu;
 	u8 ram[512_KB];
 	u8 bios[32_KB];
+	u8 cart[32_KB];
 	u8 io[0x100];
 	u32 fbuf[640*240];
 };

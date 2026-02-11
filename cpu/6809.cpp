@@ -331,7 +331,7 @@ u64 c6809::step11()
 		return 10;
 	
 	default:
-		std::println("6809: Unimpl step11 opc = ${:X}", opc);
+		std::println("6809:${:X}: Unimpl step11 opc = ${:X}", pc-1, opc);
 		exit(1);
 	}
 	
@@ -340,6 +340,21 @@ u64 c6809::step11()
 
 u64 c6809::step()
 {
+	if( nmi_line )
+	{
+		nmi_line = false;
+		push16(pc);
+		push16(U);
+		push16(Y);
+		push16(X);
+		push8(DP);
+		push8(B);
+		push8(A);
+		push8(F.v|BIT(7)); //todo: E actually set, or just in the stack image?
+		pc = read16(0xfffc);
+		return 8;	
+	}
+
 	u8 opc = read(pc++);
 	//	std::println("${:X}: opc ${:X}", /*(pc-1 < 0x5000) ? (0xc03f + ((pc-1)&0x1fff)) : */pc-1, opc);
 	u8 t = 0;
@@ -1132,15 +1147,16 @@ u64 c6809::step()
 		return 2;
 	case 0x1E: // EXG
 		{
-			u8 V1 = getreg(opc&15);
-			u8 V2 = getreg(opc>>4);
-			setreg(opc>>4, V1);
-			setreg(opc&15, V2);
+			t = read(pc++);
+			u8 V1 = getreg(t&15);
+			u8 V2 = getreg(t>>4);
+			setreg(t>>4, V1);
+			setreg(t&15, V2);
 		}
 		return 8;
 	case 0x1F: // TFR
-		opc = read(pc++);
-		setreg(opc&15, getreg(opc>>4));
+		t = read(pc++);
+		setreg(t&15, getreg(t>>4));
 		return 6;
 	case 0x35:
 	case 0x37:{ // PULS/PULU
@@ -1723,7 +1739,21 @@ u64 c6809::step()
 		t = read(ea);
 		setNZ(t);
 		F.b.V = 0;
-		return 7;
+		return 7;		
+	/*case 0x19: // DAA
+		t = 0;
+		if( F.b.C || A > 0x90 || (A > 0x80 && (A&15)>9) )
+		{
+			t = (A&0xf0) + 0x60;
+		}
+		if( F.b.H || (A&15)>9 )
+		{
+			t |= (A&0x0f) + 6;
+		}
+		A = t;
+		setNZ(A);
+		F.b.C = ((A>0x99)?1:0);
+		return 2;*/
 	default:
 		std::println("6809:${:X}: unimpl opc ${:X}", pc, opc);
 		exit(1);

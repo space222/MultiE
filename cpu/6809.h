@@ -138,6 +138,7 @@ public:
 	c6809_flags F;
 	u8 A, B;
 	u16 X, Y, U, S, pc, DP, ea;
+	bool nmi_line=false, irq_line=false, firq_line=false;
 	int cycles; // not a timestamp. internal use for individual instruction
 };
 
