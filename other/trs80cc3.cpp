@@ -215,6 +215,7 @@ void trs80cc3::reset()
 	memset(io, 0, 0x100);
 	memset(ram, 0, 512_KB);
 	for(u32 i = 0; i < 8; ++i) { io[0xA0+i] = io[0xA8+i] = 0x38 + i; }
+	rom_enabled = true;
 }
 
 bool trs80cc3::loadROM(std::string fname)

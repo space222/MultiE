@@ -29,6 +29,21 @@ public:
 	}
 	
 	bool load_media(int, std::string) override;
+	
+	std::vector<u8> pastebuf;
+	void key_down(int sc) override
+	{
+		if( sc == SDL_SCANCODE_F10 )
+		{
+			auto S = SDL_GetClipboardText();
+			std::string str = S;
+			for(u32 i = 0; i < str.size(); ++i)
+			{
+				pastebuf.push_back(str[str.size()-i-1]);
+			}
+			SDL_free(S);
+		}
+	}
 
 	
 	u8 disk_io_read(u8 a);
