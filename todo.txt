@@ -383,10 +383,12 @@ After responding to that, a bit more SIF traffic and then everything spins waiti
 Radio Shack TRS-80 Color Computer 3
 --------------------------------------
 1. Start the many graphics modes. First one needs to be whatever the BASIC starts in.
-2. Keyboard, then timer.
-3. Carts, then tape
+2. Timer
+3. Cassette
 4. Sound
-Status: Solved enough cpu issues to boot to BASIC (can see copyright msg and 'OK' printed to $70400)
+5. Actually sim the floppy and support more commands than seek and read 1 sector.
+Status: Disk basic loads and can read the floppy. The one disk I've tried results in 
+syntax errors at some point in every program though.
 
 
 

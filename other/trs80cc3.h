@@ -22,6 +22,15 @@ public:
 	void reset() override;
 	bool loadROM(std::string) override;
 	
+	std::array<std::string, 8>& media_names() override
+	{
+		static std::array<std::string, 8> a = { "Floppy A" };
+		return a;
+	}
+	
+	bool load_media(int, std::string) override;
+
+	
 	u8 disk_io_read(u8 a);
 	void disk_io_write(u8 a, u8 v);
 	
@@ -37,6 +46,9 @@ public:
 	
 	u64 stamp=0;
 	u64 last_target=0;
+	
+	std::vector<u8> floppyA;
+	u32 track=0, sector=1, secoffs=0;
 
 	c6809 cpu;
 	u8 ram[512_KB];

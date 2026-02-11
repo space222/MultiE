@@ -99,6 +99,9 @@ u8 trs80cc3::read_io(u8 a)
 	{
 	case 0x00: return keyboard_state();
 //	case 0x02: return 0xff;
+
+	case 0xfc: return bios[0x7ffc];
+	case 0xfd: return bios[0x7ffd];
 	default: break;
 	}
 	if( (a&0xf0) == 0x40 ) std::println("${:X}: IO Rd ${:X}", cpu.pc, a);
@@ -242,6 +245,18 @@ bool trs80cc3::loadROM(std::string fname)
 	fclose(fp);
 	return true;
 }
+
+bool trs80cc3::load_media(int ind, std::string fname)
+{
+	if( ind != 0 ) return false;
+	if( !freadall(floppyA, fopen(fname.c_str(), "rb")) )
+	{
+		std::println("Unable to open '{}'", fname);
+		return false;
+	}
+	return true;
+}
+
 
 // yoinked from https://github.com/susam/pcface/blob/main/out/oldschool-bios-8x8/fontlist.js
 u8 bios8x8[][8] = {
