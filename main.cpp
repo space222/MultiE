@@ -915,7 +915,7 @@ void imgui_run()
 	}
 	
 	ImGui::Render();
-	ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData());
+	ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), MainRender);
 }
 
 void console::setVsync(bool e)
