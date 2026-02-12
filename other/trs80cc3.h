@@ -64,6 +64,7 @@ public:
 	
 	std::vector<u8> floppyA;
 	u32 track=0, sector=1, secoffs=0;
+	bool fdc_do_nmi=false;
 
 	c6809 cpu;
 	u8 ram[512_KB];

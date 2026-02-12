@@ -387,8 +387,8 @@ Radio Shack TRS-80 Color Computer 3
 3. Cassette
 4. Sound
 5. Actually sim the floppy and support more commands than seek and read 1 sector.
-Status: Disk basic loads and can read the floppy. The one disk I've tried results in 
-syntax errors at some point in every program though.
+Status: Disk basic loads and can read the floppy. However, zero software functions.
+Some things may show an initial screen, but eventually fail. 
 
 
 

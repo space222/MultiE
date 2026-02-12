@@ -36,7 +36,7 @@ u8 trs80cc3::keyboard_state()
 		if( keys[SDL_SCANCODE_R] ) val &= ~BIT(2);
 		if( keys[SDL_SCANCODE_Z] ) val &= ~BIT(3);
 		if( keys[SDL_SCANCODE_2] ) val &= ~BIT(4);
-		if( keys[SDL_SCANCODE_LSHIFT] && keys[SDL_SCANCODE_SEMICOLON] ) val &= ~BIT(5);
+		if( keys[SDL_SCANCODE_KP_MULTIPLY] ) val &= ~BIT(5);
 		if( keys[SDL_SCANCODE_ESCAPE] ) val &= ~BIT(6);
 	}	
 	if( rows & BIT(3) ) 
@@ -222,7 +222,7 @@ bool trs80cc3::loadROM(std::string fname)
 {
 	if( !freadall(bios, fopen("./bios/trs80cc3.bios", "rb"), 32_KB) )
 	{
-		std::println("Need a TRS-80 CoCo3 BIOS");
+		std::println("Need a TRS-80 CoCo3 BIOS\nExtended Color Basic 2.0 (./bios/trs80cc3.bios)");
 		return false;
 	}
 	
