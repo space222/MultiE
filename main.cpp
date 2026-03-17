@@ -54,6 +54,8 @@
 #include "dc/dreamcast.h"
 #include "ps2/ps2.h"
 #include "other/trs80cc3.h"
+#include "other/vectrex.h"
+#include "nintendo/snes/snes.h"
 void try_kirq();
 void gdb_start();
 extern std::atomic<int> gdb_active;
@@ -538,6 +540,38 @@ void imgui_run()
 			}
 			if( ImGui::BeginMenu("Alpha") )
 			{
+				if( ImGui::MenuItem("Nintendo SNES") )
+				{
+					std::string f = getOpenFile("SNES");
+					if( !f.empty() )
+					{
+						delete sys;
+						sys = new snes;
+						if( ! sys->loadROM(f) ) 
+						{
+							printf("unable to load ROM\n");
+							exit(1);
+						}
+						else newinstance = true;
+						crt_scale = 1.f;
+					}				
+				}
+				if( ImGui::MenuItem("Vectrex") )
+				{
+					std::string f = getOpenFile("Vectrex");
+					if( !f.empty() )
+					{
+						delete sys;
+						sys = new Vectrex;
+						if( ! sys->loadROM(f) ) 
+						{
+							printf("unable to load ROM\n");
+							exit(1);
+						}
+						else newinstance = true;
+						crt_scale = 1.f;
+					}				
+				}
 				if( ImGui::MenuItem("Radio Shack TRS-80 CC3") )
 				{
 					std::string f = getOpenFile("TRS-80 CC3");

@@ -183,20 +183,27 @@ public:
 	void draw_tex_shaded_tri(P v0, u32 u0, u32 V0, P v1, u32 u1, u32 V1, P v2, u32 u2, u32 V2,
 		u32 r0, u32 b0, u32 g0, u32 r1, u32 b1, u32 g1, u32 r2, u32 b2, u32 g2	);
 
-	enum ADSR_STATE { ADSR_MUTED, ADSR_ATTACK, ADSR_DECAY, ADSR_SUSTAIN, ADSR_RELEASE };
 	
 	struct
 	{
-		u32 vxpitch, start, repeat, adsr, sustain, curadsr, Lcurvol, Rcurvol;
+		u32 vxpitch, start, repeat, curadsr, Lcurvol, Rcurvol;
 		u32 pcount;
 		s16 Lvol, Rvol;
-		u16 adsr_step;
-		int adsr_vol, adsr_cyc;
-		ADSR_STATE adsr_state;
+		int adsr_cyc;
+		int phase=3;
 		u32 curaddr, curnibble;
 		s16 out, cur, old, older, oldest;
+		u16 adsr_hi, adsr_lo, env_level;
 		s16 decoded_samples[28];
 	} svoice[24];
+	enum AdsrPhase { PHASE_ATTACK=0, PHASE_DECAY, PHASE_SUSTAIN, PHASE_RELEASE };
+	struct spu_env_params
+	{
+		bool decreasing=false, exponential=false;
+		int step=4, shift=0;
+	};
+	spu_env_params get_phase_params(u32 ind);
+	void adsr_clock(u32 ind);
 	u32 spu_cycles;    // 33.8688 / 44100 = output current sample every 768 cycles
 	u32 spu_write_addr;
 	u32 spu_kon, spu_koff, spu_endx, spu_en_noise, spu_en_reverb, spu_pmon;

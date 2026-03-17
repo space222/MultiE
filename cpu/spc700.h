@@ -5,8 +5,9 @@
 #include <functional>
 #include <coroutine>
 #include <utility>
-#include "itypes.h"
 #include "Yieldable.h"
+#include "itypes.h"
+
 /*
 struct Yieldable
 {
@@ -45,24 +46,22 @@ struct Yieldable
 	}
 };
 */
+
 #define PACKED __attribute__((packed))
 
-enum coru6502_type { CPU_2A03=0, CPU_6502, CPU_65C02, CPU_WDC65C02, CPU_HUC6280 };
-
-struct coru6502
+struct spc700
 {
-	u16 pc;
-	u8 s, a, x, y;
-	bool irq_line, nmi_line, waiting;
-	u32 pba;
+	u16 pc, opc, DP;
+	u8 S, A, X, Y;
+	bool waiting;
 	union {
 		struct {
 			unsigned int C : 1;
 			unsigned int Z : 1;
 			unsigned int I : 1;
-			unsigned int D : 1;
+			unsigned int H : 1;
 			unsigned int b : 1;
-			unsigned int t : 1;
+			unsigned int P : 1;
 			unsigned int V : 1;
 			unsigned int N : 1;
 		} PACKED b;
@@ -70,23 +69,33 @@ struct coru6502
 	} PACKED F; // usually called P on the 6502, but easier for me to remember F
 
 
-	std::function<u8(coru6502&, u32)> reader;
-	std::function<void(coru6502&, u32, u8)> writer;
-	u32 cpu_type = CPU_6502;
+	std::function<u8(spc700&, u32)> reader;
+	std::function<void(spc700&, u32, u8)> writer;
 	
-	//todo: HuC6280 MMU regs
 	u8 read(u16 addr) 
 	{
-		pba = addr;
+		//pba = addr;
 		return reader(*this, addr); 
 	}
 	void write(u16 addr, u8 v) 
 	{ 
-		pba = addr;
+		//pba = addr;
 		writer(*this, addr, v); 
 	}
 	
-	void prev() { read(pba); }
+	void push(u8 v)
+	{
+		write(0x100 | S, v);
+		S -= 1;
+	}
+	
+	u8 pop()
+	{
+		S += 1;
+		return read(0x100|S);
+	}
+	
+	//void prev() { read(pba); }
 	
 	void setnz(u8 v)
 	{
@@ -94,20 +103,15 @@ struct coru6502
 		F.b.N = v>>7;
 	}
 	
-	u8 add(u8 A, u8 B)
-	{
-		if( F.b.D && cpu_type!=CPU_2A03 )
-		{
-			printf("6502coru:todo: decimal mode.\n");
-			exit(1);
-			return 0;
-		}
+	u8 add(u8 a, u8 b)
+	{ //todo: this cpu had an H flag instead of decimal mode
 		u16 res = F.b.C;
-		res += A;
-		res += B;
+		res += a;
+		res += b;
 		setnz(res);
+		F.b.H = ((a&0xf)+(b&0xf)+F.b.C)>>4;
 		F.b.C = res>>8;
-		F.b.V = (((res^A)&(res^B)&0x80)?1:0);
+		F.b.V = (((res^a)&(res^b)&0x80)?1:0);
 		return res;
 	}
 	

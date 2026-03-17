@@ -1,5 +1,6 @@
 #include <cstdio>
 #include <cstdlib>
+#include <print>
 #include <algorithm>
 #include "psx.h"
 
@@ -8,6 +9,8 @@
 #define LOOP_START  (SRAM[V.curaddr+1]&4)
 #define ENVELOPE_COUNTER_MAX (1u << (33 - 11))
 
+inline s16 apply_vol(s16 in, s16 v) { return (s32(in) * s32(v))>>15; }
+inline u32 satsub(u32 a, u32 b) { if( b > a ) { return 0; } return a - b; }
 
 extern s16 spu_interp_table[]; // not really extern, just forward declared
 static int pos_xa_adpcm_table[] = { 0, 60, 115, 98, 122 };
@@ -15,7 +18,7 @@ static int neg_xa_adpcm_table[] = { 0, 0, -52, -55, -60 };
 
 void psx::tick_spu()
 {
-	float total = 0;
+	s32 total = 0;
 	for(u32 v = 0; v < 24; ++v)
 	{
 		auto& V = svoice[v];
@@ -25,15 +28,15 @@ void psx::tick_spu()
 		{
 			spu_kon &= ~(1u<<v);
 			V.curaddr = V.start&0x7ffff;
-			V.adsr_state = ADSR_ATTACK;
-			V.pcount = V.curnibble = V.adsr_vol = 0;
+			V.phase = PHASE_ATTACK;
+			V.pcount = V.curnibble = V.env_level = 0;
 			V.adsr_cyc = ENVELOPE_COUNTER_MAX;
 			spu_decode_block(v);
 		}
 		if( spu_koff & (1u<<v) )
 		{
 			spu_koff &= ~(1u<<v);
-			V.adsr_state = ADSR_RELEASE;	
+			V.phase = PHASE_RELEASE;	
 			V.adsr_cyc = ENVELOPE_COUNTER_MAX;
 		}
 
@@ -51,16 +54,11 @@ void psx::tick_spu()
 		}
 
 		V.out = V.decoded_samples[V.curnibble];
-		
-		s32 ev = V.out;
-		ev *= (s32(V.Rvol)+s32(V.Lvol))/2;
-		if( V.adsr_state != ADSR_RELEASE )
-		{
-			total += (((u16(V.out)^0x8000)/65535.f)*2 - 1);
-		}
+		adsr_clock(v);
+		total += apply_vol(apply_vol(V.out, V.env_level), V.Lvol<<1);
 	}
 	
-	spu_out = std::clamp(total/4, -1.f, 1.f);
+	spu_out = std::clamp(total/32768.f, -1.f, 1.f);
 }
 
 void psx::spu_decode_block(u32 voice)
@@ -73,6 +71,9 @@ void psx::spu_decode_block(u32 voice)
 	if( filter > 4 ) filter = 4;
 	s16 f0 = pos_xa_adpcm_table[filter];
 	s16 f1 = neg_xa_adpcm_table[filter];
+	
+	s16 old = V.old;
+	s16 older = V.older;
 
 	for(u32 i = 0; i < 28; ++i)
 	{
@@ -84,13 +85,16 @@ void psx::spu_decode_block(u32 voice)
 		//t >>= shift;
 		t <<= 12 - shf;
 		
-		int samp = t + ((V.old*f0 + V.older*f1+32)/64);
-  		V.cur = std::clamp(samp, -32768, 32767);
-		V.oldest = V.older;
-		V.older = V.old;
-		V.old = V.cur;
-        	V.decoded_samples[i] = V.cur;
+		int samp = t + ((old*f0 + older*f1+32)/64);
+		samp = std::clamp(samp, -32768, 32767);
+		older = old;
+		old = samp;
+		
+  		V.decoded_samples[i] = samp;
 	}
+	
+	V.older = older;
+	V.old = old;
 
 	if( LOOP_START )
 	{
@@ -103,8 +107,8 @@ void psx::spu_decode_block(u32 voice)
 
 		if( ! LOOP_REPEAT )
 		{
-			V.adsr_state = ADSR_RELEASE;
-			V.adsr_vol = 0;
+			V.phase = PHASE_RELEASE;
+			V.env_level = 0;
 		}
 	} else {
 		V.curaddr += 16;
@@ -129,8 +133,8 @@ void psx::spu_write(u32 addr, u32 val, int size)
 		case 2: svoice[V].Rvol = val; return;
 		case 4: svoice[V].vxpitch = val&0xffff; return;
 		case 6: svoice[V].start = (val&0xffff)<<3; return;
-		case 8: svoice[V].adsr = val&0xffff; return;
-		case 0xA: svoice[V].sustain = val&0xffff; return;
+		case 8: svoice[V].adsr_lo = val&0xffff; return;
+		case 0xA: svoice[V].adsr_hi = val&0xffff; return;
 		case 0xC: return; // adsr current volume?
 		case 0xE: svoice[V].repeat = (val&0xffff)<<3; return;
 		default:
@@ -202,7 +206,7 @@ u32 psx::spu_read(u32 addr, int size)
 		u32 reg = (addr&0xf);
 		switch( reg )
 		{
-		case 0xC: return svoice[V].adsr_vol; // adsr current volume?
+		case 0xC: return svoice[V].env_level; // adsr current volume?
 		default: 
 			//printf("SPU: Read Voice %i, reg $%X\n", V, reg);
 			break;	
@@ -213,6 +217,81 @@ u32 psx::spu_read(u32 addr, int size)
 	//printf("SPU: Read $%X\n", addr);
 	return 0;
 }
+
+void psx::adsr_clock(u32 ind)
+{
+	auto& V = svoice[ind];
+	
+	if( V.phase == PHASE_ATTACK && V.env_level >= 0x7FFF )
+	{
+            V.phase = PHASE_DECAY;
+        }
+        
+	const u16 sustain_level = ((V.adsr_lo&15)+1)*0x800;
+
+        // Note that the envelope should go straight from Attack to Sustain if the sustain level is
+        // set to the highest possible value
+        if( V.phase == PHASE_DECAY && u16(V.env_level) <= sustain_level )
+        {
+		V.phase = PHASE_SUSTAIN;
+        }
+	
+	// For a shift value of N, the envelope should update every 1 << (N - 11) cycles.
+        // Accomplish this by using a counter decrement of MAX >> (N - 11)
+        auto params = get_phase_params(ind);
+        
+        u32 counter_decrement = ENVELOPE_COUNTER_MAX >> satsub(params.shift, 11);
+        
+        // Quadruple the update interval if in exponential increase mode and volume is above the threshold
+        if( params.decreasing && params.exponential && V.env_level > 0x6000 )
+        {
+		counter_decrement >>= 2;
+        }
+
+        V.adsr_cyc = satsub(V.adsr_cyc, counter_decrement);
+        if( V.adsr_cyc != 0 ) return;
+        
+	V.adsr_cyc = ENVELOPE_COUNTER_MAX;
+
+        // If shift is less than 11, step is left shifted
+        params.step <<= satsub(11, params.shift);
+
+        // In exponential decrease mode, use current volume as a multiplier
+        // This has the effect of slowing updates at lower volumes
+        s32 current_level = V.env_level;
+        if( params.decreasing && params.exponential )
+        {
+		params.step = (params.step * current_level) >> 15;
+        }
+        
+        // Apply step and clamp to an unsigned 15-bit integer
+        V.env_level = std::clamp<s32>(current_level + params.step, 0, 0x7FFF);
+}
+
+psx::spu_env_params psx::get_phase_params(u32 ind)
+{
+	auto& V = svoice[ind];
+	
+	switch( V.phase )
+	{
+	case PHASE_ATTACK: return { false, (V.adsr_lo & BIT(15)) ? true:false, 7 - ((V.adsr_lo>>8)&3), (V.adsr_lo>>10)&0x1F };
+	case PHASE_DECAY: return { true, true, -8, (V.adsr_lo>>4)&15 };
+	case PHASE_SUSTAIN:{
+		bool dec  = V.adsr_hi&BIT(14);
+		bool expo = V.adsr_hi&BIT(15);
+		int step = 7 - ((V.adsr_hi>>6)&3);
+		if( dec ) { step ^= 7; }
+		return { dec, expo, step, (V.adsr_hi>>8)&31 };
+		}
+	
+	case PHASE_RELEASE: return { true, (V.adsr_hi & BIT(5)) ? true:false, -8, V.adsr_hi&31 };
+	default:
+		std::println("get_phase_params should never get here");
+		exit(1);
+		return {};
+	}
+}
+
 
 s16 spu_interp_table[] = {
 -1, -1, -1, -1, -1, -1, -1, -1,

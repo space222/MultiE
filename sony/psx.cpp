@@ -1,5 +1,6 @@
 #include <cstdio>
 #include <cstdlib>
+#include <iostream>
 #include <string>
 #include <vector>
 #include <filesystem>
@@ -7,6 +8,7 @@
 #include <unistd.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <print>
 #include <SDL.h>
 #include "Settings.h"
 #include "psx.h"
@@ -113,7 +115,7 @@ void psx::dma_run_channel(u32 ch)
 		for(u32 i = 0; i < dma_len; ++i)
 		{
  			u32 header = (i == dma_len - 1) ? 0xFFFFFF : (address - 4);
-			*(u32*)&RAM[address] = header;
+ 			*(u32*)&RAM[address] = header;
     			address -= 4;
 		}
 		dchan[6].madr = addr;
