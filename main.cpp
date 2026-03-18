@@ -553,7 +553,7 @@ void imgui_run()
 							exit(1);
 						}
 						else newinstance = true;
-						crt_scale = 1.f;
+						crt_scale = 2.f;
 					}				
 				}
 				if( ImGui::MenuItem("Vectrex") )

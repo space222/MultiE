@@ -82,6 +82,7 @@ public:
 		{
 			opc = 0;
 		} else {
+			//std::println("Fetching ${:X}:${:X}", pb>>16, pc);
 			opc = bus_read(pb|pc);
 		}
 	}

@@ -13,10 +13,11 @@ and writes at the end (after advancing everything else by 6/8/12 mclk cycles):
 
 Yieldable c65816::run()
 {
-	reg oper, addr;
+	reg oper{}, addr{};
 	u8 bank=0;
 	u16 t=0;
 	u32 t32=0;
+	
 while(1)
 {
 	//std::println("About to run ${:X}", opc);

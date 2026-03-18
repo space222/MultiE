@@ -362,6 +362,7 @@ Notes:
 Still should ask on discord about proper video timing
 
 
+
 Sony Playstation 2
 ---------------------
 1. Continue thru BIOS, implementing EE instructions along the way
@@ -380,6 +381,17 @@ After responding to that, a bit more SIF traffic and then everything spins waiti
 
 
 
+Nintendo SNES
+----------------
+1. Tons of I/O
+2. Rest of LoROM/HiROM/whatever memory mappings
+3. Begin background rendering with whatever krom's tests/demos need
+4. Integrate my spc player for sound.
+5. Most backgrounds, input, etc
+6. Coprocessors would be neat but are low priority for once most other things work.
+
+
+
 Radio Shack TRS-80 Color Computer 3
 --------------------------------------
 1. Start the many graphics modes. First one needs to be whatever the BASIC starts in.
@@ -390,12 +402,6 @@ Radio Shack TRS-80 Color Computer 3
 Status: Disk basic loads and can read the floppy. However, zero software functions.
 Some things may show an initial screen, but eventually fail. 
 
-
-
-Vectrex
-----------
-1. Everything
-Status: not started
 
 
 
