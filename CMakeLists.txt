@@ -32,7 +32,7 @@ nintendo/gba_timer.cpp nintendo/gba_sound.cpp nintendo/gba_gpio.cpp cpu/z80_new.
 sega/dc/dreamcast.cpp sega/dc/cpuregs.cpp sega/dc/timer.cpp sega/dc/maple.cpp sega/dc/disc.cpp sega/dc/ta.cpp
 sega/dc/sound.cpp cpu/arm7di.cpp cpu/8086.cpp cpu/286.cpp ibm/ibmpc.cpp ibm/ibmpc_pit.cpp sony/ps2/ps2.cpp 
 sony/ps2/iop.cpp cpu/EEngine.cpp sony/ps2/gs.cpp cpu/6809.cpp other/trs80cc3.cpp other/trs80cc3_fdc.cpp
-other/vectrex.cpp cpu/65816.cpp nintendo/snes/snes.cpp nintendo/snes/ppu.cpp cpu/spc700.cpp
+other/vectrex.cpp cpu/65816.cpp nintendo/snes/snes.cpp nintendo/snes/ppu.cpp cpu/spc700.cpp nintendo/snes/snd.cpp
 #stub/gdb_stub.cpp
 )
 

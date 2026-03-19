@@ -24,7 +24,8 @@ public:
 	virtual float pop_sample() { return 0; }
 	
 	void setVsync(bool);
-	
+	void setSampleRate(u32);
+
 	virtual void event(u64, u32) { return; }
 	
 	virtual std::array<std::string, 8>& media_names() 

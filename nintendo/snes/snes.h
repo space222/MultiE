@@ -4,16 +4,17 @@
 #include <vector>
 #include "console.h"
 #include "65816.h"
-//#include "spc700.h"
+#include "spc700.h"
 
 class snes : public console
 {
 public:
 	~snes()
 	{
+		setVsync(1);
 	}
 	
-	snes() { setVsync(1); }
+	snes() { setVsync(0); }
 
 	u32 fb_bpp() override { return 16; } // bgr555
 	u32 fb_width() override { return 256; }
@@ -23,16 +24,24 @@ public:
 	void reset() override 
 	{ 
 		cpu.E=1;
+		cpu.F.v = 0;
 		cpu.F.b.M = 1;
 		cpu.F.b.X = 1;
 		cpu.X.v = cpu.Y.v = 0;
+		cpu.A.v = 0;
 		cpu.pc = cpu.bus_read(0xfffc); 
 		cpu.pc |= cpu.bus_read(0xfffd)<<8; 
 		cpu.opc = cpu.bus_read(cpu.pc); 
-		cpu.pb=0; 
+		cpu.pb = cpu.db = cpu.D.v = 0; 
 		cpu.S.v = 0x1FFF;
-		cpu_run = cpu.run(); 
+		spc.pc = 0xffc0;
+		spcram[0xf1] = 0xb0;
+		cpu_run = cpu.run();
+		spc_run = spc.run();
 	}
+	
+	s64 cpu_stamp=0;
+	u64 spc_div=0;
 
 	void run_frame() override;
 	bool loadROM(std::string) override;
@@ -51,6 +60,8 @@ public:
 		u8 wrmpya=0, wrmpyb=0, wrdivl=0, wrdivh=0, wrdivb=0;
 		u8 htimel=0, htimeh=0, vtimel=0, vtimeh=0, mdmaen=0, hdmaen=0;
 		u8 wmaddl=0, wmaddm=0, wmaddh=0;
+		s32 multres=0;
+		u16 quot=0, remain=0;
 	} io;
 	
 	struct {
@@ -71,7 +82,7 @@ public:
 		u16 m7a=0, m7b=0, m7c=0, m7d=0, m7x=0, m7y=0;
 		u8 m7latch=0;
 		
-		u8 wmaddh=0, wmaddl=0;
+		u8 vmaddh=0, vmaddl=0;
 		
 		u8 objsel=0, oamaddh=0, oamaddl=0;
 		u8 oam_latch=0;
@@ -82,6 +93,8 @@ public:
 		u16 cgram[256];
 		
 		u8 rdnmi=0;
+		
+		u8 m7sel=0;
 		
 		u8 dmaregs[0x80];
 		u8 vram[64_KB];
@@ -100,9 +113,13 @@ public:
 		u32 ram_size;
 	} cart;
 	
+	enum phases { ADSR_ATTACK=0, ADSR_DECAY, ADSR_SUSTAIN, ADSR_RELEASE, ADSR_GAIN };
+		
 	struct {
-		u8 to_cpu[4];
-		u8 to_spc[4];
+		u8 to_cpu[4]={0};
+		u8 to_spc[4]={0};
+		
+		float Left=0, Right=0;
 
 		u32 tinternal[3]={0,0,0};
 		u32 target[3]={0,0,0};
@@ -111,7 +128,6 @@ public:
 		u8 dsp_regs[0x100];
 		u32 glblcnt = 0;
 
-		enum phases { ADSR_ATTACK=0, ADSR_DECAY, ADSR_SUSTAIN, ADSR_RELEASE, ADSR_GAIN };
 		struct {
 			u32 block_addr=0;
 			u32 loop_addr=0;
@@ -119,17 +135,31 @@ public:
 			s16 decoded[16];
 			u32 decoded_ind=0;
 			s16 oldest=0, older=0, old=0, cur=0, out=0;
-			s16 env_level;
+			s16 env_level=0;
 			int phase=ADSR_RELEASE;
 		} voice[8];
 	} apu;
 	u8 spcram[64_KB];
-	
+	void decode_block(u32 vind);
+	void adsr_clock(u32 vind);	
+	void gain_clock(u32 vind);
+	void dsp_write(u8 reg, u8 v);
+	u8 dsp_read(u8 reg);
+	void dsp_clock();
+	void ssmp_write(u8 a, u8 v);
+	u8 ssmp_read(u8 a);
+	u8 spc_read(u16);
+	void spc_write(u16, u8);
+	void snd_clock(); // runs the spc700 and s-dsp
+	u64 smp_clocks=0;
+	u64 spc_stamp=0;
 
 	u16 fbuf[512*480];
 
 	c65816 cpu;
 	Yieldable cpu_run;
+	spc700 spc;
+	Yieldable spc_run;
 
 	u8 ram[128_KB];
 	std::vector<u8> SRAM;

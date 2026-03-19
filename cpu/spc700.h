@@ -115,11 +115,11 @@ struct spc700
 		return res;
 	}
 	
-	void cmp(u8 A, u8 B)
+	void cmp(u8 a, u8 b)
 	{
 		u16 res = 1;
-		res += A;
-		res += B^0xff;
+		res += a;
+		res += b^0xff;
 		F.b.C = ((res>>8)?1:0);
 		setnz(res);
 	}

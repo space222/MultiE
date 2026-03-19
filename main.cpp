@@ -952,6 +952,19 @@ void imgui_run()
 	ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), MainRender);
 }
 
+void console::setSampleRate(u32 rate)
+{
+	SDL_AudioSpec want, got;
+	want.freq = rate;
+	want.channels = 1;
+	want.callback = audio_callback;
+	want.samples = 512;
+	want.format = AUDIO_F32;
+	SDL_CloseAudioDevice(audio_dev);
+	audio_dev = SDL_OpenAudioDevice(nullptr, 0, &want, &got, 0);
+	SDL_PauseAudioDevice(audio_dev, 0);
+}
+
 void console::setVsync(bool e)
 {
 	SDL_RenderSetVSync(MainRender, e?1:0); //while?

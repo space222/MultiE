@@ -23,19 +23,23 @@ void snes::io_write(u8 bank, u32 a, u8 v)
 	case 0x210A: ppu.bg4sc = v; return;
 	case 0x210B: ppu.bg12nba = v; return;
 	case 0x210C: ppu.bg34nba = v; return;
-	case 0x2115: ppu.vmain = v&0x8F; if( v&15 ) { std::println("VMAIN = ${:X}", v&0x8f); } return;
+	case 0x2115: ppu.vmain = v&0x8F; return;
 	
-	case 0x210D: ppu.bg1hofs = (v<<8)|(ppu.bgofs_latch&~7)|(ppu.bghofs_latch&7);
-		     ppu.bgofs_latch = ppu.bghofs_latch = v;
+	case 0x210D: ppu.bg1hofs = (v<<8)|(ppu.bgofs_latch&~7)|((ppu.bg1hofs>>8)&7); //snesdev wiki pseudocode is wrong
+										     //this is based on fullsnes, but dunno if I understood it correctly
+			//std::println("BG1H = ${:X}", ppu.bg1hofs);
+		     ppu.bgofs_latch = v;
 		     return;
-	case 0x210F: ppu.bg2hofs = (v<<8)|(ppu.bgofs_latch&~7)|(ppu.bghofs_latch&7);
-		     ppu.bgofs_latch = ppu.bghofs_latch = v;
+	case 0x210F: ppu.bg2hofs = (v<<8)|(ppu.bgofs_latch&~7)|((ppu.bg2hofs>>8)&7);
+		     //std::println("BG2H = ${:X}", ppu.bg2hofs);
+		    ppu.bgofs_latch = v;
 		     return;
-	case 0x2111: ppu.bg3hofs = (v<<8)|(ppu.bgofs_latch&~7)|(ppu.bghofs_latch&7);
-		     ppu.bgofs_latch = ppu.bghofs_latch = v;
+	case 0x2111: ppu.bg3hofs = (v<<8)|(ppu.bgofs_latch&~7)|((ppu.bg3hofs>>8)&7);
+		    //std::println("BG3H = ${:X}", ppu.bg3hofs);
+		     ppu.bgofs_latch = v;
 		     return;
-	case 0x2113: ppu.bg4hofs = (v<<8)|(ppu.bgofs_latch&~7)|(ppu.bghofs_latch&7);
-		     ppu.bgofs_latch = ppu.bghofs_latch = v;
+	case 0x2113: ppu.bg4hofs = (v<<8)|(ppu.bgofs_latch&~7)|((ppu.bg4hofs>>8)&7);
+		     ppu.bgofs_latch = v;
 		     return;
 	case 0x210E: ppu.bg1vofs = (v<<8)|ppu.bgofs_latch;
 		     ppu.bgofs_latch = v;
@@ -55,6 +59,7 @@ void snes::io_write(u8 bank, u32 a, u8 v)
 		     return;
 	case 0x211C: ppu.m7b = (v<<8)|ppu.m7latch;
 		     ppu.m7latch = v;
+		     io.multres = s32(s16(ppu.m7a)) * s8(v);
 		     return;
 	case 0x211D: ppu.m7c = (v<<8)|ppu.m7latch;
 		     ppu.m7latch = v;
@@ -69,16 +74,24 @@ void snes::io_write(u8 bank, u32 a, u8 v)
 		     ppu.m7latch = v;
 		     return;
 		     
-	case 0x2116: ppu.wmaddl = v; return;
-	case 0x2117: ppu.wmaddh = v; return;
+	case 0x2116: ppu.vmaddl = v; return;
+	case 0x2117: ppu.vmaddh = v; return;
 	
-	case 0x2118: { u32 waddr = ((ppu.wmaddh<<8)|ppu.wmaddl)&0x7fff;
-		       ppu.vram[(waddr*2)&0xffff] = v;
-		       if( !(ppu.vmain & BIT(7)) ) { ppu.wmaddl+=1; if(!ppu.wmaddl) ppu.wmaddh++; }
+	case 0x2118: { 
+			if( ppu.vmain&12 ) { std::println("VMAIN = ${:X}", ppu.vmain); exit(1); }
+			u32 incr = 1;
+			if( (ppu.vmain&3)== 1 ) incr = 32; else if( (ppu.vmain&3) ) incr = 128; 
+			u32 vaddr = ((ppu.vmaddh<<8)|ppu.vmaddl)&0x7fff;
+		       ppu.vram[(vaddr*2)&0xffff] = v;
+		       if( !(ppu.vmain & BIT(7)) ) { vaddr+=incr; ppu.vmaddl=vaddr; ppu.vmaddh=vaddr>>8; }
 		      }return;
-	case 0x2119: { u32 waddr = ((ppu.wmaddh<<8)|ppu.wmaddl)&0x7fff;
-		       ppu.vram[(waddr*2 + 1)&0xffff] = v;
-		       if( (ppu.vmain & BIT(7)) ) { ppu.wmaddl+=1; if(!ppu.wmaddl) ppu.wmaddh++; }
+	case 0x2119: { 
+			if( ppu.vmain&12 ) { std::println("VMAIN = ${:X}", ppu.vmain); exit(1); }
+			u32 incr = 1;
+			if( (ppu.vmain&3)== 1 ) incr = 32; else if( (ppu.vmain&3) ) incr = 128; 
+			u32 vaddr = ((ppu.vmaddh<<8)|ppu.vmaddl)&0x7fff;
+		       ppu.vram[(vaddr*2 + 1)&0xffff] = v;
+		       if( (ppu.vmain & BIT(7)) ) { vaddr+=incr; ppu.vmaddl=vaddr; ppu.vmaddh=vaddr>>8; }
 		      }return;
 		      
 	case 0x2121: ppu.cgadd = v; ppu.cgram_byte=0; return;
@@ -110,7 +123,6 @@ void snes::io_write(u8 bank, u32 a, u8 v)
 	case 0x2132: ppu.coldata = v; return;
 	case 0x2133: ppu.setini = v&0xcf; return;
 	
-
 	case 0x2140: apu.to_spc[0] = v; return;
 	case 0x2141: apu.to_spc[1] = v; return;
 	case 0x2142: apu.to_spc[2] = v; return;
@@ -130,13 +142,22 @@ void snes::io_write(u8 bank, u32 a, u8 v)
 	
 	case 0x4016: /*todo joypad*/ return;
 	
-	case 0x4200: io.nmitimen = v&0xb1; return;
+	case 0x4200: io.nmitimen = v&0xb1; return; /*todo: raise nmi if currently in vblank*/
 	case 0x4201: io.wrio = v; return;
 	case 0x4202: io.wrmpya = v; return;
 	case 0x4203: io.wrmpyb = v; /*todo: multiply*/ return;
 	case 0x4204: io.wrdivl = v; return;
 	case 0x4205: io.wrdivh = v; return;
-	case 0x4206: io.wrdivb = v; return;
+	case 0x4206:{
+		u16 dividend = io.wrdivh<<8; dividend |= io.wrdivl;
+		if( v == 0 )
+		{
+			io.quot = 0xffff; io.remain = dividend;
+		} else {
+			io.quot = dividend/v;
+			io.remain = dividend%v;
+		}
+		}return;
 	case 0x4207: io.htimel = v; return;
 	case 0x4208: io.htimeh = v&1; return;
 	case 0x4209: io.vtimel = v; return;
@@ -147,11 +168,11 @@ void snes::io_write(u8 bank, u32 a, u8 v)
 	case 0x420C: io.hdmaen = v; return;	
 	case 0x420D: io.memsel = v&1; return;
 	
-
+	case 0x211A: ppu.m7sel = v&0xc3; return;
 	default:
 		if( a >= 0x4300 && a < 0x4380 ) { ppu.dmaregs[a&0x7f] = v; return; }
-		std::println("io wr ${:X}:${:X} = ${:X}", bank, a, v);
-		//exit(1);
+		std::println("${:X}:${:X}: io wr ${:X}:${:X} = ${:X}", cpu.pb>>16, cpu.pc, bank, a, v);
+		exit(1);
 		return;
 	}
 }
@@ -161,13 +182,38 @@ u8 snes::io_read(u8 bank, u32 a)
 	if( a < 0x2000 ) { do_master_cycles(2); return ram[a]; }
 	switch( a )
 	{
+	case 0x4016: return 1; // joypad1 rd
+	case 0x4017: return 1; // joypad2 rd
+	
+	case 0x4211: return 0; // timer irq flag
+	case 0x4212: return (ppu.scanline>239 ? 0x80:0);
+	
+	case 0x4214: return io.quot;
+	case 0x4215: return io.quot>>8;
+	case 0x4216: return io.remain;
+	case 0x4217: return io.remain>>8;
+	
+	case 0x4218: return 0x00; //auto joypad 1l
+	case 0x4219: return 0x00; //auto joypad 1h
+	
+	case 0x421A:
+	case 0x421B:
+	case 0x421C:
+	case 0x421D: 
+	case 0x421E:
+	case 0x421F: return 0x00;
+	
+	case 0x2134: return io.multres;
+	case 0x2135: return io.multres>>8;
+	case 0x2136: return io.multres>>16;
+	
 	case 0x2140: return apu.to_cpu[0];
 	case 0x2141: return apu.to_cpu[1];
 	case 0x2142: return apu.to_cpu[2];
 	case 0x2143: return apu.to_cpu[3];
 	case 0x4210: { u8 v = ppu.rdnmi; ppu.rdnmi &= 0x7f; return 2 | v; }
 	}
-	std::println("${:X}: io rd ${:X}:${:X}", cpu.pc, bank, a);
+	std::println("${:X}:${:X}: io rd ${:X}:${:X}", cpu.pb>>16, cpu.pc, bank, a);
 	exit(1);
 	return 0;
 }
@@ -197,7 +243,7 @@ u8 snes::read(u32 a)
 	if( a >= 0x8000 )
 	{
 		//std::println("snes rd ${:X}:${:X}", bank, a);
-		return ROM[(bank*1024*32 + (a&0x7fff)) % ROM.size()];
+		return ROM[(((bank&0x7f)*0x8000) + (a&0x7fff))];
 	}
 	
 	std::println("snes rd ${:X}:${:X}", bank, a);
@@ -207,7 +253,20 @@ u8 snes::read(u32 a)
 void snes::do_master_cycles(s64 master_cycles)
 {
 	ppu_mc(master_cycles);
+	cpu_stamp += master_cycles * 24576000;
+	spc_stamp += master_cycles;
+	if( spc_stamp >= 487 ) { spc_stamp-=487; audio_add(apu.Left, apu.Right); }
 
+	while( cpu_stamp > 0 )
+	{
+		cpu_stamp -= 21477272;
+		spc_div += 1;
+		if( spc_div >= 24 )
+		{
+			spc_div = 0;
+			snd_clock();
+		}
+	}
 }
 
 void snes::run_frame()
@@ -261,7 +320,9 @@ void snes::run_dma(u32 cn)
 		}
 	}
 	
-	
+	ppu.dmaregs[rb|5] = ppu.dmaregs[rb|6] = 0;
+	ppu.dmaregs[rb|3] = src>>8;
+	ppu.dmaregs[rb|2] = src;
 }
 
 bool snes::loadROM(std::string fname)
@@ -273,6 +334,8 @@ bool snes::loadROM(std::string fname)
 	}
 	cpu.bus_read = [&](u32 a)->u8 { return read(a); };
 	cpu.bus_write = [&](u32 a, u8 v) { write(a,v); };
+	spc.reader = [&](spc700&, u16 a) { return spc_read(a); };
+	spc.writer = [&](spc700&, u16 a, u8 v) { spc_write(a,v); };
 
 	//find rom header to get board info: rom/ram sizes, coprocessor, mapping type (loRom, hiRom, exhiRom)
 	u32 hd = 0x7fc0;

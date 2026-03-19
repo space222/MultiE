@@ -1,0 +1,437 @@
+#include <print>
+#include "snes.h"
+extern u32 snes_dsp_poffset[];
+extern u32 snes_dsp_period[];
+extern s32 snes_interp_table[];
+
+void snes::snd_clock()
+{
+	spc_run();
+	if( spcram[0xF1] & 1 )
+	{
+		apu.tinternal[0] += 1;
+		if( apu.tinternal[0] == apu.target[0]*128 )
+		{
+			apu.tinternal[0] = 0;
+			apu.tout[0] += 1;
+			apu.tout[0] &= 15;
+			//std::println("tout0=${:X}", tout[0]);	
+		}
+	}
+	if( spcram[0xF1] & 2 )
+	{
+		apu.tinternal[1] += 1;
+		if( apu.tinternal[1] == apu.target[1]*128 )
+		{
+			apu.tinternal[1] = 0;
+			apu.tout[1] += 1;
+			apu.tout[1] &= 15;
+		}
+	}
+	if( spcram[0xF1] & 4 )
+	{
+		apu.tinternal[2] += 1;
+		if( apu.tinternal[2] == apu.target[2]*16 )
+		{
+			//std::println("int2=${:X}, tar2=${:X}", tinternal[2], target[2]*16);
+			apu.tinternal[2] = 0;
+			apu.tout[2] += 1;
+			apu.tout[2] &= 15;
+		}
+	}
+	smp_clocks += 1;
+	if( smp_clocks >= 32 )
+	{
+		smp_clocks = 0;
+		dsp_clock();
+	}
+}
+
+void snes::decode_block(u32 vind)
+{
+	auto& V = apu.voice[vind];
+
+	u8 header = spcram[V.block_addr&0xffff];
+	
+	s16 older = V.old;
+	s16 old = V.cur;
+	
+	for(u32 i = 0; i < 16; ++i)
+	{
+		u8 b = spcram[(V.block_addr + 1 + i/2)&0xffff];
+		b >>= 4*((i&1)^1);
+		b &= 15;
+		
+		u32 shf = header>>4;
+		s16 shifted = s8(b<<4)>>4;
+		
+		if( shf >= 13 )
+		{
+			shifted >>= 3;
+			shf = 12;	
+		}
+		shifted = (shifted<<shf)>>1;
+		
+		switch( (header>>2)&3 )
+		{
+		case 0: break;
+		case 1: shifted += old + (-old >> 4); break;
+		case 2: shifted += old*2 + ((-old*3) >> 5) - older + (older >> 4); break;
+		case 3: shifted += old*2 + ((-old*13)>>6) - older + ((older*3)>>4); break;		
+		}
+		
+		//switch( (header>>2)&3 )
+		//{
+		//case 0: break;
+		//case 1: shifted += old*0.9375f; break;
+		//case 2: shifted += old*1.90625f - older*0.9375f; break;
+		//case 3: shifted += old*1.796875f - older*0.8125f; break;		
+		//}
+	
+		older = old;
+		old = shifted;
+		V.decoded[i] = shifted;
+	}
+	
+	switch( header&3 )
+	{
+	case 0:
+	case 2:	
+		V.block_addr += 9;
+		break;
+	case 1:
+		V.block_addr  = *(u16*)&spcram[((apu.dsp_regs[0x5D]<<8) + apu.dsp_regs[(vind<<4)|4]*4 + 2)&0xffff];
+		V.phase = ADSR_RELEASE;
+		V.env_level = 0;
+		break;
+	case 3:
+		V.block_addr  = *(u16*)&spcram[((apu.dsp_regs[0x5D]<<8) + apu.dsp_regs[(vind<<4)|4]*4 + 2)&0xffff];
+		//dsp_regs[0x7c] |= BIT(vind); // set endx flag ??
+		break;
+	}
+}
+
+void snes::adsr_clock(u32 vind)
+{
+	auto& V = apu.voice[vind];
+	if( apu.glblcnt == 0 )
+	{
+		apu.glblcnt = 0x77ff;
+	} else {
+		apu.glblcnt -= 1;
+	}
+	u32 rate = 0;
+	switch( V.phase )
+	{
+	case ADSR_ATTACK:
+		if( (apu.dsp_regs[(vind<<4)|5]&15) == 0xf )
+		{
+			rate = 31;
+		} else {
+			rate = (apu.dsp_regs[(vind<<4)|5]&15)*2 + 1;
+		}
+		if( 0 == (apu.glblcnt + snes_dsp_poffset[rate]) % snes_dsp_period[rate] )
+		{
+			V.env_level += (((apu.dsp_regs[(vind<<4)|5]&15)==15) ? 0x400 : 32);
+			//std::println("V{} attack, acnt=${:X}, lvl = ${:X}", vind, V.acnt, V.env_level);
+		}
+		if( V.env_level >= 0x7ff )
+		{
+			V.phase = ADSR_DECAY;
+		}
+		break;
+	case ADSR_DECAY:
+		rate = ((apu.dsp_regs[(vind<<4)|5]>>4)&7)*2 + 16;
+		if( 0 == (apu.glblcnt + snes_dsp_poffset[rate]) % snes_dsp_period[rate] )
+		{
+			V.env_level = (V.env_level - 1) - (V.env_level>>8);
+			//std::println("V{} decay, acnt=${:X}, lvl = ${:X}", vind, V.acnt, V.env_level);
+		}
+		if( (V.env_level>>8) == (apu.dsp_regs[(vind<<4)|6]>>5) )
+		{
+			V.phase = ADSR_SUSTAIN;
+		}
+		break;
+	case ADSR_SUSTAIN:
+		rate = apu.dsp_regs[(vind<<4)|6]&0x1f;
+		if( rate && 0 == (apu.glblcnt + snes_dsp_poffset[rate]) % snes_dsp_period[rate] )
+		{
+			V.env_level = (V.env_level - 1) - (V.env_level>>8);
+			//std::println("V{} sus, acnt=${:X}, lvl = ${:X}", vind, V.acnt, V.env_level);
+		}
+		break;
+	case ADSR_RELEASE:
+		V.env_level -= 8;
+		break;
+	}
+	V.env_level = std::clamp<s16>(V.env_level, 0, 0x7ff);
+}
+
+void snes::gain_clock(u32 vind)
+{
+	if( apu.voice[vind].phase == ADSR_RELEASE )
+	{
+		apu.voice[vind].env_level = std::clamp(apu.voice[vind].env_level - 8, 0, 0x7ff);
+		return;
+	}
+
+	u8 gr = apu.dsp_regs[(vind<<4)|7];
+	if( !(gr & 0x80) )
+	{
+		apu.voice[vind].env_level = gr<<4;
+		return;
+	}
+	//todo: gain modes that change level
+}
+
+void snes::dsp_clock()
+{
+	for(u32 b = 0; b < 8 && apu.dsp_regs[0x4c]; ++b)
+	{
+		if( !(apu.dsp_regs[0x4c] & BIT(b)) ) continue;
+		apu.dsp_regs[0x4c] &= ~BIT(b);
+		
+		auto& V = apu.voice[b];
+		V.phase = ADSR_ATTACK;
+		V.env_level = V.pcnt = 0;
+		V.old = V.older = V.oldest = V.cur = 0;
+		V.block_addr = *(u16*)&spcram[((apu.dsp_regs[0x5D]<<8) + apu.dsp_regs[(b<<4)|4]*4)&0xffff];
+		//V.loop_addr  = *(u16*)&spcram[(dsp_regs[0x5D]<<8) + dsp_regs[(b<<4)|4]*4 + 2];
+		// ^ loop address read at time of loop or upon key-on?
+		apu.dsp_regs[0x7c] &= ~BIT(b); // endx bit cleared
+		V.decoded_ind = 0;
+		decode_block(b);
+	}
+	
+	for(u32 b = 0; b < 8 && apu.dsp_regs[0x5c]; ++b)
+	{
+		if( !(apu.dsp_regs[0x5c] & BIT(b)) ) continue;
+		apu.dsp_regs[0x5c] &= ~BIT(b);
+		auto& V = apu.voice[b];
+		V.phase = ADSR_RELEASE;
+	}
+	
+	s32 total_L=0, total_R=0;
+	for(u32 vind = 0; vind < 8; ++vind)
+	{
+		if( apu.dsp_regs[0x3D] & BIT(vind) ) continue; //todo: noise
+		auto& V = apu.voice[vind];
+		
+		if( apu.dsp_regs[(vind<<4)|5] & 0x80 )
+		{
+			adsr_clock(vind);
+		} else {
+			gain_clock(vind);
+		}
+
+		u16 pitch = (apu.dsp_regs[(vind<<4)|3]<<8) | apu.dsp_regs[(vind<<4)|2];
+		if( apu.dsp_regs[0x2D] & BIT(vind) & 0xFE ) pitch += (apu.voice[vind-1].out >> 5) * pitch >> 10;
+		V.pcnt += pitch;
+		while( V.pcnt >= 0x1000 )
+		{
+			V.pcnt -= 0x1000;
+			V.oldest = V.older;
+			V.older = V.old;
+			V.old = V.cur;
+			V.cur = V.decoded[V.decoded_ind];
+			
+			u32 i = (V.pcnt>>4)&0xff;
+			s32 out = ((snes_interp_table[0x0FF-i] * V.oldest) >> 10);
+			out += ((snes_interp_table[0x1FF-i] * V.older) >> 10);
+			out += ((snes_interp_table[0x100+i] * V.old) >> 10);
+			out += ((snes_interp_table[i] * V.cur) >> 10);
+			out >>= 1;
+			
+			/* // from apudsp_jwdonal.txt
+			u32 d = i;	
+			s32 out  = ((snes_interp_table[255-d] * V.cur) >> 11);
+			out += ((snes_interp_table[511-d] * V.old) >> 11);
+			out += ((snes_interp_table[256+d] * V.older) >> 11);
+			// The above 3 wrap at 15 bits signed. The last is added to that, and is
+			// clamped rather than wrapped.
+			out = ((out & 0x7FFF) ^ 0x4000) - 0x4000;
+			out += ((snes_interp_table[  0+d] * V.oldest) >> 11);
+			*/
+			V.out = out;
+						
+			V.decoded_ind += 1;
+			if( V.decoded_ind >= 16 ) 
+			{
+				decode_block(vind);
+				V.decoded_ind = 0;
+			}
+		}
+		
+		V.out = (V.out * V.env_level)>>11;
+		s16 lout = std::clamp((V.out * s8(apu.dsp_regs[(vind<<4)]))>>7, -0x8000, 0x7fff);
+		s16 rout = std::clamp((V.out * s8(apu.dsp_regs[(vind<<4)|1]))>>7, -0x8000,0x7fff);
+		total_L += lout;
+		total_R += rout;
+	}
+	
+	total_L = (total_L * s8(apu.dsp_regs[0x0c]))>>7;
+	total_R = (total_R * s8(apu.dsp_regs[0x1c]))>>7;
+	apu.Left = std::clamp(total_L, -0x8000, 0x7fff)/32768.f;
+	apu.Right = std::clamp(total_R, -0x8000, 0x7fff)/32768.f;
+}
+
+void snes::dsp_write(u8 reg, u8 v)
+{
+	if( reg == 0x2D && v ) std::println("pmon R${:X} = ${:X}", reg, v);
+	apu.dsp_regs[reg] = v;
+}
+
+u8 snes::dsp_read(u8 reg)
+{
+	std::println("DSP READ ${:X}", reg);
+	if( (reg & 15) == 8 )
+	{
+		return apu.voice[reg>>4].env_level >> 4;
+	}
+	if( (reg & 15) == 9 )
+	{
+		return apu.voice[reg>>4].out >> 8;
+	}
+	return apu.dsp_regs[reg];
+}
+
+static u8 spc_ipl[0x40] = { 0xCD,0xEF,0xBD,0xE8,0x00,0xC6,0x1D,0xD0,0xFC,0x8F,0xAA,0xF4,0x8F,0xBB,0xF5,0x78,
+0xCC,0xF4,0xD0,0xFB,0x2F,0x19,0xEB,0xF4,0xD0,0xFC,0x7E,0xF4,0xD0,0x0B,0xE4,0xF5,
+0xCB,0xF4,0xD7,0x00,0xFC,0xD0,0xF3,0xAB,0x01,0x10,0xEF,0x7E,0xF4,0x10,0xEB,0xBA,
+0xF6,0xDA,0x00,0xBA,0xF4,0xC4,0xF4,0xDD,0x5D,0xD0,0xDB,0x1F,0x00,0x00,0xC0,0xFF };
+
+u8 snes::spc_read(u16 a)
+{
+	//std::println("SPC rd ${:X}", a);
+	if( a >= 0xffc0 && (spcram[0xF1] & 0x80) ) return spc_ipl[a&0x3f];
+	if( a < 0xF0 || a >= 0x100 ) return spcram[a];
+	return ssmp_read(a);
+}
+
+void snes::spc_write(u16 a, u8 v)
+{
+	//std::println("SPC wr ${:X} = ${:X}", a, v);
+	if( a < 0xF0 || a >= 0x100 ) { spcram[a] = v; return; }
+	ssmp_write(a, v);
+}
+
+void snes::ssmp_write(u8 a, u8 v)
+{
+	switch( a )
+	{
+	case 0xF1:
+		std::println("S-DSP Ctrl = ${:X}", v);
+		if( !(spcram[0xf1]&1) && (v&1) )
+		{
+			apu.tinternal[0] = apu.tout[0] = 0;
+		}
+		if( !(spcram[0xf1]&2) && (v&2) )
+		{
+			apu.tinternal[1] = apu.tout[1] = 0;
+		}
+		if( !(spcram[0xf1]&4) && (v&4) )
+		{
+			apu.tinternal[2] = apu.tout[2] = 0;
+		}
+		break;
+	case 0xF2: break;
+	case 0xF3:
+		if( !(spcram[0xF2] & 0x80) )
+		{
+			dsp_write(spcram[0xF2], v);
+		}
+		break;
+	case 0xF4:
+	case 0xF5:
+	case 0xF6:
+	case 0xF7: apu.to_cpu[a&3] = v; return;
+	case 0xFA: apu.target[0] = v; return;
+	case 0xFB: apu.target[1] = v; return;
+	case 0xFC: apu.target[2] = v; return;
+	default: break;
+	}
+	spcram[a] = v;
+	//std::println("SPC io wr ${:X} = ${:X}", a, v);
+}
+
+u8 snes::ssmp_read(u8 a)
+{
+	if( a != 0xFD && a < 0xF4 && a > 0xF7 ) std::println("spc io rd ${:X}", a);
+	switch( a )
+	{
+	case 0xF2: return spcram[a]&0x7f;
+	case 0xF3: return dsp_read(spcram[a]&0x7f);
+	case 0xF4: 
+	case 0xF5:
+	case 0xF6:
+	case 0xF7: return apu.to_spc[a&3];
+	case 0xFD: return std::exchange(apu.tout[0], 0);
+	case 0xFE: return std::exchange(apu.tout[1], 0);
+	case 0xFF: return std::exchange(apu.tout[2], 0);
+	default: break;
+	}
+	return spcram[a];
+}
+
+u32 snes_dsp_poffset[] = {
+	0, 0, 1040,
+	536, 0, 1040,
+	536, 0, 1040,
+	536, 0, 1040,
+	536, 0, 1040,
+	536, 0, 1040,
+	536, 0, 1040,
+	536, 0, 1040,
+	536, 0, 1040,
+	536, 0, 1040,
+	536, 0, 1040
+};
+
+u32 snes_dsp_period[] = {
+0, 2048, 1536,
+1280, 1024, 768,
+640, 512, 384,
+320, 256, 192,
+160, 128, 96,
+80, 64, 48,
+40, 32, 24,
+20, 16, 12,
+10, 8, 6,
+5, 4, 3,
+2, 1
+};
+
+s32 snes_interp_table[] = {
+0x000, 0x000, 0x000, 0x000, 0x000, 0x000, 0x000, 0x000, 0x000, 0x000, 0x000, 0x000, 0x000, 0x000, 0x000, 0x000,  //
+0x001, 0x001, 0x001, 0x001, 0x001, 0x001, 0x001, 0x001, 0x001, 0x001, 0x001, 0x002, 0x002, 0x002, 0x002, 0x002,  //
+0x002, 0x002, 0x003, 0x003, 0x003, 0x003, 0x003, 0x004, 0x004, 0x004, 0x004, 0x004, 0x005, 0x005, 0x005, 0x005,  //
+0x006, 0x006, 0x006, 0x006, 0x007, 0x007, 0x007, 0x008, 0x008, 0x008, 0x009, 0x009, 0x009, 0x00A, 0x00A, 0x00A,  //
+0x00B, 0x00B, 0x00B, 0x00C, 0x00C, 0x00D, 0x00D, 0x00E, 0x00E, 0x00F, 0x00F, 0x00F, 0x010, 0x010, 0x011, 0x011,  //
+0x012, 0x013, 0x013, 0x014, 0x014, 0x015, 0x015, 0x016, 0x017, 0x017, 0x018, 0x018, 0x019, 0x01A, 0x01B, 0x01B,  // entry
+0x01C, 0x01D, 0x01D, 0x01E, 0x01F, 0x020, 0x020, 0x021, 0x022, 0x023, 0x024, 0x024, 0x025, 0x026, 0x027, 0x028,  // 000h..0FFh
+0x029, 0x02A, 0x02B, 0x02C, 0x02D, 0x02E, 0x02F, 0x030, 0x031, 0x032, 0x033, 0x034, 0x035, 0x036, 0x037, 0x038,  //
+0x03A, 0x03B, 0x03C, 0x03D, 0x03E, 0x040, 0x041, 0x042, 0x043, 0x045, 0x046, 0x047, 0x049, 0x04A, 0x04C, 0x04D,  //
+0x04E, 0x050, 0x051, 0x053, 0x054, 0x056, 0x057, 0x059, 0x05A, 0x05C, 0x05E, 0x05F, 0x061, 0x063, 0x064, 0x066,  //
+0x068, 0x06A, 0x06B, 0x06D, 0x06F, 0x071, 0x073, 0x075, 0x076, 0x078, 0x07A, 0x07C, 0x07E, 0x080, 0x082, 0x084,  //
+0x086, 0x089, 0x08B, 0x08D, 0x08F, 0x091, 0x093, 0x096, 0x098, 0x09A, 0x09C, 0x09F, 0x0A1, 0x0A3, 0x0A6, 0x0A8,  //
+0x0AB, 0x0AD, 0x0AF, 0x0B2, 0x0B4, 0x0B7, 0x0BA, 0x0BC, 0x0BF, 0x0C1, 0x0C4, 0x0C7, 0x0C9, 0x0CC, 0x0CF, 0x0D2,  //
+0x0D4, 0x0D7, 0x0DA, 0x0DD, 0x0E0, 0x0E3, 0x0E6, 0x0E9, 0x0EC, 0x0EF, 0x0F2, 0x0F5, 0x0F8, 0x0FB, 0x0FE, 0x101,  //
+0x104, 0x107, 0x10B, 0x10E, 0x111, 0x114, 0x118, 0x11B, 0x11E, 0x122, 0x125, 0x129, 0x12C, 0x130, 0x133, 0x137,  //
+0x13A, 0x13E, 0x141, 0x145, 0x148, 0x14C, 0x150, 0x153, 0x157, 0x15B, 0x15F, 0x162, 0x166, 0x16A, 0x16E, 0x172,  //
+0x176, 0x17A, 0x17D, 0x181, 0x185, 0x189, 0x18D, 0x191, 0x195, 0x19A, 0x19E, 0x1A2, 0x1A6, 0x1AA, 0x1AE, 0x1B2,  //
+0x1B7, 0x1BB, 0x1BF, 0x1C3, 0x1C8, 0x1CC, 0x1D0, 0x1D5, 0x1D9, 0x1DD, 0x1E2, 0x1E6, 0x1EB, 0x1EF, 0x1F3, 0x1F8,  //
+0x1FC, 0x201, 0x205, 0x20A, 0x20F, 0x213, 0x218, 0x21C, 0x221, 0x226, 0x22A, 0x22F, 0x233, 0x238, 0x23D, 0x241,  //
+0x246, 0x24B, 0x250, 0x254, 0x259, 0x25E, 0x263, 0x267, 0x26C, 0x271, 0x276, 0x27B, 0x280, 0x284, 0x289, 0x28E,  //
+0x293, 0x298, 0x29D, 0x2A2, 0x2A6, 0x2AB, 0x2B0, 0x2B5, 0x2BA, 0x2BF, 0x2C4, 0x2C9, 0x2CE, 0x2D3, 0x2D8, 0x2DC,  //
+0x2E1, 0x2E6, 0x2EB, 0x2F0, 0x2F5, 0x2FA, 0x2FF, 0x304, 0x309, 0x30E, 0x313, 0x318, 0x31D, 0x322, 0x326, 0x32B,  // entry
+0x330, 0x335, 0x33A, 0x33F, 0x344, 0x349, 0x34E, 0x353, 0x357, 0x35C, 0x361, 0x366, 0x36B, 0x370, 0x374, 0x379,  // 100h..1FFh
+0x37E, 0x383, 0x388, 0x38C, 0x391, 0x396, 0x39B, 0x39F, 0x3A4, 0x3A9, 0x3AD, 0x3B2, 0x3B7, 0x3BB, 0x3C0, 0x3C5,  //
+0x3C9, 0x3CE, 0x3D2, 0x3D7, 0x3DC, 0x3E0, 0x3E5, 0x3E9, 0x3ED, 0x3F2, 0x3F6, 0x3FB, 0x3FF, 0x403, 0x408, 0x40C,  //
+0x410, 0x415, 0x419, 0x41D, 0x421, 0x425, 0x42A, 0x42E, 0x432, 0x436, 0x43A, 0x43E, 0x442, 0x446, 0x44A, 0x44E,  //
+0x452, 0x455, 0x459, 0x45D, 0x461, 0x465, 0x468, 0x46C, 0x470, 0x473, 0x477, 0x47A, 0x47E, 0x481, 0x485, 0x488,  //
+0x48C, 0x48F, 0x492, 0x496, 0x499, 0x49C, 0x49F, 0x4A2, 0x4A6, 0x4A9, 0x4AC, 0x4AF, 0x4B2, 0x4B5, 0x4B7, 0x4BA,  //
+0x4BD, 0x4C0, 0x4C3, 0x4C5, 0x4C8, 0x4CB, 0x4CD, 0x4D0, 0x4D2, 0x4D5, 0x4D7, 0x4D9, 0x4DC, 0x4DE, 0x4E0, 0x4E3,  //
+0x4E5, 0x4E7, 0x4E9, 0x4EB, 0x4ED, 0x4EF, 0x4F1, 0x4F3, 0x4F5, 0x4F6, 0x4F8, 0x4FA, 0x4FB, 0x4FD, 0x4FF, 0x500,  //
+0x502, 0x503, 0x504, 0x506, 0x507, 0x508, 0x50A, 0x50B, 0x50C, 0x50D, 0x50E, 0x50F, 0x510, 0x511, 0x511, 0x512,  //
+0x513, 0x514, 0x514, 0x515, 0x516, 0x516, 0x517, 0x517, 0x517, 0x518, 0x518, 0x518, 0x518, 0x518, 0x519, 0x519  //
+};

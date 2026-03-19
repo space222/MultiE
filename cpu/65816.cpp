@@ -12,20 +12,47 @@ and writes at the end (after advancing everything else by 6/8/12 mclk cycles):
 #define write(cycles, addr, v) mcyc(cycles); bus_write(addr, v)
 
 Yieldable c65816::run()
+{	
+while(1)
 {
 	reg oper{}, addr{};
 	u8 bank=0;
 	u16 t=0;
 	u32 t32=0;
-	
-while(1)
-{
 	//std::println("About to run ${:X}", opc);
 	switch( opc )
 	{
-	case 0x00: // brk (temporary impl for testing)
+	case 0x00: // brk 
+		/*//(temporary impl for SST testing other instructions)
 		std::println("${:X}:${:X}: BRK! do_irqs={}", pb>>16, pc, do_irqs);
 		mcyc(1);
+		*/
+		//std::println("brk (or nmi) at ${:X}:${:X}", pb>>16, pc);
+		if( !do_irqs )
+		{
+		/*1.1*/ pc++;
+		/*1.2*/ oper.v = read(6, pb|pc);
+		/*2.1*/ pc++;
+		}
+		/*2.2*/ write(6, S.v, pb>>16); S.v--;
+		/*3.2*/ write(6, S.v, pc>>8); S.v--;
+		/*4.2*/ write(6, S.v, pc); S.v--;
+		/*5.1*/ if( do_irqs && irq_line )
+			{
+				addr.v = 0xFFEE;
+			} else if( do_irqs && nmi_line ) {
+				addr.v = 0xFFEA;	
+				nmi_line = false;
+			} else {
+				addr.v = 0xFFE6; // actual brk
+			}
+		/*5.2*/ write(6, S.v, F.v); S.v--;
+		/*6.2*/ oper.v = read(6, addr.v);
+		/*7.1*/ F.b.I = 1; F.b.D = 0;
+		/*7.2*/ oper.b.h = read(6, (addr.v+1)&0xffff);
+			pb = 0; pc = oper.v;
+			do_irqs = false;
+		/*8.2*/ mcyc(6); fetch();
 		break;
 	case 0x01: // ora (dp, x)
 		/*1.1*/ pc++;
