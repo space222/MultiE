@@ -1,127 +1,154 @@
 #include <print>
 #include "snes.h"
 
-void snes::ppu_draw_scanline()
+void snes::render_sprites(u16* res)
 {
-	if( (ppu.bgmode & 7) > 1 ) 
+
+
+
+
+
+}
+
+u16 snes::pal2c16(u8 p)
+{
+	u16 pal = ppu.cgram[p];
+	u8 R = (pal&0x1f) * ((ppu.inidisp&15)/15.f);
+	u8 G = ((pal>>5)&0x1f) * ((ppu.inidisp&15)/15.f);
+	u8 B = ((pal>>10)&0x1f) * ((ppu.inidisp&15)/15.f);
+	return (B<<10)|(G<<5)|R;
+}
+
+void snes::render_bg(u16* res, u32 bpp, u32 index)
+{
+	u16* v16 = (u16*)ppu.vram;
+	u32 yscroll, xscroll, charbase;
+	u32 bgsc;
+	switch( index )
 	{
-		std::println("Using mode {}", ppu.bgmode&7);
-		exit(1);
+	case 1: charbase = (ppu.bg12nba&15)<<12; bgsc = ppu.bg1sc; xscroll = ppu.bg1hofs; yscroll = ppu.bg1vofs; break;
+	case 2: charbase = (ppu.bg12nba>>4)<<12; bgsc = ppu.bg2sc; xscroll = ppu.bg2hofs; yscroll = ppu.bg2vofs; break;
+	case 3: charbase = (ppu.bg34nba&15)<<12; bgsc = ppu.bg3sc; xscroll = ppu.bg3hofs; yscroll = ppu.bg3vofs; break;
+	case 4: charbase = (ppu.bg34nba>>4)<<12; bgsc = ppu.bg4sc; xscroll = ppu.bg4hofs; yscroll = ppu.bg4vofs; break;
 	}
 	
+	for(u32 i = 0; i < 256; ++i)
 	{
-		u16 bgc = ppu.cgram[0];
-		u8 R = (bgc&0x1f) * ((ppu.inidisp&15)/15.f);
-		u8 G = ((bgc>>5)&0x1f) * ((ppu.inidisp&15)/15.f);
-		u8 B = ((bgc>>10)&0x1f) * ((ppu.inidisp&15)/15.f);
+		u32 X = i + (xscroll&0x3ff);
+		u32 Y = ppu.scanline + (yscroll&0x3ff);
+		u32 mapaddr = ((bgsc>>2)*1024);
+		u32 tilesize = (bpp==2) ? 8 : ((bpp==4) ? 16 : 32);
+		u32 palmult =  (bpp==2) ? 4 : ((bpp==4) ? 16 : 0);
+		
+		switch( bgsc&3 )
+		{
+		case 0: break; // one screen wrapping
+		case 1: X &= 0x1ff; if( X > 255 ) mapaddr += 0x400; break;
+		case 2: Y &= 0x1ff; if( Y > 255 ) mapaddr += 0x400; break;
+		case 3:
+			Y &= 0x1ff; if( Y > 255 ) mapaddr += 0x800;
+			X &= 0x1ff; if( X > 255 ) mapaddr += 0x400;		
+			break;
+		}		
+		
+		Y &= 0xff;
+		X &= 0xff;
+		u16 mapentry = v16[(mapaddr + (Y/8)*32 + (X/8))&0x7fff];
+		u16 tile = mapentry & 0x3ff;
+		u16 w1 = v16[(charbase + tile*tilesize + ((Y&7)^((mapentry&BIT(15))?7:0)))&0x7fff];
+		u16 w2 = 0;
+		if( bpp == 4 )
+		{
+			w2 = v16[(charbase + tile*tilesize + 8 + ((Y&7)^((mapentry&BIT(15))?7:0)))&0x7fff];
+		}
+		u8 pix = (X&7)^((mapentry&BIT(14))?0:7);
+		u8 b1 = (w1>>pix)&1;
+		u8 b2 = ((w1>>8)>>pix)&1;
+		u8 b3 = (w2>>pix)&1;
+		u8 b4 = ((w2>>8)>>pix)&1;
+		u16 pal_ind = (b4<<3)|(b3<<2)|(b2<<1)|b1;
+		if( pal_ind )
+		{
+			if( (ppu.bgmode&7)==0 ) pal_ind += ((index-1)*32);
+			res[i] = (((mapentry>>10)&7)*palmult + pal_ind) | (mapentry & BIT(13));
+		} else {
+			res[i] = 0;
+		}
+	}		
+}
+
+void snes::ppu_draw_scanline()
+{
+	{
+		u16 bgc = ppu.fixed_color;
+		u8 R = (bgc&0x1f);
+		u8 G = ((bgc>>5)&0x1f);
+		u8 B = ((bgc>>10)&0x1f);
+		R *= ((ppu.inidisp&15)/15.f);
+		G *= ((ppu.inidisp&15)/15.f);
+		B *= ((ppu.inidisp&15)/15.f);
 		for(u32 x = 0; x < 256; ++x) fbuf[ppu.scanline*256 + x] = (B<<10)|(G<<5)|R;
 	}
+	u16 bg1[256]={0};
+	u16 bg2[256]={0};
+	u16 bg3[256]={0};
+	u16 bg4[256]={0};
 	
 	if( (ppu.bgmode&7) == 1 )
 	{
-		u16* v16 = (u16*)ppu.vram;
-		for(u32 i = 0; i < 256; ++i)
-		{
-			u16 mapentry = v16[(((ppu.bg3sc>>2)*1024) + (ppu.scanline/8)*32 + (i/8))&0x7fff];
-			u16 tile = mapentry & 0x3ff;
-			u16 chrbase1 = (ppu.bg34nba&15)<<12;
-			u16 w1 = v16[chrbase1 + tile*8 + ((ppu.scanline&7)^((mapentry&BIT(15))?7:0))];
-			u8 pix = (i&7)^((mapentry&BIT(14))?0:7);
-			u8 b1 = w1;
-			u8 b2 = w1>>8;
-			b2 = (b2>>pix)&1;
-			u8 bpp2 = (b2<<1)|((b1>>pix)&1);
-			u16 pal = ppu.cgram[((mapentry>>10)&7)*4 + bpp2];
-
-			u8 R = (pal&0x1f) * ((ppu.inidisp&15)/15.f);
-			u8 G = ((pal>>5)&0x1f) * ((ppu.inidisp&15)/15.f);
-			u8 B = ((pal>>10)&0x1f) * ((ppu.inidisp&15)/15.f);
-			if( bpp2 )
-			{
-				fbuf[ppu.scanline*256 + i] = (B<<10)|(G<<5)|R;
-				continue;
-			}
+		u8 re = ppu.tm|ppu.ts;
+		if( re & 1 ) render_bg(bg1, 4, 1);
+		if( re & 2 ) render_bg(bg2, 4, 2);
+		if( re & 4 ) render_bg(bg3, 2, 3);
 		
-			if( 1 )
-			{
-				mapentry = v16[(((ppu.bg2sc>>2)*1024) + (ppu.scanline/8)*32 + (i/8))&0x7fff];
-				tile = mapentry & 0x3ff;
-				chrbase1 = (ppu.bg12nba>>4)<<12;
-				w1 = v16[chrbase1 + tile*16 + ((ppu.scanline&7)^((mapentry&BIT(15))?7:0))];
-				u16 w2 = v16[chrbase1 + tile*16 + 8 + ((ppu.scanline&7)^((mapentry&BIT(15))?7:0))];
-				pix = (i&7)^((mapentry&BIT(14))?0:7);
-				b1 = w1;
-				b1 = (b1>>pix)&1;
-				b2 = w1>>8;
-				b2 = (b2>>pix)&1;
-				u8 b3 = w2;
-				b3 = (b3>>pix)&1;
-				u8 b4 = w2>>8;
-				b4 = (b4>>pix)&1;
-				
-				u8 bpp4 = (b4<<3)|(b3<<2)|(b2<<1)|b1;
-				pal = ppu.cgram[(((mapentry>>10)&7)*16 + bpp4)&0xff];
-
-				R = (pal&0x1f) * ((ppu.inidisp&15)/15.f);
-				G = ((pal>>5)&0x1f) * ((ppu.inidisp&15)/15.f);
-				B = ((pal>>10)&0x1f) * ((ppu.inidisp&15)/15.f);
-				if( bpp4 )
-				{
-					fbuf[ppu.scanline*256 + i] = (B<<10)|(G<<5)|R;
-					continue;
-				}
-			}
-
-			mapentry = v16[(((ppu.bg1sc>>2)*1024) + (ppu.scanline/8)*32 + (i/8))&0x7fff];
-			tile = mapentry & 0x3ff;
-			chrbase1 = (ppu.bg12nba&15)<<12;
-			w1 = v16[chrbase1 + tile*16 + ((ppu.scanline&7)^((mapentry&BIT(15))?7:0))];
-			u16 w2 = v16[chrbase1 + tile*16 + 8 + ((ppu.scanline&7)^((mapentry&BIT(15))?7:0))];
-			pix = (i&7)^((mapentry&BIT(14))?0:7);
-			b1 = w1;
-			b1 = (b1>>pix)&1;
-			b2 = w1>>8;
-			b2 = (b2>>pix)&1;
-			u8 b3 = w2;
-			b3 = (b3>>pix)&1;
-			u8 b4 = w2>>8;
-			b4 = (b4>>pix)&1;
-			
-			u8 bpp4 = (b4<<3)|(b3<<2)|(b2<<1)|b1;
-			pal = ppu.cgram[(((mapentry>>10)&7)*16 + bpp4)&0xff];
-
-			R = (pal&0x1f) * ((ppu.inidisp&15)/15.f);
-			G = ((pal>>5)&0x1f) * ((ppu.inidisp&15)/15.f);
-			B = ((pal>>10)&0x1f) * ((ppu.inidisp&15)/15.f);
-			if(  1 )
-			{
-				if( bpp4 ) 
-				{
-					fbuf[ppu.scanline*256 + i] = (B<<10)|(G<<5)|R;
-				}
-			}
+		u32 scoffs = ppu.scanline*256;
+		for(u32 i = 0; i < 256; ++i, ++scoffs)
+		{ //temp ordering for now, since no sprites or color math yet anyway
+			if( u8(bg3[i]) && (ppu.bgmode&BIT(3)) ) { fbuf[scoffs] = pal2c16(bg3[i]); continue; }
+			if( u8(bg1[i]) && (bg1[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg1[i]); continue; }
+			if( u8(bg2[i]) && (bg2[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg2[i]); continue; }
+			if( u8(bg3[i]) && !(ppu.bgmode&BIT(3))) { fbuf[scoffs] = pal2c16(bg3[i]); continue; }
+			if( u8(bg1[i]) && !(bg1[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg1[i]); continue; }
+			if( u8(bg2[i]) && !(bg2[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg2[i]); continue; }
 		}
 		return;
 	}
 	
-	u16* v16 = (u16*)ppu.vram;
-	for(u32 i = 0; i < 256; ++i)
+	if( (ppu.bgmode&7) == 3 )
 	{
-		u16 mapentry = v16[(((ppu.bg2sc>>2)*1024) + (ppu.scanline/8)*32 + (i/8))&0x7fff];
-		u16 tile = mapentry & 0x3ff;
-		u16 chrbase1 = (ppu.bg12nba>>4)<<12;
-		u16 b1 = v16[chrbase1 + tile*8 + ((ppu.scanline&7)^((mapentry&BIT(15))?7:0))];
-		u8 pix = (i&7)^((mapentry&BIT(14))?0:7);
-		u8 b2 = b1>>8;
-		b2 = (b2>>pix)&1;
-		u8 bpp2 = (b2<<1)|((b1>>pix)&1);
-		u16 pal = ppu.cgram[((mapentry>>10)&7)*4 + bpp2];
-
-		u8 R = (pal&0x1f) * ((ppu.inidisp&15)/15.f);
-		u8 G = ((pal>>5)&0x1f) * ((ppu.inidisp&15)/15.f);
-		u8 B = ((pal>>10)&0x1f) * ((ppu.inidisp&15)/15.f);
-		if( bpp2 ) fbuf[ppu.scanline*256 + i] = (B<<10)|(G<<5)|R;
+		if( ppu.tm & 2 ) render_bg(bg2, 4, 2);
+		
+		u32 scoffs = ppu.scanline*256;
+		for(u32 i = 0; i < 256; ++i, ++scoffs)
+		{
+			if( bg2[i] ) { fbuf[scoffs] = pal2c16(bg2[i]); continue; }
+		}
+		return;
 	}
+	
+	
+	
+	if( (ppu.bgmode&7) == 0 )
+	{
+		u8 re = ppu.tm|ppu.ts;
+		if( re & 1 ) render_bg(bg1, 2, 1);
+		if( re & 2 ) render_bg(bg2, 2, 2);
+		if( re & 4 ) render_bg(bg3, 2, 3);
+		if( re & 8 ) render_bg(bg4, 2, 4);
+		
+		u32 scoffs = ppu.scanline*256;	
+		for(u32 i = 0; i < 256; ++i, ++scoffs)
+		{
+			if( bg1[i] & 0xff ) { fbuf[scoffs] = pal2c16(bg1[i]); continue; }
+			if( bg2[i] & 0xff ) { fbuf[scoffs] = pal2c16(bg2[i]); continue; }
+			if( bg3[i] & 0xff ) { fbuf[scoffs] = pal2c16(bg3[i]); continue; }
+			if( bg4[i] & 0xff ) { fbuf[scoffs] = pal2c16(bg4[i]); continue; }
+		}
+		return;
+	}
+	
+	std::println("Unimpl bg mode {}", ppu.bgmode&7);
+	exit(1);	
 }
 
 void snes::ppu_mc(s64 mc)

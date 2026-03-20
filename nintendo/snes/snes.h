@@ -36,6 +36,8 @@ public:
 		cpu.S.v = 0x1FFF;
 		spc.pc = 0xffc0;
 		spcram[0xf1] = 0xb0;
+		memset(&apu, 0, sizeof(apu));
+		memset(&ppu, 0, sizeof(ppu));
 		cpu_run = cpu.run();
 		spc_run = spc.run();
 	}
@@ -54,6 +56,7 @@ public:
 	void io_write(u8, u32, u8);
 	
 	void run_dma(u32 cn);
+	u16 keys();
 	
 	struct {
 		u8 memsel=0, nmitimen=0, wrio=0;
@@ -77,7 +80,8 @@ public:
 		u8 w12sel=0, w34sel=0, wobjsel=0, wh0=0, wh1=0, wh2=0, wh3=0, wbglog=0, wobjlog=0;
 		u8 tm=0, ts=0, tmw=0, tsw=0;
 		u8 cgadd=0;
-		u8 cgwsel=0, cgadsub=0, coldata=0, setini=0, mpyl=0, mpym=0, mpyh=0, slhv=0;
+		u8 cgwsel=0, cgadsub=0, setini=0, mpyl=0, mpym=0, mpyh=0, slhv=0;
+		u16 fixed_color=0;
 		
 		u16 m7a=0, m7b=0, m7c=0, m7d=0, m7x=0, m7y=0;
 		u8 m7latch=0;
@@ -103,6 +107,9 @@ public:
 	} ppu;
 	void ppu_mc(s64);
 	void ppu_draw_scanline();
+	void render_bg(u16* res, u32 bpp, u32 index);
+	void render_sprites(u16* res);
+	u16 pal2c16(u8);
 	
 	enum cartmapping { MAPPING_LOROM=0, MAPPING_HIROM=1, MAPPING_EXHIROM=5 };
 	struct {
@@ -125,7 +132,7 @@ public:
 		u32 target[3]={0,0,0};
 		u32 tout[3]={0,0,0};
 
-		u8 dsp_regs[0x100];
+		u8 dsp_regs[0x100]={0};
 		u32 glblcnt = 0;
 
 		struct {

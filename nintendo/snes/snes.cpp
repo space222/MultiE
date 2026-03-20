@@ -1,4 +1,5 @@
 #include <print>
+#include <SDL.h>
 #include "util.h"
 #include "snes.h"
 
@@ -114,13 +115,17 @@ void snes::io_write(u8 bank, u32 a, u8 v)
 	case 0x2129: ppu.wh3 = v; return;
 	case 0x212A: ppu.wbglog = v; return;
 	case 0x212B: ppu.wobjlog = v&15; return;
-	case 0x212C: ppu.tm = v&0x1f; return;
-	case 0x212D: ppu.ts = v&0x1f; return;
+	case 0x212C: ppu.tm = v&0x1f; /*std::println("TM = ${:X}", v);*/ return;
+	case 0x212D: ppu.ts = v&0x1f; /*std::println("TS = ${:X}", v);*/ return;
 	case 0x212E: ppu.tmw = v&0x1f; return;
 	case 0x212F: ppu.tsw = v&0x1f; return;
 	case 0x2130: ppu.cgwsel = v&0xf3; return;
 	case 0x2131: ppu.cgadsub = v; return;
-	case 0x2132: ppu.coldata = v; return;
+	case 0x2132: 
+			if( v & 0x80 ) { ppu.fixed_color &= ~(31<<10); ppu.fixed_color |= (v&31)<<10; }
+			if( v & 0x40 ) { ppu.fixed_color &= ~(31<<5); ppu.fixed_color |= (v&31)<<5; }
+			if( v & 0x20 ) { ppu.fixed_color &= ~31; ppu.fixed_color |= v&31; }
+			return;
 	case 0x2133: ppu.setini = v&0xcf; return;
 	
 	case 0x2140: apu.to_spc[0] = v; return;
@@ -131,7 +136,7 @@ void snes::io_write(u8 bank, u32 a, u8 v)
 	case 0x2180:{
 		     u32 addr = (io.wmaddh<<16)|(io.wmaddm<<8)|io.wmaddl;
 		     ram[addr++] = v;
-		     io.wmaddh = addr>>16;
+		     io.wmaddh = (addr>>16)&1;
 		     io.wmaddm = addr>>8;
 		     io.wmaddl = addr;
 		     }return;
@@ -193,8 +198,8 @@ u8 snes::io_read(u8 bank, u32 a)
 	case 0x4216: return io.remain;
 	case 0x4217: return io.remain>>8;
 	
-	case 0x4218: return 0x00; //auto joypad 1l
-	case 0x4219: return 0x00; //auto joypad 1h
+	case 0x4218: return keys(); //auto joypad 1l
+	case 0x4219: return keys()>>8; //auto joypad 1h
 	
 	case 0x421A:
 	case 0x421B:
@@ -217,6 +222,25 @@ u8 snes::io_read(u8 bank, u32 a)
 	exit(1);
 	return 0;
 }
+
+u16 snes::keys()
+{
+	auto k = SDL_GetKeyboardState(nullptr);
+	u16 val = 0;
+	if( k[SDL_SCANCODE_W] ) val ^= BIT(4);
+	if( k[SDL_SCANCODE_Q] ) val ^= BIT(5);
+	if( k[SDL_SCANCODE_X] ) val ^= BIT(6);
+	if( k[SDL_SCANCODE_Z] ) val ^= BIT(15);
+	if( k[SDL_SCANCODE_RETURN] ) val ^= BIT(13);
+	
+	if( k[SDL_SCANCODE_UP] ) val ^= BIT(11);
+	if( k[SDL_SCANCODE_DOWN] ) val ^= BIT(10);
+	if( k[SDL_SCANCODE_LEFT] ) val ^= BIT(9);
+	if( k[SDL_SCANCODE_RIGHT] ) val ^= BIT(8);
+	
+	return val;
+}
+
 
 void snes::write(u32 a, u8 v)
 {
@@ -243,7 +267,7 @@ u8 snes::read(u32 a)
 	if( a >= 0x8000 )
 	{
 		//std::println("snes rd ${:X}:${:X}", bank, a);
-		return ROM[(((bank&0x7f)*0x8000) + (a&0x7fff))];
+		return ROM[(((bank&0x7f)*0x8000) + (a&0x7fff))  % ROM.size()];
 	}
 	
 	std::println("snes rd ${:X}:${:X}", bank, a);
@@ -286,7 +310,7 @@ void snes::run_dma(u32 cn)
 	u8 bank = ppu.dmaregs[rb|4];
 	u32 len = ppu.dmaregs[rb|5]|(ppu.dmaregs[rb|6]<<8);
 	if( len == 0 ) len = 0x10000;
-	const u16 baddr = 0x2100 | ppu.dmaregs[rb|1];
+	const u16 baddr = ppu.dmaregs[rb|1];
 	const u8 param = ppu.dmaregs[rb|0];
 	
 	//std::println("DMA src=${:X}, dst=${:X}, len=${:X}", src, baddr, len);
@@ -302,14 +326,14 @@ void snes::run_dma(u32 cn)
 		case 4: mod = i&3; break;
 		default: break; //0,2,6 unmodded
 		}
-		
+		u16 B_Bus = u8(baddr+mod) | 0x2100;
 		if( param & 0x80 )
 		{
 			//std::println("dma to mem rd ${:X}, wr ${:X}", baddr+mod, (bank<<16)|src);
-			write((bank<<16)|src, io_read(0, baddr+mod));
+			write((bank<<16)|src, io_read(0, B_Bus));
 		} else {
 			//std::println("dma to dev rd ${:X}, wr ${:X}", (bank<<16)|src, baddr+mod);
-			io_write(0, baddr+mod, read((bank<<16)|src));
+			io_write(0, B_Bus, read((bank<<16)|src));
 		}
 		
 		if( ((param>>3) & 3) == 0 )

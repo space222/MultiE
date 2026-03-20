@@ -383,11 +383,11 @@ After responding to that, a bit more SIF traffic and then everything spins waiti
 
 Nintendo SNES
 ----------------
-1. Tons of I/O
-2. Rest of LoROM/HiROM/whatever memory mappings
-3. Begin background rendering with whatever krom's tests/demos need
-4. Integrate my spc player for sound.
-5. Most backgrounds, input, etc
+1. Sprites
+2. Rest of LoROM/HiROM/whatever memory mappings, including save ram (and files)
+3. ppu timers
+4. proper sprite/bg priority + color math
+5. better timing, including stalling the cpu during dma and ram refresh
 6. Coprocessors would be neat but are low priority for once most other things work.
 
 
