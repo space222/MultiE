@@ -14,7 +14,16 @@ void snes::io_write(u8 bank, u32 a, u8 v)
 	case 0x2102: ppu.oamaddl = v; ppu.oamadd=((ppu.oamaddh&1)<<8)|v; ppu.internal_oamadd=(ppu.oamadd<<1); return;
 	case 0x2103: ppu.oamaddh = v&0x81; ppu.oamadd&=0xff; ppu.oamadd|=(v&1)<<8; ppu.internal_oamadd=(ppu.oamadd<<1); return;
 	
-	case 0x2104: /*todo: oam write*/ return;
+	case 0x2104:{
+			if( !(ppu.internal_oamadd & 1) ) ppu.oam_latch = v;
+			if( ppu.internal_oamadd < 0x200 && (ppu.internal_oamadd&1) )
+			{
+				ppu.oam[ppu.internal_oamadd-1] = ppu.oam_latch;
+				ppu.oam[ppu.internal_oamadd] = v;
+			}
+			if( ppu.internal_oamadd >= 0x200 ) ppu.oamhi[ppu.internal_oamadd&31] = v;
+			ppu.internal_oamadd += 1;	
+		}return;
 	
 	case 0x2105: ppu.bgmode = v; return;
 	case 0x2106: ppu.mosaic = v; return;
@@ -231,7 +240,7 @@ u16 snes::keys()
 	if( k[SDL_SCANCODE_Q] ) val ^= BIT(5);
 	if( k[SDL_SCANCODE_X] ) val ^= BIT(6);
 	if( k[SDL_SCANCODE_Z] ) val ^= BIT(15);
-	if( k[SDL_SCANCODE_RETURN] ) val ^= BIT(13);
+	if( k[SDL_SCANCODE_RETURN] ) val ^= BIT(12);
 	
 	if( k[SDL_SCANCODE_UP] ) val ^= BIT(11);
 	if( k[SDL_SCANCODE_DOWN] ) val ^= BIT(10);

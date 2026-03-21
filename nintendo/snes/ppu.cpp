@@ -111,6 +111,39 @@ void snes::ppu_draw_scanline()
 			if( u8(bg1[i]) && !(bg1[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg1[i]); continue; }
 			if( u8(bg2[i]) && !(bg2[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg2[i]); continue; }
 		}
+		
+		for(u32 i = 0; i < 128; ++i)
+		{
+			int Y = ppu.oam[i*4 + 1];
+			int X = ppu.oam[i*4 + 0];
+			u32 upperX = ppu.oam[512 + (i/4)]>>((i&3)*2);
+			if( upperX&1 ) X -= 256;
+			int w = 8, h=8;
+			switch( ppu.objsel>>5 )
+			{
+			case 0: if( upperX & 2 ) w=h=16; break;
+			case 1: if(upperX&2) w=h=32; break;
+			case 2: if(upperX&2) w=h=64; break;
+			case 3: if(upperX&2) w=h=32; else w=h=16; break;
+			case 4: if(upperX&2) w=h=64; else w=h=16; break;
+			case 5: if(upperX&2) w=h=64; else w=h=32; break;
+			case 6: if(upperX&2) { w=32;h=64; } else { w=16;h=32; } break;
+			case 7: if(upperX&2) w=h=32; else { w=16;h=32; } break;			
+			}
+			
+			if( ppu.scanline - Y > h-1 || ppu.scanline - Y < 0 ) continue;
+			if( ppu.scanline == Y || ppu.scanline == Y+h-1 )
+			{
+				for(int x = X; x < X+w; ++x)
+				{
+					if( x < 0 || x > 255 ) continue;
+					fbuf[ppu.scanline*256 + x] = 0x7fff;
+				}
+				continue;
+			}
+			fbuf[ppu.scanline*256 + X] = 
+			fbuf[ppu.scanline*256 + X + w - 1] = 0x7fff;
+		}		
 		return;
 	}
 	

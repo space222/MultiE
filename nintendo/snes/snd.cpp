@@ -283,7 +283,7 @@ void snes::dsp_write(u8 reg, u8 v)
 
 u8 snes::dsp_read(u8 reg)
 {
-	std::println("DSP READ ${:X}", reg);
+	//std::println("DSP READ ${:X}", reg);
 	if( (reg & 15) == 8 )
 	{
 		return apu.voice[reg>>4].env_level >> 4;
@@ -320,7 +320,15 @@ void snes::ssmp_write(u8 a, u8 v)
 	switch( a )
 	{
 	case 0xF1:
-		std::println("S-DSP Ctrl = ${:X}", v);
+		//std::println("S-DSP Ctrl = ${:X}", v);
+		if( v & BIT(4) )
+		{
+			apu.to_spc[0] = apu.to_spc[1] = 0;
+		}
+		if( v & BIT(5) )
+		{
+			apu.to_spc[2] = apu.to_spc[3] = 0;
+		}
 		if( !(spcram[0xf1]&1) && (v&1) )
 		{
 			apu.tinternal[0] = apu.tout[0] = 0;
