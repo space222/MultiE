@@ -22,7 +22,8 @@ void snes::io_write(u8 bank, u32 a, u8 v)
 				ppu.oam[ppu.internal_oamadd] = v;
 			}
 			if( ppu.internal_oamadd >= 0x200 ) ppu.oamhi[ppu.internal_oamadd&31] = v;
-			ppu.internal_oamadd += 1;	
+			ppu.internal_oamadd += 1;
+			ppu.internal_oamadd &= 0x3ff;	
 		}return;
 	
 	case 0x2105: ppu.bgmode = v; return;
@@ -226,6 +227,10 @@ u8 snes::io_read(u8 bank, u32 a)
 	case 0x2142: return apu.to_cpu[2];
 	case 0x2143: return apu.to_cpu[3];
 	case 0x4210: { u8 v = ppu.rdnmi; ppu.rdnmi &= 0x7f; return 2 | v; }
+	
+	default:
+		if( a >= 0x4300 && a < 0x4380 ) return ppu.dmaregs[a&0x7f];
+		break;
 	}
 	std::println("${:X}:${:X}: io rd ${:X}:${:X}", cpu.pb>>16, cpu.pc, bank, a);
 	exit(1);

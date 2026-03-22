@@ -70,7 +70,7 @@ public:
 	struct {
 		s64 master_cycles=0;
 		bool frame_complete=false;
-		u32 scanline=0;
+		int scanline=0;
 		
 		u8 inidisp=0, bgmode=0, mosaic=0, bg1sc=0, bg2sc=0, bg3sc=0, bg4sc=0;
 		u8 bg12nba=0, bg34nba=0, vmain=0;
@@ -91,6 +91,7 @@ public:
 		u8 objsel=0, oamaddh=0, oamaddl=0;
 		u8 oam_latch=0;
 		u16 oamadd=0,internal_oamadd=0;
+		u16 oam_highest_pri=0;
 		
 		u8 cgram_byte=0;
 		u8 cgram_latch=0;

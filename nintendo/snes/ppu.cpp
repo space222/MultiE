@@ -112,16 +112,20 @@ void snes::ppu_draw_scanline()
 			if( u8(bg2[i]) && !(bg2[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg2[i]); continue; }
 		}
 		
-		for(u32 i = 0; i < 128; ++i)
+		u32 num_sprites = 0;
+		u8 sprind[128]={0};
+		u16 spr[256]={0};
+		for(u32 i = 0; i < 128 && num_sprites<32; ++i)
 		{
-			int Y = ppu.oam[i*4 + 1];
-			int X = ppu.oam[i*4 + 0];
-			u32 upperX = ppu.oam[512 + (i/4)]>>((i&3)*2);
+			u8 SI = (ppu.oam_highest_pri + i)&0x7f;
+			int Y = ppu.oam[SI*4 + 1];
+			int X = ppu.oam[SI*4 + 0];
+			u32 upperX = ppu.oamhi[SI/4]>>((SI&3)*2);
 			if( upperX&1 ) X -= 256;
-			int w = 8, h=8;
-			switch( ppu.objsel>>5 )
+			int w=8, h=8;
+			switch( (ppu.objsel>>5)&7 )
 			{
-			case 0: if( upperX & 2 ) w=h=16; break;
+			case 0: if(upperX&2) w=h=16; break;
 			case 1: if(upperX&2) w=h=32; break;
 			case 2: if(upperX&2) w=h=64; break;
 			case 3: if(upperX&2) w=h=32; else w=h=16; break;
@@ -131,19 +135,62 @@ void snes::ppu_draw_scanline()
 			case 7: if(upperX&2) w=h=32; else { w=16;h=32; } break;			
 			}
 			
+			if( X < -w ) continue;
 			if( ppu.scanline - Y > h-1 || ppu.scanline - Y < 0 ) continue;
-			if( ppu.scanline == Y || ppu.scanline == Y+h-1 )
+			sprind[num_sprites++] = SI;
+		}
+
+		for(u32 i = 0; i < num_sprites; ++i)
+		{
+			int Y = ppu.oam[sprind[i]*4 + 1];
+			int X = ppu.oam[sprind[i]*4 + 0];
+			u32 upperX = ppu.oamhi[sprind[i]/4]>>((sprind[i]&3)*2);
+			if( upperX&1 ) X -= 256;
+			int w=8, h=8;
+			switch( (ppu.objsel>>5)&7 )
 			{
-				for(int x = X; x < X+w; ++x)
-				{
-					if( x < 0 || x > 255 ) continue;
-					fbuf[ppu.scanline*256 + x] = 0x7fff;
-				}
-				continue;
+			case 0: if(upperX&2) w=h=16; break;
+			case 1: if(upperX&2) w=h=32; break;
+			case 2: if(upperX&2) w=h=64; break;
+			case 3: if(upperX&2) w=h=32; else w=h=16; break;
+			case 4: if(upperX&2) w=h=64; else w=h=16; break;
+			case 5: if(upperX&2) w=h=64; else w=h=32; break;
+			case 6: if(upperX&2) { w=32;h=64; } else { w=16;h=32; } break;
+			case 7: if(upperX&2) w=h=32; else { w=16;h=32; } break;
 			}
-			fbuf[ppu.scanline*256 + X] = 
-			fbuf[ppu.scanline*256 + X + w - 1] = 0x7fff;
-		}		
+			
+			for(int px = 0; px < w && X+px < 256; ++px)
+			{
+				if( X+px < 0 || spr[X+px] ) continue;
+				bool flipY = (ppu.oam[sprind[i]*4 + 3] & 0x80);
+				bool flipX = (ppu.oam[sprind[i]*4 + 3] & 0x40);
+				int relY = ppu.scanline - Y;
+				if( flipY ) { relY = h - relY - 1; }
+				int relX = (flipX ? px : w - px - 1);
+				int tile = ppu.oam[sprind[i]*4 + 2];
+				tile += (relY/8)*16;
+				tile += ((flipX ? w - px - 1 : px)/8);
+				u32 offset = tile*16 + ((ppu.oam[sprind[i]*4 + 3]&1) ? ((((ppu.objsel>>3)&3)+1)<<12) :0);
+				relY &= 7;
+				//if( flipY ) { relY ^= 7; }
+				relX &= 7;
+				
+				u16 w1 = ((u16*)ppu.vram)[((ppu.objsel&3)<<13) + offset + relY];
+				u16 w2 = ((u16*)ppu.vram)[((ppu.objsel&3)<<13) + offset + 8 + relY];
+				u8 b1 = (w1>>relX)&1;
+				u8 b2 = ((w1>>8)>>relX)&1;
+				u8 b3 = (w2>>relX)&1;
+				u8 b4 = ((w2>>8)>>relX)&1;
+				u16 pal_ind = (b4<<3)|(b3<<2)|(b2<<1)|b1;
+				if( pal_ind )
+				{
+					spr[X+px] = 0x80 + ((ppu.oam[sprind[i]*4 + 3]>>1)&7)*16 + pal_ind;
+				}
+			}		
+		}
+		
+		for(u32 i = 0; i < 256; ++i) { if( spr[i] ) { fbuf[ppu.scanline*256 + i] = pal2c16(spr[i]); }}
+
 		return;
 	}
 	
@@ -196,14 +243,16 @@ void snes::ppu_mc(s64 mc)
 	{
 		//todo: vblank nmi
 		if( io.nmitimen & 0x80 ) { cpu.nmi_line = true; }
-		
 		ppu.rdnmi |= 0x80;
+		ppu.internal_oamadd = ppu.oamadd<<1;
 	}
 	
 	if( ppu.scanline >= 263 )
 	{
 		ppu.frame_complete = true;
 		ppu.scanline = 0;
+		ppu.oam_highest_pri = ((ppu.oamaddh&0x80) ? ((ppu.oamaddl>>1)&0x7f) : 0);
+		if( ppu.oam_highest_pri ) std::println("hipri=${:X}", ppu.oam_highest_pri);
 		ppu.rdnmi &= ~0x80;
 	}
 }
