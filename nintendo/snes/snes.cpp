@@ -157,7 +157,7 @@ void snes::io_write(u8 bank, u32 a, u8 v)
 	
 	case 0x4016: /*todo joypad*/ return;
 	
-	case 0x4200: io.nmitimen = v&0xb1; return; /*todo: raise nmi if currently in vblank*/
+	case 0x4200: io.nmitimen = v&0xb1; if( !(v&0x30) ) { cpu.irq_line=false; io.timeup&=0x7f; } return; /*todo: raise nmi if currently in vblank*/
 	case 0x4201: io.wrio = v; return;
 	case 0x4202: io.wrmpya = v; return;
 	case 0x4203: io.wrmpyb = v; /*todo: multiply*/ return;
@@ -187,7 +187,7 @@ void snes::io_write(u8 bank, u32 a, u8 v)
 	default:
 		if( a >= 0x4300 && a < 0x4380 ) { ppu.dmaregs[a&0x7f] = v; return; }
 		std::println("${:X}:${:X}: io wr ${:X}:${:X} = ${:X}", cpu.pb>>16, cpu.pc, bank, a, v);
-		exit(1);
+		//exit(1);
 		return;
 	}
 }
@@ -200,7 +200,6 @@ u8 snes::io_read(u8 bank, u32 a)
 	case 0x4016: return 1; // joypad1 rd
 	case 0x4017: return 1; // joypad2 rd
 	
-	case 0x4211: return 0; // timer irq flag
 	case 0x4212: return (ppu.scanline>239 ? 0x80:0);
 	
 	case 0x4214: return io.quot;
@@ -222,18 +221,38 @@ u8 snes::io_read(u8 bank, u32 a)
 	case 0x2135: return io.multres>>8;
 	case 0x2136: return io.multres>>16;
 	
+	case 0x2137: ppu.vcounter = ppu.scanline; ppu.stat78|=BIT(6); return 0; //todo: HV counter latch
+	case 0x2138:{ 
+		u8 r = 0;
+		if( ppu.internal_oamadd >= 0x200 )
+		{
+			r = ppu.oamhi[ppu.internal_oamadd&0x1f];
+		} else {
+			r = ppu.oam[ppu.internal_oamadd];
+		}
+		ppu.internal_oamadd += 1;
+		ppu.internal_oamadd &= 0x3ff;
+		return r;
+		}
+	
+	case 0x213C: return 0;
+	case 0x213D:{ u8 r = ppu.vcounter>>(ppu.vcounter_ff * 8); ppu.vcounter_ff^=1; return r; } //todo: counters
+		
+	case 0x213F: ppu.vcounter_ff=0; return std::exchange(ppu.stat78, ppu.stat78&~BIT(6)); //todo: counter latch values
+	
 	case 0x2140: return apu.to_cpu[0];
 	case 0x2141: return apu.to_cpu[1];
 	case 0x2142: return apu.to_cpu[2];
 	case 0x2143: return apu.to_cpu[3];
 	case 0x4210: { u8 v = ppu.rdnmi; ppu.rdnmi &= 0x7f; return 2 | v; }
+	case 0x4211: cpu.irq_line=false; return std::exchange(io.timeup, io.timeup&0x7f);
 	
 	default:
 		if( a >= 0x4300 && a < 0x4380 ) return ppu.dmaregs[a&0x7f];
 		break;
 	}
 	std::println("${:X}:${:X}: io rd ${:X}:${:X}", cpu.pb>>16, cpu.pc, bank, a);
-	exit(1);
+	//exit(1);
 	return 0;
 }
 
@@ -265,6 +284,12 @@ void snes::write(u32 a, u8 v)
 	// as is the io region, although io/rw might fall through to cart expansion io
 	if( (bank&0x7F) < 0x40 && a < 0x8000 ) { io_write(bank, a, v); return; }
 
+	if( bank >= 0x70 && bank < 0x80 && a < 0x8000 )
+	{
+		SRAM[((bank*32_KB) + a) % cart.ram_size] = v;
+		save_written = true;
+		return;
+	}
 
 	std::println("${:X}: snes wr ${:X}:${:X} = ${:X}", cpu.pc, bank, a, v);
 }
@@ -283,6 +308,11 @@ u8 snes::read(u32 a)
 		//std::println("snes rd ${:X}:${:X}", bank, a);
 		return ROM[(((bank&0x7f)*0x8000) + (a&0x7fff))  % ROM.size()];
 	}
+	if( bank >= 0x70 && bank < 0x80 && a < 0x8000 )
+	{
+		return SRAM[((bank*32_KB) + a) % cart.ram_size];
+	}
+	
 	
 	std::println("snes rd ${:X}:${:X}", bank, a);
 	return 0;
@@ -408,7 +438,16 @@ bool snes::loadROM(std::string fname)
 	cart.rom_size = (ROM[hd+0x17]*32_KB);
 	cart.ram_size = (1<<ROM[hd+0x18])*1024;
 	SRAM.resize(cart.ram_size);
-		
+	
+	savefile = fname;
+	auto pos = fname.rfind('.');
+	if( pos != std::string::npos ) savefile = savefile.substr(0, pos);
+	savefile += ".ram";
+	std::println("Save file: {}", savefile);
+	
+	freadall(SRAM, fopen(savefile.c_str(), "rb"));
+	save_written = false;
+	
 	return true;
 }
 

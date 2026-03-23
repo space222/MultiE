@@ -12,6 +12,12 @@ public:
 	~snes()
 	{
 		setVsync(1);
+		if( save_written )
+		{
+			FILE* fp = fopen(savefile.c_str(), "wb");
+			fwrite(SRAM.data(), 1, SRAM.size(), fp);
+			fclose(fp);
+		}
 	}
 	
 	snes() { setVsync(0); }
@@ -58,6 +64,9 @@ public:
 	void run_dma(u32 cn);
 	u16 keys();
 	
+	std::string savefile;
+	bool save_written=false;
+	
 	struct {
 		u8 memsel=0, nmitimen=0, wrio=0;
 		u8 wrmpya=0, wrmpyb=0, wrdivl=0, wrdivh=0, wrdivb=0;
@@ -65,6 +74,7 @@ public:
 		u8 wmaddl=0, wmaddm=0, wmaddh=0;
 		s32 multres=0;
 		u16 quot=0, remain=0;
+		u8 timeup=0;	
 	} io;
 	
 	struct {
@@ -100,6 +110,10 @@ public:
 		u8 rdnmi=0;
 		
 		u8 m7sel=0;
+		
+		u8 stat78=3;
+		u8 vcounter_ff=0;
+		u16 vcounter=0, hcounter=0;
 		
 		u8 dmaregs[0x80];
 		u8 vram[64_KB];

@@ -383,12 +383,16 @@ After responding to that, a bit more SIF traffic and then everything spins waiti
 
 Nintendo SNES
 ----------------
-1. Sprites
-2. Rest of LoROM/HiROM/whatever memory mappings, including save ram (and files)
-3. ppu timers
-4. proper sprite/bg priority + color math
-5. better timing, including stalling the cpu during dma and ram refresh
-6. Coprocessors would be neat but are low priority for once most other things work.
+1. HDMA
+2. Windows
+3. Color Math
+4. ppu counters, latches, and timers
+5. manual controller read
+6. HiROM
+7. Coprocessors (SA-1 first maybe?)
+Status: A number of games are playable. BG Modes 0, 1, and 3 supported with sprites.
+Still some priority and scrolling issues (most easily seen in All-Stars, or the Zelda
+title screen lacking the triforce behind the logo).
 
 
 

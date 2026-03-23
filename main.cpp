@@ -357,6 +357,22 @@ void imgui_run()
 						else newinstance = true;
 					}
 				}
+				if( ImGui::MenuItem("SNES") )
+				{
+					std::string f = getOpenFile("SNES");
+					if( !f.empty() )
+					{
+						delete sys;
+						sys = new snes;
+						if( ! sys->loadROM(f) ) 
+						{
+							printf("unable to load ROM\n");
+							exit(1);
+						}
+						else newinstance = true;
+						crt_scale = 2.f;
+					}				
+				}
 				if( ImGui::MenuItem("Nintendo 64") )
 				{
 					std::string f = getOpenFile("Nintendo 64");
@@ -540,22 +556,6 @@ void imgui_run()
 			}
 			if( ImGui::BeginMenu("Alpha") )
 			{
-				if( ImGui::MenuItem("Nintendo SNES") )
-				{
-					std::string f = getOpenFile("SNES");
-					if( !f.empty() )
-					{
-						delete sys;
-						sys = new snes;
-						if( ! sys->loadROM(f) ) 
-						{
-							printf("unable to load ROM\n");
-							exit(1);
-						}
-						else newinstance = true;
-						crt_scale = 2.f;
-					}				
-				}
 				if( ImGui::MenuItem("Vectrex") )
 				{
 					std::string f = getOpenFile("Vectrex");
