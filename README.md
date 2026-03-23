@@ -10,7 +10,7 @@ alpha need serious work as in don't boot or just started. The alpha&beta menus a
 other than the top of alpha tends to be the newest system.
 
 See todo.txt for the full status information. Systems that I've declared out of beta include:
-* Nintendo: NES, GB/C, GBA, Virtual Boy, N64
+* Nintendo: NES, SNES, GB/C, GBA, Virtual Boy, N64
 * Sony: PS1
 * Atari: 2600
 * Sega: SMS, Genesis

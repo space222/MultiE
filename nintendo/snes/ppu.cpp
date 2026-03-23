@@ -187,17 +187,29 @@ void snes::ppu_draw_scanline()
 		u32 scoffs = ppu.scanline*256;
 		for(u32 i = 0; i < 256; ++i, ++scoffs)
 		{ 
-			if( bg3hi && (bg3[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg3[i]); continue; }
-			if( (spr[i]&0x300) == 0x300 ) { fbuf[scoffs] = pal2c16(spr[i]); continue; }
-			if( (bg1[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg1[i]); continue; }
-			if( (bg2[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg2[i]); continue; }
-			if( (spr[i]&0x300) == 0x200 ) { fbuf[scoffs] = pal2c16(spr[i]); continue; }
-			if( bg1[i] && !(bg1[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg1[i]); continue; }
-			if( bg2[i] && !(bg2[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg2[i]); continue; }
-			if( (spr[i]&0x300) == 0x100 ) { fbuf[scoffs] = pal2c16(spr[i]); continue; }
-			if( !bg3hi && (bg3[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg3[i]); continue; }
-			if( spr[i] && (spr[i]&0x300) == 0x000 ) { fbuf[scoffs] = pal2c16(spr[i]); continue; }
-			if( bg3[i] ) { fbuf[scoffs] = pal2c16(bg3[i]); continue; }
+			if( ppu.tm & 4 )if( bg3hi && (bg3[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg3[i]); continue; }
+			if( ppu.tm & 16 )if( (spr[i]&0x300) == 0x300 ) { fbuf[scoffs] = pal2c16(spr[i]); continue; }
+			if( ppu.tm & 1 )if( (bg1[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg1[i]); continue; }
+			if( ppu.tm & 2 )if( (bg2[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg2[i]); continue; }
+			if( ppu.tm & 16 )if( (spr[i]&0x300) == 0x200 ) { fbuf[scoffs] = pal2c16(spr[i]); continue; }
+			if( ppu.tm & 1 )if( bg1[i] && !(bg1[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg1[i]); continue; }
+			if( ppu.tm & 2 )if( bg2[i] && !(bg2[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg2[i]); continue; }
+			if( ppu.tm & 16 )if( (spr[i]&0x300) == 0x100 ) { fbuf[scoffs] = pal2c16(spr[i]); continue; }
+			if( ppu.tm & 4 )if( !bg3hi && (bg3[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg3[i]); continue; }
+			if( ppu.tm & 16 )if( spr[i] && (spr[i]&0x300) == 0x000 ) { fbuf[scoffs] = pal2c16(spr[i]); continue; }
+			if( ppu.tm & 4 )if( bg3[i] ) { fbuf[scoffs] = pal2c16(bg3[i]); continue; }
+
+			if( ppu.ts & 4 )if( bg3hi && (bg3[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg3[i]); continue; }
+			if( ppu.ts & 16 )if( (spr[i]&0x300) == 0x300 ) { fbuf[scoffs] = pal2c16(spr[i]); continue; }
+			if( ppu.ts & 1 )if( (bg1[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg1[i]); continue; }
+			if( ppu.ts & 2 )if( (bg2[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg2[i]); continue; }
+			if( ppu.ts & 16 )if( (spr[i]&0x300) == 0x200 ) { fbuf[scoffs] = pal2c16(spr[i]); continue; }
+			if( ppu.ts & 1 )if( bg1[i] && !(bg1[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg1[i]); continue; }
+			if( ppu.ts & 2 )if( bg2[i] && !(bg2[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg2[i]); continue; }
+			if( ppu.ts & 16 )if( (spr[i]&0x300) == 0x100 ) { fbuf[scoffs] = pal2c16(spr[i]); continue; }
+			if( ppu.ts & 4 )if( !bg3hi && (bg3[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg3[i]); continue; }
+			if( ppu.ts & 16 )if( spr[i] && (spr[i]&0x300) == 0x000 ) { fbuf[scoffs] = pal2c16(spr[i]); continue; }
+			if( ppu.ts & 4 )if( bg3[i] ) { fbuf[scoffs] = pal2c16(bg3[i]); continue; }
 		}
 		return;
 	}
@@ -212,17 +224,26 @@ void snes::ppu_draw_scanline()
 		u32 scoffs = ppu.scanline*256;
 		for(u32 i = 0; i < 256; ++i, ++scoffs)
 		{
-			if( (spr[i]&0x300)==0x300 ) { fbuf[scoffs] = pal2c16(spr[i]); continue; }
-			if( (bg1[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg1[i]); continue; }
+			if( ppu.tm & 16 ) if( (spr[i]&0x300)==0x300 ) { fbuf[scoffs] = pal2c16(spr[i]); continue; }
+			if( ppu.tm & 1 ) if( (bg1[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg1[i]); continue; }
 			
-			if( (spr[i]&0x300)==0x200 ) { fbuf[scoffs] = pal2c16(spr[i]); continue; }
-			if( (bg2[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg2[i]); continue; }
+			if( ppu.tm & 16 ) if( (spr[i]&0x300)==0x200 ) { fbuf[scoffs] = pal2c16(spr[i]); continue; }
+			if( ppu.tm & 2 ) if( (bg2[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg2[i]); continue; }
 			
-			if( (spr[i]&0x300)==0x100 ) { fbuf[scoffs] = pal2c16(spr[i]); continue; }
-			if( bg1[i] && !(bg1[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg1[i]); continue; }
+			if( ppu.tm & 16 ) if( (spr[i]&0x300)==0x100 ) { fbuf[scoffs] = pal2c16(spr[i]); continue; }
+			if( ppu.tm & 1 ) if( bg1[i] && !(bg1[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg1[i]); continue; }
 			
-			if( spr[i] && (spr[i]&0x300)==0x000 ) { fbuf[scoffs] = pal2c16(spr[i]); continue; }
-			if( bg2[i] && !(bg2[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg2[i]); continue; }
+			if( ppu.tm & 16 ) if( spr[i] && (spr[i]&0x300)==0x000 ) { fbuf[scoffs] = pal2c16(spr[i]); continue; }
+			if( ppu.tm & 2 ) if( bg2[i] && !(bg2[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg2[i]); continue; }
+
+			if( ppu.ts & 16 ) if( (spr[i]&0x300)==0x300 ) { fbuf[scoffs] = pal2c16(spr[i]); continue; }
+			if( ppu.ts & 1 ) if( (bg1[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg1[i]); continue; }		
+			if( ppu.ts & 16 ) if( (spr[i]&0x300)==0x200 ) { fbuf[scoffs] = pal2c16(spr[i]); continue; }
+			if( ppu.ts & 2 ) if( (bg2[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg2[i]); continue; }
+			if( ppu.ts & 16 ) if( (spr[i]&0x300)==0x100 ) { fbuf[scoffs] = pal2c16(spr[i]); continue; }
+			if( ppu.ts & 1 ) if( bg1[i] && !(bg1[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg1[i]); continue; }
+			if( ppu.ts & 16 ) if( spr[i] && (spr[i]&0x300)==0x000 ) { fbuf[scoffs] = pal2c16(spr[i]); continue; }
+			if( ppu.ts & 2 ) if( bg2[i] && !(bg2[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg2[i]); continue; }
 		}
 		return;
 	}
