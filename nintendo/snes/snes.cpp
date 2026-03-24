@@ -6,7 +6,7 @@
 void snes::io_write(u8 bank, u32 a, u8 v)
 {
 	if( a < 0x2000 ) { do_master_cycles(2); ram[a] = v; return; }
-	//std::println("io wr ${:X}:${:X} = ${:X}", bank, a, v);
+	//std::println("${:X}:${:X}: io wr ${:X}:${:X} = ${:X}", cpu.pb>>16, cpu.pc, bank, a, v);
 	switch( a )
 	{
 	case 0x2100: ppu.inidisp = v&0x8F; return;
@@ -157,10 +157,10 @@ void snes::io_write(u8 bank, u32 a, u8 v)
 	
 	case 0x4016: /*todo joypad*/ return;
 	
-	case 0x4200: io.nmitimen = v&0xb1; if( !(v&0x30) ) { cpu.irq_line=false; io.timeup&=0x7f; } return; /*todo: raise nmi if currently in vblank*/
+	case 0x4200: io.nmitimen = v&0xb1; if( !(v&BIT(5)) ) { cpu.do_irqs=cpu.irq_line=false; io.timeup&=0x7f; } return; /*todo: raise nmi if currently in vblank*/
 	case 0x4201: io.wrio = v; return;
 	case 0x4202: io.wrmpya = v; return;
-	case 0x4203: io.wrmpyb = v; /*todo: multiply*/ return;
+	case 0x4203: io.wrmpyb = v; io.remain = io.wrmpya; io.remain *= io.wrmpyb; return;
 	case 0x4204: io.wrdivl = v; return;
 	case 0x4205: io.wrdivh = v; return;
 	case 0x4206:{
@@ -195,12 +195,13 @@ void snes::io_write(u8 bank, u32 a, u8 v)
 u8 snes::io_read(u8 bank, u32 a)
 {
 	if( a < 0x2000 ) { do_master_cycles(2); return ram[a]; }
+	//std::println("${:X}:${:X}: io rd ${:X}:${:X}", cpu.pb>>16, cpu.pc, bank, a);
 	switch( a )
 	{
 	case 0x4016: return 1; // joypad1 rd
 	case 0x4017: return 1; // joypad2 rd
 	
-	case 0x4212: return (ppu.scanline>239 ? 0x80:0);
+	case 0x4212: return (ppu.scanline>239 ? 0x80:0)|(ppu.master_cycles<340?0x40:0);
 	
 	case 0x4214: return io.quot;
 	case 0x4215: return io.quot>>8;
@@ -245,7 +246,7 @@ u8 snes::io_read(u8 bank, u32 a)
 	case 0x2142: return apu.to_cpu[2];
 	case 0x2143: return apu.to_cpu[3];
 	case 0x4210: { u8 v = ppu.rdnmi; ppu.rdnmi &= 0x7f; return 2 | v; }
-	case 0x4211: cpu.irq_line=false; return std::exchange(io.timeup, io.timeup&0x7f);
+	case 0x4211: cpu.do_irqs=cpu.irq_line=false; return std::exchange(io.timeup, io.timeup&0x7f);
 	
 	default:
 		if( a >= 0x4300 && a < 0x4380 ) return ppu.dmaregs[a&0x7f];

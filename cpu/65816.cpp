@@ -40,6 +40,7 @@ while(1)
 		/*5.1*/ if( do_irqs && irq_line )
 			{
 				addr.v = 0xFFEE;
+				//std::println("IRQ accepted");
 			} else if( do_irqs && nmi_line ) {
 				addr.v = 0xFFEA;	
 				nmi_line = false;
@@ -1225,12 +1226,11 @@ while(1)
 			break;
 	case 0x40: // rti
 		/*1.1*/ pc++;
-		/*3.2*/ S.v++; oper.b.l = read(18, S.v);
-		/*4.1*/ F.v = oper.v;
-		/*4.2*/ S.v++; oper.b.l = read(6, S.v);
-		/*5.2*/ S.v++; oper.b.h = read(6, S.v);
+		/*3.2*/ S.v++; F.v = read(18, S.v);
+		/*4.2*/ S.v++; addr.b.l = read(6, S.v);
+		/*5.2*/ S.v++; addr.b.h = read(6, S.v);
 		/*6.2*/ S.v++; pb = read(6, S.v); pb<<=16; poll_irqs();
-		/*7.1*/ pc = oper.v; if(F.b.X) { X.v = X.b.l; Y.v = Y.b.l; }
+		/*7.1*/ pc = addr.v; if(F.b.X) { X.v = X.b.l; Y.v = Y.b.l; }
 		/*7.2*/ mcyc(6); fetch();
 			break;
 	case 0x41: // eor (dp, x)
@@ -3456,9 +3456,12 @@ while(1)
 		/*1.1*/ pc++;
 		/*1.2*/ read(6, pb|pc);
 		/*3.1*/ mcyc(9);
+			std::println("WAI!");
+			exit(1);
 		while( !do_irqs ) 
 		{
 		/*3.2*/ poll_irqs(); //todo: how to leave loop
+			mcyc(3);
 		}
 			fetch();
 			break;

@@ -125,6 +125,7 @@ public:
 	void render_bg(u16* res, u32 bpp, u32 index);
 	void render_sprites(u16* res);
 	u16 pal2c16(u8);
+	void hdma_run(u32 chan);
 	
 	enum cartmapping { MAPPING_LOROM=0, MAPPING_HIROM=1, MAPPING_EXHIROM=5 };
 	struct {

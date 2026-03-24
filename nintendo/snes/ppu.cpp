@@ -292,29 +292,42 @@ void snes::ppu_mc(s64 mc)
 	ppu.master_cycles -= 1364;
 
 	if( ppu.scanline < 224 ) ppu_draw_scanline();
-	ppu.scanline++;
 	
-	if( (io.nmitimen&0x30)>0x10 && ((io.vtimeh<<8)|io.vtimel)==ppu.scanline )
+	for(u32 b = 0; b < 8; ++b) { if( io.hdmaen & BIT(b) ) { hdma_run(b); } }
+	
+	if( (io.nmitimen&0x20) && ((io.vtimeh<<8)|io.vtimel)==ppu.scanline )
 	{
 		io.timeup |= 0x80;
-		//cpu.irq_line = true;
+		cpu.irq_line = true;
+		//std::println("irq raised on vtime {} == scanline {}", ((io.vtimeh<<8)|io.vtimel), ppu.scanline);
 	}
 	
 	if( ppu.scanline == 224 )
 	{
-		//todo: vblank nmi
 		if( io.nmitimen & 0x80 ) { cpu.nmi_line = true; }
 		ppu.rdnmi |= 0x80;
 		ppu.internal_oamadd = ppu.oamadd<<1;
 	}
 	
-	if( ppu.scanline >= 263 )
+	if( ppu.scanline == 261 )
 	{
+		//std::println("---");
 		ppu.frame_complete = true;
 		ppu.scanline = 0;
 		ppu.oam_highest_pri = ((ppu.oamaddh&0x80) ? ((ppu.oamaddl>>1)&0x7f) : 0);
 		//if( ppu.oam_highest_pri ) std::println("hipri=${:X}", ppu.oam_highest_pri);
+		//std::println("BgMode = {}", ppu.bgmode&7);
 		ppu.rdnmi &= ~0x80;
+	} else {
+		ppu.scanline++;
 	}
+	
+}
+
+void snes::hdma_run(u32 chan)
+{
+	const u8 rb = chan<<4;
+	
+	
 }
 
