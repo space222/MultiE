@@ -261,17 +261,20 @@ u16 snes::keys()
 {
 	auto k = SDL_GetKeyboardState(nullptr);
 	u16 val = 0;
-	if( k[SDL_SCANCODE_W] ) val ^= BIT(4);
-	if( k[SDL_SCANCODE_Q] ) val ^= BIT(5);
-	if( k[SDL_SCANCODE_X] ) val ^= BIT(6);
-	if( k[SDL_SCANCODE_Z] ) val ^= BIT(15);
-	if( k[SDL_SCANCODE_RETURN] ) val ^= BIT(12);
+	if( k[SDL_SCANCODE_X] ) val ^= BIT(15); // B
+	if( k[SDL_SCANCODE_Z] ) val ^= BIT(14); // Y
+	if( k[SDL_SCANCODE_A] ) val ^= BIT(13); // select
+	if( k[SDL_SCANCODE_RETURN] ) val ^= BIT(12); // start
 	
 	if( k[SDL_SCANCODE_UP] ) val ^= BIT(11);
 	if( k[SDL_SCANCODE_DOWN] ) val ^= BIT(10);
 	if( k[SDL_SCANCODE_LEFT] ) val ^= BIT(9);
 	if( k[SDL_SCANCODE_RIGHT] ) val ^= BIT(8);
-	
+
+	if( k[SDL_SCANCODE_C] ) val ^= BIT(7); // A
+	if( k[SDL_SCANCODE_S] ) val ^= BIT(6); // X
+	if( k[SDL_SCANCODE_Q] ) val ^= BIT(5); // L
+	if( k[SDL_SCANCODE_E] ) val ^= BIT(4); // R
 	return val;
 }
 
@@ -439,7 +442,9 @@ bool snes::loadROM(std::string fname)
 	cart.rom_size = (ROM[hd+0x17]*32_KB);
 	cart.ram_size = (1<<ROM[hd+0x18])*1024;
 	SRAM.resize(cart.ram_size);
-	
+	cart.ext_size = ((cart.chipset>>4)==1) ? 64_KB : 0;
+	extram.resize(cart.ext_size);
+		
 	savefile = fname;
 	auto pos = fname.rfind('.');
 	if( pos != std::string::npos ) savefile = savefile.substr(0, pos);

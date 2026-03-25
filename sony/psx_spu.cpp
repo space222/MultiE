@@ -3,6 +3,7 @@
 #include <print>
 #include <algorithm>
 #include "psx.h"
+// portions based on jsgroth's blog on ps1 audio (https://jsgroth.dev/blog/posts/ps1-spu-part-1/)
 
 #define LOOP_END    (SRAM[V.curaddr+1]&1)
 #define LOOP_REPEAT (SRAM[V.curaddr+1]&2)

@@ -3,6 +3,7 @@
 
 void snes::render_sprites(u16* spr)
 {
+	if( ppu.scanline == 0 ) return;
 	u32 num_sprites = 0;
 	u8 sprind[32]={0};
 	for(u32 i = 0; i < 128 && num_sprites<32; ++i)
@@ -26,8 +27,10 @@ void snes::render_sprites(u16* spr)
 		}
 		
 		if( X < -w ) continue;
-		if( ppu.scanline - Y > h-1 || ppu.scanline - Y < 0 ) continue;
-		sprind[num_sprites++] = SI;
+		if( ( (Y + h - 1 > 255) && ppu.scanline <= ((Y+h-1)&0xff) ) || (ppu.scanline >= Y && ppu.scanline < (Y + h)) )
+		{
+			sprind[num_sprites++] = SI;
+		}
 	}
 
 	for(u32 i = 0; i < num_sprites; ++i)
@@ -54,7 +57,7 @@ void snes::render_sprites(u16* spr)
 			if( X+px < 0 || spr[X+px] ) continue;
 			bool flipY = (ppu.oam[sprind[i]*4 + 3] & 0x80);
 			bool flipX = (ppu.oam[sprind[i]*4 + 3] & 0x40);
-			int relY = ppu.scanline - Y;
+			int relY = (Y+h-1>255) ? h - (((Y+h-1)&255) - ppu.scanline) - 1 : ppu.scanline - Y;
 			if( flipY ) { relY = h - relY - 1; }
 			int relX = (flipX ? px : w - px - 1);
 			int tile = ppu.oam[sprind[i]*4 + 2];
@@ -218,6 +221,40 @@ void snes::ppu_draw_scanline()
 	{
 		u8 re = ppu.tm | ppu.ts;
 		if( re & 1 ) render_bg(bg1, 8, 1);
+		if( re & 2 ) render_bg(bg2, 4, 2);
+		render_sprites(spr);
+		
+		u32 scoffs = ppu.scanline*256;
+		for(u32 i = 0; i < 256; ++i, ++scoffs)
+		{
+			if( ppu.tm & 16 ) if( (spr[i]&0x300)==0x300 ) { fbuf[scoffs] = pal2c16(spr[i]); continue; }
+			if( ppu.tm & 1 ) if( (bg1[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg1[i]); continue; }
+			
+			if( ppu.tm & 16 ) if( (spr[i]&0x300)==0x200 ) { fbuf[scoffs] = pal2c16(spr[i]); continue; }
+			if( ppu.tm & 2 ) if( (bg2[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg2[i]); continue; }
+			
+			if( ppu.tm & 16 ) if( (spr[i]&0x300)==0x100 ) { fbuf[scoffs] = pal2c16(spr[i]); continue; }
+			if( ppu.tm & 1 ) if( bg1[i] && !(bg1[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg1[i]); continue; }
+			
+			if( ppu.tm & 16 ) if( spr[i] && (spr[i]&0x300)==0x000 ) { fbuf[scoffs] = pal2c16(spr[i]); continue; }
+			if( ppu.tm & 2 ) if( bg2[i] && !(bg2[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg2[i]); continue; }
+
+			if( ppu.ts & 16 ) if( (spr[i]&0x300)==0x300 ) { fbuf[scoffs] = pal2c16(spr[i]); continue; }
+			if( ppu.ts & 1 ) if( (bg1[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg1[i]); continue; }		
+			if( ppu.ts & 16 ) if( (spr[i]&0x300)==0x200 ) { fbuf[scoffs] = pal2c16(spr[i]); continue; }
+			if( ppu.ts & 2 ) if( (bg2[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg2[i]); continue; }
+			if( ppu.ts & 16 ) if( (spr[i]&0x300)==0x100 ) { fbuf[scoffs] = pal2c16(spr[i]); continue; }
+			if( ppu.ts & 1 ) if( bg1[i] && !(bg1[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg1[i]); continue; }
+			if( ppu.ts & 16 ) if( spr[i] && (spr[i]&0x300)==0x000 ) { fbuf[scoffs] = pal2c16(spr[i]); continue; }
+			if( ppu.ts & 2 ) if( bg2[i] && !(bg2[i]&BIT(13)) ) { fbuf[scoffs] = pal2c16(bg2[i]); continue; }
+		}
+		return;
+	}
+	
+	if( (ppu.bgmode&7) == 2 )
+	{
+		u8 re = ppu.tm | ppu.ts;
+		if( re & 1 ) render_bg(bg1, 4, 1);
 		if( re & 2 ) render_bg(bg2, 4, 2);
 		render_sprites(spr);
 		

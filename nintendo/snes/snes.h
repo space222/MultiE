@@ -132,8 +132,9 @@ public:
 		u32 mapping_type=0;
 		u8 chipset=0;
 		bool fastROM=false;
-		u32 rom_size;
-		u32 ram_size;
+		u32 rom_size; // game code/data
+		u32 ram_size; // save ram
+		u32 ext_size; // extra ram like for the SuperFX
 	} cart;
 	
 	enum phases { ADSR_ATTACK=0, ADSR_DECAY, ADSR_SUSTAIN, ADSR_RELEASE, ADSR_GAIN };
@@ -176,6 +177,46 @@ public:
 	void snd_clock(); // runs the spc700 and s-dsp
 	u64 smp_clocks=0;
 	u64 spc_stamp=0;
+	
+	struct {
+		u8 fetch; // pipeline byte
+		u8 to_reg, from_reg, pb, ramb, romb, rombuf, color, scb, scm;
+		u16 r[16];
+		u16 last_rdaddr, plotopt;
+
+		union {
+			struct {
+				unsigned int pad0 : 1;
+				unsigned int Z : 1;
+				unsigned int C : 1;
+				unsigned int S : 1;
+				unsigned int V : 1;
+				unsigned int GO : 1;
+				unsigned int R : 1;
+				unsigned int pad1 : 1;
+				
+				unsigned int a1 : 1;
+				unsigned int a2 : 1;
+				unsigned int IL : 1;
+				unsigned int IH : 1;
+				unsigned int B : 1;
+				unsigned int pad2 : 2;
+				unsigned int IRQ : 1;
+			} PACKED b;
+			u16 v;
+		} PACKED F;
+		
+		u8 ccache[512];
+		u16 cache_base;
+		
+		u64 stamp;
+	} gsu;
+	void gsu_exec(u8);
+	void gsu_run();
+	void gsu_write(u16, u8);
+	u8 gsu_read(u8, u16);
+	u16 gsu_add(u16,u16,u16);
+	u16 gsu_setSZ(u16);
 
 	u16 fbuf[512*480];
 
@@ -187,6 +228,6 @@ public:
 	u8 ram[128_KB];
 	std::vector<u8> SRAM;
 	std::vector<u8> ROM;
-
+	std::vector<u8> extram;
 };
 

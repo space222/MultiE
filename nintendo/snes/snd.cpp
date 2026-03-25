@@ -3,6 +3,7 @@
 extern u32 snes_dsp_poffset[];
 extern u32 snes_dsp_period[];
 extern s32 snes_interp_table[];
+// portions based on jsgroth's blog on ps1 audio (https://jsgroth.dev/blog/posts/ps1-spu-part-1/)
 
 void snes::snd_clock()
 {
