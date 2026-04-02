@@ -32,6 +32,7 @@ public:
 	u8 snd_ctrl;
 	u8 irq_en;
 	u8 rom_taddr, ram_taddr;
+	u8 statFC;
 	
 	z80 cpu;
 	u64 last_target, stamp;

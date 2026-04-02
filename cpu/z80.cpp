@@ -57,7 +57,7 @@ u64 z80::step()
 	} else if( iff1 && irq_line && !intr_blocked ) {
 		push(pc);
 		pc = 0x38;
-		//irq_line = 0;
+		irq_line = 0;
 		iff1 = 0;
 		halted = false;
 	}

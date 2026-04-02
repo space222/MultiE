@@ -32,12 +32,14 @@ void snes::gsu_exec(u8 opc)
 		break;	
 	case 0x05: // bra
 		t = gread(gsu.pb, gsu.r[15]); gsu.r[15] += 1;
+		gsu.fetch = gread(gsu.pb, gsu.r[15]);
 		gsu.r[15] += s8(t) - 1;
 		gsu.stamp += 1;
 		break;
 	case 0x06: // bge
 		gsu.stamp += 1;
 		t = gread(gsu.pb, gsu.r[15]); gsu.r[15] += 1;
+		gsu.fetch = gread(gsu.pb, gsu.r[15]);
 		if( gsu.F.b.S == gsu.F.b.V )
 		{
 			gsu.r[15] += s8(t) - 1;
@@ -46,6 +48,7 @@ void snes::gsu_exec(u8 opc)
 	case 0x07: // blt
 		gsu.stamp += 1;
 		t = gread(gsu.pb, gsu.r[15]); gsu.r[15] += 1;
+		gsu.fetch = gread(gsu.pb, gsu.r[15]);
 		if( gsu.F.b.S != gsu.F.b.V )
 		{
 			gsu.r[15] += s8(t) - 1;
@@ -54,6 +57,7 @@ void snes::gsu_exec(u8 opc)
 	case 0x08: // bne
 		gsu.stamp += 1;
 		t = gread(gsu.pb, gsu.r[15]); gsu.r[15] += 1;
+		gsu.fetch = gread(gsu.pb, gsu.r[15]);
 		if( gsu.F.b.Z == 0 )
 		{
 			gsu.r[15] += s8(t) - 1;
@@ -62,6 +66,7 @@ void snes::gsu_exec(u8 opc)
 	case 0x09: // beq
 		gsu.stamp += 1;
 		t = gread(gsu.pb, gsu.r[15]); gsu.r[15] += 1;
+		gsu.fetch = gread(gsu.pb, gsu.r[15]);
 		if( gsu.F.b.Z == 1 )
 		{
 			gsu.r[15] += s8(t) - 1;
@@ -70,6 +75,7 @@ void snes::gsu_exec(u8 opc)
 	case 0x0A: // bpl
 		gsu.stamp += 1;
 		t = gread(gsu.pb, gsu.r[15]); gsu.r[15] += 1;
+		gsu.fetch = gread(gsu.pb, gsu.r[15]);
 		if( gsu.F.b.S == 0 )
 		{
 			gsu.r[15] += s8(t) - 1;
@@ -78,6 +84,7 @@ void snes::gsu_exec(u8 opc)
 	case 0x0B: // bmi
 		gsu.stamp += 1;
 		t = gread(gsu.pb, gsu.r[15]); gsu.r[15] += 1;
+		gsu.fetch = gread(gsu.pb, gsu.r[15]);
 		if( gsu.F.b.S == 1 )
 		{
 			gsu.r[15] += s8(t) - 1;
@@ -86,6 +93,7 @@ void snes::gsu_exec(u8 opc)
 	case 0x0C: // bcc
 		gsu.stamp += 1;
 		t = gread(gsu.pb, gsu.r[15]); gsu.r[15] += 1;
+		gsu.fetch = gread(gsu.pb, gsu.r[15]);
 		if( gsu.F.b.C == 0 )
 		{
 			gsu.r[15] += s8(t) - 1;
@@ -94,6 +102,7 @@ void snes::gsu_exec(u8 opc)
 	case 0x0D: // bcs
 		gsu.stamp += 1;
 		t = gread(gsu.pb, gsu.r[15]); gsu.r[15] += 1;
+		gsu.fetch = gread(gsu.pb, gsu.r[15]);
 		if( gsu.F.b.C == 1 )
 		{
 			gsu.r[15] += s8(t) - 1;
@@ -102,6 +111,7 @@ void snes::gsu_exec(u8 opc)
 	case 0x0E: // bvc
 		gsu.stamp += 1;
 		t = gread(gsu.pb, gsu.r[15]); gsu.r[15] += 1;
+		gsu.fetch = gread(gsu.pb, gsu.r[15]);
 		if( gsu.F.b.V == 0 )
 		{
 			gsu.r[15] += s8(t) - 1;
@@ -110,6 +120,7 @@ void snes::gsu_exec(u8 opc)
 	case 0x0F: // bvs
 		gsu.stamp += 1;
 		t = gread(gsu.pb, gsu.r[15]); gsu.r[15] += 1;
+		gsu.fetch = gread(gsu.pb, gsu.r[15]);
 		if( gsu.F.b.V == 1 )
 		{
 			gsu.r[15] += s8(t) - 1;
@@ -178,9 +189,19 @@ void snes::gsu_exec(u8 opc)
 			gwrite(gsu.r[opc&15]+1, gsu.r[FROM]>>8);
 		}
 		break;
-	case 0x3C: gsu.r[12] -= 1; setsz(gsu.r[12]); if( gsu.F.b.Z==0 ) { gsu.r[15]=gsu.r[13]-1; } break;
+	case 0x3C: 
+		gsu.r[12] -= 1; 
+		setsz(gsu.r[12]);
+		if( gsu.F.b.Z==0 ) 
+		{ 
+			gsu.r[15]=gsu.r[13]-1; 
+		} 
+		break;
 		
-	case 0x4D: gsu.r[TO] = setsz((gsu.r[FROM]<<8)|(gsu.r[FROM]>>8)); check14(TO); break;
+	case 0x4D: 	
+		gsu.r[TO] = setsz((gsu.r[FROM]<<8)|(gsu.r[FROM]>>8)); 
+		check14(TO); 
+		break;
 	case 0x4E: 
 		if( ALT1 )
 		{
@@ -189,7 +210,10 @@ void snes::gsu_exec(u8 opc)
 			gsu.color = gsu.r[FROM];
 		}
 		break;
-	case 0x4F: gsu.r[TO] = setsz(~gsu.r[FROM]); check14(TO); break;
+	case 0x4F: 			
+		gsu.r[TO] = setsz(~gsu.r[FROM]); 
+		check14(TO);
+		break;
 	case 0x50:
 	case 0x51:
 	case 0x52:
@@ -230,7 +254,7 @@ void snes::gsu_exec(u8 opc)
 			gsu_add(gsu.r[FROM], ~gsu.r[opc&15], 1);
 			return;
 		}
-		gsu.r[TO] = gsu_add(gsu.r[FROM], ~(ALT2 ? (opc&15) : gsu.r[opc&15]), (ALT1 ? gsu.F.b.C : 0));
+		gsu.r[TO] = gsu_add(gsu.r[FROM], ~(ALT2 ? (opc&15) : gsu.r[opc&15]), (ALT1 ? gsu.F.b.C : 1));
 		check14(TO);
 		break;
 	case 0x70:
@@ -300,13 +324,16 @@ void snes::gsu_exec(u8 opc)
 	case 0x94: // link #n
 		gsu.r[11] = gsu.r[15] + (opc&15);
 		break;
-	case 0x95: gsu.r[TO] = setsz(s8(gsu.r[FROM])); check14(TO); break;
-	case 0x96: // asr / div2 (todo: probably wrong?)
+	case 0x95: 	
+		gsu.r[TO] = setsz(s8(gsu.r[FROM]));
+		check14(TO);
+		break;
+	case 0x96: // asr / div2
+		gsu.F.b.C = gsu.r[FROM]&1;
 		if( ALT1 && gsu.r[FROM] == 0xffff )
 		{
 			gsu.r[TO] = setsz(0);
 		} else {
-			gsu.F.b.C = gsu.r[FROM]&1;
 			gsu.r[TO] = setsz(s16(gsu.r[FROM])>>1);
 		}
 		check14(TO);
@@ -380,6 +407,7 @@ void snes::gsu_exec(u8 opc)
 	case 0xAD:
 	case 0xAE:
 	case 0xAF: // ibt / lms
+		if( (opc&15)==15 ) gsu.fetch = gread(gsu.pb, gsu.r[15]+1);
 		if( ALT1 )
 		{
 			t = gread(gsu.pb, gsu.r[15]++)<<1;
@@ -526,6 +554,7 @@ void snes::gsu_exec(u8 opc)
 	case 0xFD:
 	case 0xFE:
 	case 0xFF: // iwt  / lm
+		if( (opc&15)==15 ) gsu.fetch = gread(gsu.pb, gsu.r[15]+2);
 		if( ALT1 )
 		{
 			t = gread(gsu.pb, gsu.r[15]++);
@@ -585,7 +614,7 @@ u8 snes::gsu_read(u8 bank, u16 addr)
 	if( bank == 0x70 || bank == 0x71 )
 	{
 		gsu.last_rdaddr = (bank << 16)|addr;
-		return SRAM[(((bank&1)<<16)|addr) % cart.ram_size];
+		return extram[(((bank&1)<<16)|addr) % cart.ram_size];
 	}
 
 	if( bank < 0x40 )
@@ -609,7 +638,7 @@ void snes::gsu_write(u16 addr, u8 v)
 		std::println("GSU: Unimpl write ${:X}:${:X}", gsu.ramb, addr);
 		return;
 	}
-	ram[((gsu.ramb&1)<<16)|addr] = v;
+	extram[((gsu.ramb&1)<<16)|addr] = v;
 }
 
 u16 snes::gsu_setSZ(u16 v)

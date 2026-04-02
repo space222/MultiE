@@ -319,7 +319,7 @@ void snes::ppu_draw_scanline()
 	}
 	
 	std::println("Unimpl bg mode {}", ppu.bgmode&7);
-	exit(1);	
+	//exit(1);	
 }
 
 void snes::ppu_mc(s64 mc)
@@ -328,10 +328,32 @@ void snes::ppu_mc(s64 mc)
 	if( ppu.master_cycles < 1364 ) return;
 	ppu.master_cycles -= 1364;
 
-	if( ppu.scanline < 224 ) ppu_draw_scanline();
-	
-	for(u32 b = 0; b < 8; ++b) { if( io.hdmaen & BIT(b) ) { hdma_run(b); } }
-	
+	if( ppu.scanline == 0 )
+	{
+		for(u32 b = 0; b < 8; ++b) 
+		{ // setup the hdma regs for the next frame, not clear what should happen here
+			if( !(io.hdmaen & BIT(b)) ) continue;
+			const u8 rb = b<<4;
+			ppu.dmaregs[rb|8] = ppu.dmaregs[rb|2];
+			ppu.dmaregs[rb|9] = ppu.dmaregs[rb|3];
+			ppu.dmaregs[rb|0xA] = read((ppu.dmaregs[rb|4]<<16)|(ppu.dmaregs[rb|3]<<8)|ppu.dmaregs[rb|2]);
+			ppu.dmaregs[rb|2]+=1; if( ppu.dmaregs[rb|2] == 0 ) ppu.dmaregs[rb|3]+=1;
+			if( ppu.dmaregs[rb|0] & BIT(6) )
+			{
+				ppu.dmaregs[rb|5] = read((ppu.dmaregs[rb|4]<<16)|(ppu.dmaregs[rb|3]<<8)|ppu.dmaregs[rb|2]);
+				ppu.dmaregs[rb|2]+=1; if( ppu.dmaregs[rb|2] == 0 ) ppu.dmaregs[rb|3]+=1;
+				ppu.dmaregs[rb|6] = read((ppu.dmaregs[rb|4]<<16)|(ppu.dmaregs[rb|3]<<8)|ppu.dmaregs[rb|2]);
+				ppu.dmaregs[rb|2]+=1; if( ppu.dmaregs[rb|2] == 0 ) ppu.dmaregs[rb|3]+=1;
+			}
+		}
+	}
+
+	if( ppu.scanline < 224 ) 
+	{
+		for(u32 b = 0; b < 8; ++b) { if( io.hdmaen & BIT(b) ) { hdma_run(b); } }
+		ppu_draw_scanline();
+	}
+		
 	if( (io.nmitimen&0x20) && ((io.vtimeh<<8)|io.vtimel)==ppu.scanline )
 	{
 		io.timeup |= 0x80;
@@ -361,10 +383,90 @@ void snes::ppu_mc(s64 mc)
 	
 }
 
+static const u32 bytes_in_unit[] = { 1,2,2,4,4,4,2,4 };
+
+void snes::hdma_xfer(u32 chan)
+{
+	const u8 rb = chan<<4;
+	u8 bank = (ppu.dmaregs[rb|0]&BIT(6)) ? ppu.dmaregs[rb|7] : ppu.dmaregs[rb|4];
+	u16 src_addr = (ppu.dmaregs[rb|0]&BIT(6)) ? (ppu.dmaregs[rb|6]<<8)|ppu.dmaregs[rb|5] : (ppu.dmaregs[rb|9]<<8)|ppu.dmaregs[rb|8];
+	
+	for(u32 i = 0; i < bytes_in_unit[ppu.dmaregs[rb|0]&7]; ++i)
+	{
+		u8 bbus = ppu.dmaregs[rb|1];
+		u8 v = read((bank<<16)|src_addr);		
+		switch( ppu.dmaregs[rb|0]&7 )
+		{
+		case 0: io_write(0,0x2100+bbus, v); break;
+		case 1: io_write(0,0x2100+u8(bbus+i), v); break;
+		case 2: io_write(0,0x2100+bbus, v); break;
+		case 3: io_write(0,0x2100+u8(bbus+((i>>1)&1)), v); break;
+		case 4: io_write(0,0x2100+u8(bbus+(i&3)), v); break;
+		case 5: io_write(0,0x2100+u8(bbus+(i&1)), v); break;
+		case 6: io_write(0,0x2100+bbus, v); break;
+		case 7: io_write(0,0x2100+u8(bbus+((i>>1)&1)), v); break;
+		}
+		src_addr += 1;
+	}
+	
+	if( ppu.dmaregs[rb|0] & BIT(6) )
+	{
+		ppu.dmaregs[rb|5] = src_addr;
+		ppu.dmaregs[rb|6] = src_addr>>8;
+	} else {
+		ppu.dmaregs[rb|8] = src_addr;
+		ppu.dmaregs[rb|9] = src_addr>>8;
+	}
+}
+
 void snes::hdma_run(u32 chan)
 {
 	const u8 rb = chan<<4;
+	if( ppu.dmaregs[rb|0xA] == 0 ) return; // seeing a zero from the table means this channel is done for the frame
+	ppu.dmaregs[rb|0xA] -= 1;
 	
+	if( ppu.scanline == 0 || (ppu.dmaregs[rb|0xA]&0x80) )
+	{ // first scanline always transfers, as does repeat mode
+		hdma_xfer(chan);	
+	}		
 	
+	// both modes only grab next item from hdma table upon hitting zero
+	if( (ppu.dmaregs[rb|0xA]&0x7F) != 0 ) return;
+	
+	// grab next line count / repeat indicator
+	ppu.dmaregs[rb|0xA] = read((ppu.dmaregs[rb|4]<<16)|(ppu.dmaregs[rb|3]<<8)|ppu.dmaregs[rb|2]);
+	ppu.dmaregs[rb|2]+=1; if( ppu.dmaregs[rb|2] == 0 ) ppu.dmaregs[rb|3]+=1;
+	// if indirect mode, grab pointer
+	if( ppu.dmaregs[rb|0] & BIT(6) )
+	{
+		ppu.dmaregs[rb|5] = read((ppu.dmaregs[rb|4]<<16)|(ppu.dmaregs[rb|3]<<8)|ppu.dmaregs[rb|2]);
+		ppu.dmaregs[rb|2]+=1; if( ppu.dmaregs[rb|2] == 0 ) ppu.dmaregs[rb|3]+=1;
+		ppu.dmaregs[rb|6] = read((ppu.dmaregs[rb|4]<<16)|(ppu.dmaregs[rb|3]<<8)|ppu.dmaregs[rb|2]);
+		ppu.dmaregs[rb|2]+=1; if( ppu.dmaregs[rb|2] == 0 ) ppu.dmaregs[rb|3]+=1;
+	}
+	
+	// if this is not repeat mode, do transfer. won't get here again until line count is zero
+	if( (ppu.dmaregs[rb|0xA] & 0x80) == 0 )
+	{
+		hdma_xfer(chan);
+	}
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

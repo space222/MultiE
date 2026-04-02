@@ -43,9 +43,9 @@ u8 pv1k::in(u16 port)
 	
 	if( port == 0xFC )
 	{
-		u8 res = (cpu.irq_line)?1:0;
-		cpu.irq_line = 0;
-		return res|2;	
+		u8 res = statFC;
+		statFC &= ~1;
+		return res;
 	}
 	
 	if( port == 0xFD )
@@ -110,6 +110,7 @@ void pv1k::reset()
 	cpu.out = pv1k_out;
 	fbuf.clear(); fbuf.resize(fb_width()*fb_height());
 	stamp = last_target = 0;
+	statFC = 2;
 }
 
 void pv1k::scanline(u32 line)
@@ -140,7 +141,11 @@ void pv1k::run_frame()
 {
 	for(u32 line = 0; line < 262; ++line)
 	{
-		if( line >= 196 && line <= 256 && (line&3) == 0 ) cpu.irq_line = 1;	
+		if( line >= 196 && line < 256 && (line&3) == 0 )
+		{
+			if( line == 196 ) statFC |= 1;
+			cpu.irq_line = 1;
+		}
 		const u64 target = last_target + 227;
 		while( stamp < target )
 		{

@@ -6,6 +6,16 @@
 void snes::io_write(u8 bank, u32 a, u8 v)
 {
 	if( a < 0x2000 ) { do_master_cycles(2); ram[a] = v; return; }
+	if( a >= 0x6000 && a < 0x8000 )
+	{
+		if( cart.mapping == MAPPING_HIROM )
+		{
+			SRAM[a&0x1fff] = v;
+		} else if( (cart.chipset>>4)==1 ) {
+			extram[a&0x1fff] = v;
+		}
+		return;
+	}
 	//std::println("${:X}:${:X}: io wr ${:X}:${:X} = ${:X}", cpu.pb>>16, cpu.pc, bank, a, v);
 	switch( a )
 	{
@@ -195,13 +205,24 @@ void snes::io_write(u8 bank, u32 a, u8 v)
 u8 snes::io_read(u8 bank, u32 a)
 {
 	if( a < 0x2000 ) { do_master_cycles(2); return ram[a]; }
+	if( a >= 0x6000 && a < 0x8000 )
+	{
+		if( cart.mapping == MAPPING_HIROM )
+		{
+			return SRAM[a&0x1fff];
+		} else if( (cart.chipset>>4)==1 ) {
+			return extram[a&0x1fff];
+		}
+		return 0;
+	}
 	//std::println("${:X}:${:X}: io rd ${:X}:${:X}", cpu.pb>>16, cpu.pc, bank, a);
 	switch( a )
-	{
+	{	
 	case 0x4016: return 1; // joypad1 rd
 	case 0x4017: return 1; // joypad2 rd
 	
 	case 0x4212: return (ppu.scanline>239 ? 0x80:0)|(ppu.master_cycles<340?0x40:0);
+	case 0x4213: return 0xff; //???
 	
 	case 0x4214: return io.quot;
 	case 0x4215: return io.quot>>8;
@@ -245,6 +266,16 @@ u8 snes::io_read(u8 bank, u32 a)
 	case 0x2141: return apu.to_cpu[1];
 	case 0x2142: return apu.to_cpu[2];
 	case 0x2143: return apu.to_cpu[3];
+
+	case 0x2180:{
+		     u32 addr = (io.wmaddh<<16)|(io.wmaddm<<8)|io.wmaddl;
+		     u8 ret = ram[addr++];
+		     io.wmaddh = (addr>>16)&1;
+		     io.wmaddm = addr>>8;
+		     io.wmaddl = addr;
+		     return ret;
+		     }
+
 	case 0x4210: { u8 v = ppu.rdnmi; ppu.rdnmi &= 0x7f; return 2 | v; }
 	case 0x4211: cpu.do_irqs=cpu.irq_line=false; return std::exchange(io.timeup, io.timeup&0x7f);
 	
@@ -279,17 +310,26 @@ u16 snes::keys()
 }
 
 
-void snes::write(u32 a, u8 v)
+void snes::write(u32 addr, u8 v)
 {
-	u8 bank = a>>16;
-	a &= 0xffff;
+	u8 bank = addr>>16;
+	u32 a = addr & 0xffff;
 	// WRAM region is same in all mapping modes
 	if( bank == 0x7E || bank == 0x7F ) { do_master_cycles(2); ram[((bank&1)<<16)|a] = v; return; }
 	// as is the io region, although io/rw might fall through to cart expansion io
 	if( (bank&0x7F) < 0x40 && a < 0x8000 ) { io_write(bank, a, v); return; }
+	
+	if( (bank&0x7F) >= 0x40 || (a & 0x8000) ) return romsel_write(addr, v);
 
+	
 	if( bank >= 0x70 && bank < 0x80 && a < 0x8000 )
 	{
+		//if( (cart.chipset>>4)==1 && bank < 0x72 )
+		//{
+		//	extram[(bank&1)*32_KB + a] = v;
+		//	return;
+		//}
+		std::println("sram wr ${:X}:${:X}", bank, a);
 		SRAM[((bank*32_KB) + a) % cart.ram_size] = v;
 		save_written = true;
 		return;
@@ -298,26 +338,22 @@ void snes::write(u32 a, u8 v)
 	std::println("${:X}: snes wr ${:X}:${:X} = ${:X}", cpu.pc, bank, a, v);
 }
 
-u8 snes::read(u32 a)
+u8 snes::read(u32 addr)
 {
-	u8 bank = a>>16;
-	a &= 0xffff;
+	u8 bank = addr>>16;
+	u32 a = addr & 0xffff;
 	// WRAM region is same in all mapping modes
 	if( bank == 0x7E || bank == 0x7F ) { do_master_cycles(2); return ram[((bank&1)<<16)|a]; }
 	// as is the io region, although io/rw might fall through to cart expansion io
 	if( (bank&0x7F) < 0x40 && a < 0x8000 ) { return io_read(bank, a); }
 	
-	if( a >= 0x8000 )
+	if( cart.mapping == MAPPING_HIROM )
 	{
-		//std::println("snes rd ${:X}:${:X}", bank, a);
-		return ROM[(((bank&0x7f)*0x8000) + (a&0x7fff))  % ROM.size()];
-	}
-	if( bank >= 0x70 && bank < 0x80 && a < 0x8000 )
-	{
-		return SRAM[((bank*32_KB) + a) % cart.ram_size];
+		return ROM[((bank*64_KB) + a) % ROM.size()];
 	}
 	
-	
+	if( (bank&0x7F) >= 0x40 || (a & 0x8000) ) return romsel_read(addr);
+		
 	std::println("snes rd ${:X}:${:X}", bank, a);
 	return 0;
 }
@@ -414,22 +450,34 @@ bool snes::loadROM(std::string fname)
 	if( (*(u16*)&ROM[0x7fde]^0xffff) == *(u16*)&ROM[0x7fdc] || (ROM[0x7fdc]=='C'&&ROM[0x7fdd]=='C'&&ROM[0x7fde]=='C'&&ROM[0x7fdf]=='S' ) )
 	{
 		std::println("SNES: Using LoROM Mapping");
-		cart.mapping_type = MAPPING_LOROM;
+		cart.mapping = MAPPING_LOROM;
+		romsel_read = [&](u32 a)->u8 { return lorom_romsel_read(a); };
+		romsel_write = [&](u32 a, u8 v) { lorom_romsel_write(a,v); };
+		cart_io_read = [&](u32 a)->u8 { return lorom_cart_io_read(a); };
+		cart_io_write = [&](u32 a, u8 v) { lorom_cart_io_write(a,v); };
+		
 		if( (ROM[hd+0x15]&15) != 0 )
 		{
 			std::println("warning: detected LoROM header, but {} != {}", ROM[hd+0x15]&15, 0);
 		}
 	} else if( (*(u16*)&ROM[0xffde]^0xffff) == *(u16*)&ROM[0xffdc] ) {
 		std::println("SNES: Using HiROM Mapping");
-		cart.mapping_type = MAPPING_HIROM;
+		cart.mapping = MAPPING_HIROM;
+		romsel_read = [&](u32 a)->u8 { return hirom_romsel_read(a); };
+		romsel_write = [&](u32 a, u8 v) { hirom_romsel_write(a,v); };
+		cart_io_read = [&](u32 a)->u8 { return hirom_cart_io_read(a); };
+		cart_io_write = [&](u32 a, u8 v) { hirom_cart_io_write(a,v); };
+
 		hd = 0xffc0;
 		if( (ROM[hd+0x15]&15) != 1 )
 		{
 			std::println("warning: detected HiROM header, but {} != {}", ROM[hd+0x15]&15, 1);
 		}
 	} else {
-		std::println("SNES: Failing into ExHiROM");
-		cart.mapping_type = MAPPING_EXHIROM;
+		//std::println("SNES: Failing into ExHiROM");
+		std::println("SNES: Error ExHiROM not supported");
+		exit(1);
+		cart.mapping = MAPPING_EXHIROM;
 		hd = 0x40ffc0;
 		if( (ROM[hd+0x15]&15) != 5 )
 		{

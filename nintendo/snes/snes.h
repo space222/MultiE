@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdio>
 #include <print>
+#include <functional>
 #include <vector>
 #include "console.h"
 #include "65816.h"
@@ -60,6 +61,27 @@ public:
 	void write(u32, u8);
 	u8 io_read(u8, u32);
 	void io_write(u8, u32, u8);
+	
+	std::function<u8(u32)> romsel_read;
+	std::function<void(u32, u8)> romsel_write;
+	std::function<u8(u32)> cart_io_read;
+	std::function<void(u32, u8)> cart_io_write;
+	
+	u8 lorom_romsel_read(u32);
+	void lorom_romsel_write(u32, u8);
+	u8 lorom_cart_io_read(u32);
+	void lorom_cart_io_write(u32, u8);
+	
+	u8 hirom_romsel_read(u32);
+	void hirom_romsel_write(u32, u8);
+	u8 hirom_cart_io_read(u32);
+	void hirom_cart_io_write(u32, u8);
+
+	u8 superfx_romsel_read(u32);
+	void superfx_romsel_write(u32, u8);
+	u8 superfx_cart_io_read(u32);
+	void superfx_cart_io_write(u32, u8);
+	
 	
 	void run_dma(u32 cn);
 	u16 keys();
@@ -125,11 +147,12 @@ public:
 	void render_bg(u16* res, u32 bpp, u32 index);
 	void render_sprites(u16* res);
 	u16 pal2c16(u8);
-	void hdma_run(u32 chan);
+	void hdma_run(u32);
+	void hdma_xfer(u32);
 	
 	enum cartmapping { MAPPING_LOROM=0, MAPPING_HIROM=1, MAPPING_EXHIROM=5 };
 	struct {
-		u32 mapping_type=0;
+		u32 mapping=0;
 		u8 chipset=0;
 		bool fastROM=false;
 		u32 rom_size; // game code/data
