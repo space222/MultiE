@@ -115,7 +115,8 @@ public:
 		u8 cgwsel=0, cgadsub=0, setini=0, mpyl=0, mpym=0, mpyh=0, slhv=0;
 		u16 fixed_color=0;
 		
-		u16 m7a=0, m7b=0, m7c=0, m7d=0, m7x=0, m7y=0;
+		u16 m7vofs=0, m7hofs=0, m7x=0, m7y=0;
+		s16 m7a=0, m7b=0, m7c=0, m7d=0;
 		u8 m7latch=0;
 		
 		u8 vmaddh=0, vmaddl=0;

@@ -318,6 +318,36 @@ void snes::ppu_draw_scanline()
 		return;
 	}
 	
+	if( (ppu.bgmode&7) == 7 )
+	{
+		if( (ppu.tm|ppu.ts)&16 ) render_sprites(spr);
+	
+		int m7x = s16(ppu.m7x<<3)>>3;
+		int m7y = s16(ppu.m7y<<3)>>3;
+	
+		u16* v16 = (u16*)&ppu.vram[0];
+		for(u32 x = 0; x < 256; ++x)
+		{
+			s16 oX = x + ppu.m7hofs - m7x;
+			s16 oY = ppu.scanline + ppu.m7vofs - m7y;
+			
+			s16 X = ((ppu.m7a*oX + ppu.m7b*oY)>>8) + m7x;
+			s16 Y = ((ppu.m7c*oX + ppu.m7d*oY)>>8) + m7y;
+			
+			u8 mapentry = 0;
+			if( ! ( (X<0||X>0x3ff||Y<0||Y>0x3ff) && (ppu.m7sel & 0x80) ) )
+			{
+				X &= 0x3ff;
+				Y &= 0x3ff;
+				mapentry = v16[((X/8) + (Y/8)*128)&0x7fff];
+			}
+			u8 p = v16[(mapentry*64 + (Y&7)*8 + (X&7))&0x7fff] >> 8;
+			if( ((ppu.tm|ppu.ts)&16) && spr[x] ) fbuf[ppu.scanline*256 + x] = pal2c16(spr[x]);
+			else fbuf[ppu.scanline*256 + x] = pal2c16(p);
+		}
+		return;
+	}
+	
 	std::println("Unimpl bg mode {}", ppu.bgmode&7);
 	//exit(1);	
 }
@@ -336,14 +366,14 @@ void snes::ppu_mc(s64 mc)
 			const u8 rb = b<<4;
 			ppu.dmaregs[rb|8] = ppu.dmaregs[rb|2];
 			ppu.dmaregs[rb|9] = ppu.dmaregs[rb|3];
-			ppu.dmaregs[rb|0xA] = read((ppu.dmaregs[rb|4]<<16)|(ppu.dmaregs[rb|3]<<8)|ppu.dmaregs[rb|2]);
-			ppu.dmaregs[rb|2]+=1; if( ppu.dmaregs[rb|2] == 0 ) ppu.dmaregs[rb|3]+=1;
+			ppu.dmaregs[rb|0xA] = read((ppu.dmaregs[rb|4]<<16)|(ppu.dmaregs[rb|9]<<8)|ppu.dmaregs[rb|8]);
+			ppu.dmaregs[rb|8]+=1; if( ppu.dmaregs[rb|8] == 0 ) ppu.dmaregs[rb|9]+=1;
 			if( ppu.dmaregs[rb|0] & BIT(6) )
 			{
-				ppu.dmaregs[rb|5] = read((ppu.dmaregs[rb|4]<<16)|(ppu.dmaregs[rb|3]<<8)|ppu.dmaregs[rb|2]);
-				ppu.dmaregs[rb|2]+=1; if( ppu.dmaregs[rb|2] == 0 ) ppu.dmaregs[rb|3]+=1;
-				ppu.dmaregs[rb|6] = read((ppu.dmaregs[rb|4]<<16)|(ppu.dmaregs[rb|3]<<8)|ppu.dmaregs[rb|2]);
-				ppu.dmaregs[rb|2]+=1; if( ppu.dmaregs[rb|2] == 0 ) ppu.dmaregs[rb|3]+=1;
+				ppu.dmaregs[rb|5] = read((ppu.dmaregs[rb|4]<<16)|(ppu.dmaregs[rb|9]<<8)|ppu.dmaregs[rb|8]);
+				ppu.dmaregs[rb|8]+=1; if( ppu.dmaregs[rb|8] == 0 ) ppu.dmaregs[rb|9]+=1;
+				ppu.dmaregs[rb|6] = read((ppu.dmaregs[rb|4]<<16)|(ppu.dmaregs[rb|9]<<8)|ppu.dmaregs[rb|8]);
+				ppu.dmaregs[rb|8]+=1; if( ppu.dmaregs[rb|8] == 0 ) ppu.dmaregs[rb|9]+=1;
 			}
 		}
 	}
@@ -394,17 +424,15 @@ void snes::hdma_xfer(u32 chan)
 	for(u32 i = 0; i < bytes_in_unit[ppu.dmaregs[rb|0]&7]; ++i)
 	{
 		u8 bbus = ppu.dmaregs[rb|1];
-		u8 v = read((bank<<16)|src_addr);		
+		u8 v = read((bank<<16)|src_addr);
+		//std::println("hdma ${:X}(i{}) = ${:X}", 0x2100+bbus, i, v);
 		switch( ppu.dmaregs[rb|0]&7 )
 		{
-		case 0: io_write(0,0x2100+bbus, v); break;
+		case 2: case 6: case 0: io_write(0,0x2100+bbus, v); break;
 		case 1: io_write(0,0x2100+u8(bbus+i), v); break;
-		case 2: io_write(0,0x2100+bbus, v); break;
-		case 3: io_write(0,0x2100+u8(bbus+((i>>1)&1)), v); break;
+		case 3: case 7: io_write(0,0x2100+u8(bbus+((i>>1)&1)), v); break;
 		case 4: io_write(0,0x2100+u8(bbus+(i&3)), v); break;
 		case 5: io_write(0,0x2100+u8(bbus+(i&1)), v); break;
-		case 6: io_write(0,0x2100+bbus, v); break;
-		case 7: io_write(0,0x2100+u8(bbus+((i>>1)&1)), v); break;
 		}
 		src_addr += 1;
 	}
@@ -434,15 +462,15 @@ void snes::hdma_run(u32 chan)
 	if( (ppu.dmaregs[rb|0xA]&0x7F) != 0 ) return;
 	
 	// grab next line count / repeat indicator
-	ppu.dmaregs[rb|0xA] = read((ppu.dmaregs[rb|4]<<16)|(ppu.dmaregs[rb|3]<<8)|ppu.dmaregs[rb|2]);
-	ppu.dmaregs[rb|2]+=1; if( ppu.dmaregs[rb|2] == 0 ) ppu.dmaregs[rb|3]+=1;
+	ppu.dmaregs[rb|0xA] = read((ppu.dmaregs[rb|4]<<16)|(ppu.dmaregs[rb|9]<<8)|ppu.dmaregs[rb|8]);
+	ppu.dmaregs[rb|8]+=1; if( ppu.dmaregs[rb|8] == 0 ) ppu.dmaregs[rb|9]+=1;
 	// if indirect mode, grab pointer
 	if( ppu.dmaregs[rb|0] & BIT(6) )
 	{
-		ppu.dmaregs[rb|5] = read((ppu.dmaregs[rb|4]<<16)|(ppu.dmaregs[rb|3]<<8)|ppu.dmaregs[rb|2]);
-		ppu.dmaregs[rb|2]+=1; if( ppu.dmaregs[rb|2] == 0 ) ppu.dmaregs[rb|3]+=1;
-		ppu.dmaregs[rb|6] = read((ppu.dmaregs[rb|4]<<16)|(ppu.dmaregs[rb|3]<<8)|ppu.dmaregs[rb|2]);
-		ppu.dmaregs[rb|2]+=1; if( ppu.dmaregs[rb|2] == 0 ) ppu.dmaregs[rb|3]+=1;
+		ppu.dmaregs[rb|5] = read((ppu.dmaregs[rb|4]<<16)|(ppu.dmaregs[rb|9]<<8)|ppu.dmaregs[rb|8]);
+		ppu.dmaregs[rb|8]+=1; if( ppu.dmaregs[rb|8] == 0 ) ppu.dmaregs[rb|9]+=1;
+		ppu.dmaregs[rb|6] = read((ppu.dmaregs[rb|4]<<16)|(ppu.dmaregs[rb|9]<<8)|ppu.dmaregs[rb|8]);
+		ppu.dmaregs[rb|8]+=1; if( ppu.dmaregs[rb|8] == 0 ) ppu.dmaregs[rb|9]+=1;
 	}
 	
 	// if this is not repeat mode, do transfer. won't get here again until line count is zero

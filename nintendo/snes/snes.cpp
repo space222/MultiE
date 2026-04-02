@@ -50,6 +50,8 @@ void snes::io_write(u8 bank, u32 a, u8 v)
 										     //this is based on fullsnes, but dunno if I understood it correctly
 			//std::println("BG1H = ${:X}", ppu.bg1hofs);
 		     ppu.bgofs_latch = v;
+		     ppu.m7hofs = (v << 8) | ppu.m7latch;
+		     ppu.m7latch = v;
 		     return;
 	case 0x210F: ppu.bg2hofs = (v<<8)|(ppu.bgofs_latch&~7)|((ppu.bg2hofs>>8)&7);
 		     //std::println("BG2H = ${:X}", ppu.bg2hofs);
@@ -64,6 +66,8 @@ void snes::io_write(u8 bank, u32 a, u8 v)
 		     return;
 	case 0x210E: ppu.bg1vofs = (v<<8)|ppu.bgofs_latch;
 		     ppu.bgofs_latch = v;
+		     ppu.m7vofs = (v << 8) | ppu.m7latch;
+		     ppu.m7latch = v;
 		     return;
 	case 0x2110: ppu.bg2vofs = (v<<8)|ppu.bgofs_latch;
 		     ppu.bgofs_latch = v;
