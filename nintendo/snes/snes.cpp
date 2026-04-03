@@ -118,7 +118,7 @@ void snes::io_write(u8 bank, u32 a, u8 v)
 		       ppu.vram[(vaddr*2 + 1)&0xffff] = v;
 		       if( (ppu.vmain & BIT(7)) ) { vaddr+=incr; ppu.vmaddl=vaddr; ppu.vmaddh=vaddr>>8; }
 		      }return;
-		      
+
 	case 0x2121: ppu.cgadd = v; ppu.cgram_byte=0; return;
 	case 0x2122: if( ppu.cgram_byte == 0 )
 		     {
@@ -260,6 +260,23 @@ u8 snes::io_read(u8 bank, u32 a)
 		ppu.internal_oamadd &= 0x3ff;
 		return r;
 		}
+
+	case 0x2139: { 
+			if( ppu.vmain&12 ) { std::println("VMAIN = ${:X}", ppu.vmain); exit(1); }
+			u32 incr = 1;
+			if( (ppu.vmain&3)== 1 ) incr = 32; else if( (ppu.vmain&3) ) incr = 128; 
+			u32 vaddr = ((ppu.vmaddh<<8)|ppu.vmaddl)&0x7fff;
+		       u8 ret = ppu.vram[(vaddr*2)&0xffff];
+		       if( !(ppu.vmain & BIT(7)) ) { vaddr+=incr; ppu.vmaddl=vaddr; ppu.vmaddh=vaddr>>8; }
+		      return ret; }
+	case 0x213A: { 
+			if( ppu.vmain&12 ) { std::println("VMAIN = ${:X}", ppu.vmain); exit(1); }
+			u32 incr = 1;
+			if( (ppu.vmain&3)== 1 ) incr = 32; else if( (ppu.vmain&3) ) incr = 128; 
+			u32 vaddr = ((ppu.vmaddh<<8)|ppu.vmaddl)&0x7fff;
+		       u8 ret = ppu.vram[(vaddr*2 + 1)&0xffff];
+		       if( (ppu.vmain & BIT(7)) ) { vaddr+=incr; ppu.vmaddl=vaddr; ppu.vmaddh=vaddr>>8; }
+		      return ret; }
 	
 	case 0x213C: return 0;
 	case 0x213D:{ u8 r = ppu.vcounter>>(ppu.vcounter_ff * 8); ppu.vcounter_ff^=1; return r; } //todo: counters

@@ -32,6 +32,8 @@ void snes::render_sprites(u16* spr)
 			sprind[num_sprites++] = SI;
 		}
 	}
+	
+	//u32 pixels_drawn = 0;
 
 	for(u32 i = 0; i < num_sprites; ++i)
 	{
@@ -54,6 +56,8 @@ void snes::render_sprites(u16* spr)
 		
 		for(int px = 0; px < w && X+px < 256; ++px)
 		{
+			//pixels_drawn += 1;
+			//if( pixels_drawn >= 34*8 ) return;
 			if( X+px < 0 || spr[X+px] ) continue;
 			bool flipY = (ppu.oam[sprind[i]*4 + 3] & 0x80);
 			bool flipX = (ppu.oam[sprind[i]*4 + 3] & 0x40);
@@ -122,22 +126,42 @@ void snes::render_bg(u16* res, u32 bpp, u32 index)
 			Y &= 0x1ff; if( Y > 255 ) mapaddr += 0x800;
 			X &= 0x1ff; if( X > 255 ) mapaddr += 0x400;		
 			break;
-		}		
-		
-		Y &= 0xff;
-		X &= 0xff;
-		u16 mapentry = v16[(mapaddr + (Y/8)*32 + (X/8))&0x7fff];
-		u16 tile = mapentry & 0x3ff;
-		u16 w1 = v16[(charbase + tile*tilesize + ((Y&7)^((mapentry&BIT(15))?7:0)))&0x7fff];
-		u16 w2=0, w3=0, w4=0;
-		if( bpp >= 4 )
-		{
-			w2 = v16[(charbase + tile*tilesize + 8 + ((Y&7)^((mapentry&BIT(15))?7:0)))&0x7fff];
 		}
-		if( bpp == 8 )
-		{
-			w3 = v16[(charbase + tile*tilesize + 16 + ((Y&7)^((mapentry&BIT(15))?7:0)))&0x7fff];
-			w4 = v16[(charbase + tile*tilesize + 24 + ((Y&7)^((mapentry&BIT(15))?7:0)))&0x7fff];
+		
+		u16 w1=0, w2=0, w3=0, w4=0, mapentry=0;
+		if( (ppu.bgmode&(1u<<(index+3))) )
+		{ //todo: find better tests for 16x16 mode than the konami beam intro
+			Y &= 0xff;
+			X &= 0xff;
+			mapentry = v16[(mapaddr + (Y/16)*32 + (X/16))&0x7fff];
+			u16 tile = mapentry & 0x3ff;
+			if( (X&8) ) tile += 1;
+			if( (Y&8) ) tile += 16;
+			w1 = v16[(charbase + tile*tilesize + ((Y&7)^((mapentry&BIT(15))?7:0)))&0x7fff];
+			if( bpp >= 4 )
+			{
+				w2 = v16[(charbase + tile*tilesize + 8 + ((Y&7)^((mapentry&BIT(15))?7:0)))&0x7fff];
+			}
+			if( bpp == 8 )
+			{
+				w3 = v16[(charbase + tile*tilesize + 16 + ((Y&7)^((mapentry&BIT(15))?7:0)))&0x7fff];
+				w4 = v16[(charbase + tile*tilesize + 24 + ((Y&7)^((mapentry&BIT(15))?7:0)))&0x7fff];
+			}
+		} else {
+			Y &= 0xff;
+			X &= 0xff;
+			mapentry = v16[(mapaddr + (Y/8)*32 + (X/8))&0x7fff];
+			u16 tile = mapentry & 0x3ff;
+			w1 = v16[(charbase + tile*tilesize + ((Y&7)^((mapentry&BIT(15))?7:0)))&0x7fff];
+			if( bpp >= 4 )
+			{
+				w2 = v16[(charbase + tile*tilesize + 8 + ((Y&7)^((mapentry&BIT(15))?7:0)))&0x7fff];
+			}
+			if( bpp == 8 )
+			{
+				w3 = v16[(charbase + tile*tilesize + 16 + ((Y&7)^((mapentry&BIT(15))?7:0)))&0x7fff];
+				w4 = v16[(charbase + tile*tilesize + 24 + ((Y&7)^((mapentry&BIT(15))?7:0)))&0x7fff];
+			}
 		}
 		u8 pix = (X&7)^((mapentry&BIT(14))?0:7);
 		u8 b1 = (w1>>pix)&1;
@@ -343,7 +367,8 @@ void snes::ppu_draw_scanline()
 			}
 			u8 p = v16[(mapentry*64 + (Y&7)*8 + (X&7))&0x7fff] >> 8;
 			if( ((ppu.tm|ppu.ts)&16) && spr[x] ) fbuf[ppu.scanline*256 + x] = pal2c16(spr[x]);
-			else fbuf[ppu.scanline*256 + x] = pal2c16(p);
+			else 
+				fbuf[ppu.scanline*256 + x] = pal2c16(p);
 		}
 		return;
 	}
