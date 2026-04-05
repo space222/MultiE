@@ -30,6 +30,7 @@ public:
 	u8* framebuffer() override { return (u8*)&fbuf[0]; }
 	void reset() override 
 	{ 
+		master_stamp = cpu_stamp = 0;
 		cpu.E=1;
 		cpu.F.v = 0;
 		cpu.F.b.M = 1;
@@ -43,15 +44,23 @@ public:
 		cpu.S.v = 0x1FFF;
 		spc.pc = 0xffc0;
 		spcram[0xf1] = 0xb0;
-		memset(&apu, 0, sizeof(apu));
-		memset(&ppu, 0, sizeof(ppu));
+		//memset(&apu, 0, sizeof(apu));
+		//memset(&ppu, 0, sizeof(ppu));
+		apu = apu_t();
+		ppu = ppu_t();
+		io = io_t();
 		cpu_run = cpu.run();
 		spc_run = spc.run();
+		
+		gsu.pb = 0;
+		gsu.ramb = 0x70;
+		gsu.F.v = 0;
 	}
 	
 	s64 cpu_stamp=0;
 	u64 spc_div=0;
-
+	u64 master_stamp=0;
+	
 	void run_frame() override;
 	bool loadROM(std::string) override;
 	
@@ -82,14 +91,13 @@ public:
 	u8 superfx_cart_io_read(u32);
 	void superfx_cart_io_write(u32, u8);
 	
-	
 	void run_dma(u32 cn);
 	u16 keys();
 	
 	std::string savefile;
 	bool save_written=false;
 	
-	struct {
+	struct io_t {
 		u8 memsel=0, nmitimen=0, wrio=0;
 		u8 wrmpya=0, wrmpyb=0, wrdivl=0, wrdivh=0, wrdivb=0;
 		u8 htimel=0, htimeh=0, vtimel=0, vtimeh=0, mdmaen=0, hdmaen=0;
@@ -99,7 +107,7 @@ public:
 		u8 timeup=0;	
 	} io;
 	
-	struct {
+	struct ppu_t {
 		s64 master_cycles=0;
 		bool frame_complete=false;
 		int scanline=0;
@@ -163,7 +171,7 @@ public:
 	
 	enum phases { ADSR_ATTACK=0, ADSR_DECAY, ADSR_SUSTAIN, ADSR_RELEASE, ADSR_GAIN };
 		
-	struct {
+	struct apu_t {
 		u8 to_cpu[4]={0};
 		u8 to_spc[4]={0};
 		
@@ -241,6 +249,7 @@ public:
 	u8 gsu_read(u8, u16);
 	u16 gsu_add(u16,u16,u16);
 	u16 gsu_setSZ(u16);
+	void gsu_plot();
 
 	u16 fbuf[512*480];
 

@@ -3,6 +3,35 @@
 #include "util.h"
 #include "snes.h"
 
+u16 remap(u8 vmain, u16 a)
+{
+	u8 type = (vmain>>2)&3;
+	if( type == 0 ) return a;
+	
+	if( type == 1 )
+	{
+		u16 r = a & 0xff00;
+		u16 Y = (a >> 5) & 7;
+		u16 c = a & 0x1F;
+		return r | Y | (c<<3);	
+	}
+	
+	if( type == 2 )
+	{
+		u16 r = a & 0xfe00;
+		u16 Y = (a>>6) & 7;
+		u16 c = (a>>1) & 0x1F;
+		u16 P = a&1;
+		return r | Y | (P<<3) | (c<<4);
+	}
+	
+	u16 r = a & 0xfc00;
+	u16 Y = (a>>7)&7;
+	u16 c = (a>>2)&0x1F;
+	u16 P = a&3;
+	return r|(c<<5)|(P<<3)|Y;
+}
+
 void snes::io_write(u8 bank, u32 a, u8 v)
 {
 	if( a < 0x2000 ) { do_master_cycles(2); ram[a] = v; return; }
@@ -12,6 +41,7 @@ void snes::io_write(u8 bank, u32 a, u8 v)
 		{
 			SRAM[a&0x1fff] = v;
 		} else if( (cart.chipset>>4)==1 ) {
+			std::println("io ext wr ${:X} = ${:X}", a, v);
 			extram[a&0x1fff] = v;
 		}
 		return;
@@ -103,19 +133,19 @@ void snes::io_write(u8 bank, u32 a, u8 v)
 	case 0x2117: ppu.vmaddh = v; return;
 	
 	case 0x2118: { 
-			if( ppu.vmain&12 ) { std::println("VMAIN = ${:X}", ppu.vmain); exit(1); }
+			if( ppu.vmain&12 ) { std::println("VMAIN = ${:X}", ppu.vmain); /*exit(1);*/ }
 			u32 incr = 1;
 			if( (ppu.vmain&3)== 1 ) incr = 32; else if( (ppu.vmain&3) ) incr = 128; 
 			u32 vaddr = ((ppu.vmaddh<<8)|ppu.vmaddl)&0x7fff;
-		       ppu.vram[(vaddr*2)&0xffff] = v;
+		       ppu.vram[(remap(ppu.vmain, vaddr)*2)&0xffff] = v;
 		       if( !(ppu.vmain & BIT(7)) ) { vaddr+=incr; ppu.vmaddl=vaddr; ppu.vmaddh=vaddr>>8; }
 		      }return;
 	case 0x2119: { 
-			if( ppu.vmain&12 ) { std::println("VMAIN = ${:X}", ppu.vmain); exit(1); }
+			if( ppu.vmain&12 ) { std::println("VMAIN = ${:X}", ppu.vmain); /*exit(1);*/ }
 			u32 incr = 1;
 			if( (ppu.vmain&3)== 1 ) incr = 32; else if( (ppu.vmain&3) ) incr = 128; 
 			u32 vaddr = ((ppu.vmaddh<<8)|ppu.vmaddl)&0x7fff;
-		       ppu.vram[(vaddr*2 + 1)&0xffff] = v;
+		       ppu.vram[(remap(ppu.vmain, vaddr)*2 + 1)&0xffff] = v;
 		       if( (ppu.vmain & BIT(7)) ) { vaddr+=incr; ppu.vmaddl=vaddr; ppu.vmaddh=vaddr>>8; }
 		      }return;
 
@@ -192,7 +222,7 @@ void snes::io_write(u8 bank, u32 a, u8 v)
 	case 0x4209: io.vtimel = v; return;
 	case 0x420A: io.vtimeh = v&1; return;
 	case 0x420B: io.mdmaen = v;
-		     for(u32 i = 0; i < 8; ++i) { if( io.mdmaen & BIT(i) ) { run_dma(i); io.mdmaen&=~BIT(i); } }
+		     for(u32 i = 0; i < 8; ++i) { if( (io.mdmaen & BIT(i)) && !(io.hdmaen&BIT(i)) ) { run_dma(i); io.mdmaen&=~BIT(i); } }
 		     return;
 	case 0x420C: io.hdmaen = v; return;	
 	case 0x420D: io.memsel = v&1; return;
@@ -200,7 +230,8 @@ void snes::io_write(u8 bank, u32 a, u8 v)
 	case 0x211A: ppu.m7sel = v&0xc3; return;
 	default:
 		if( a >= 0x4300 && a < 0x4380 ) { ppu.dmaregs[a&0x7f] = v; return; }
-		std::println("${:X}:${:X}: io wr ${:X}:${:X} = ${:X}", cpu.pb>>16, cpu.pc, bank, a, v);
+		cart_io_write((bank<<16)|a, v);
+		//std::println("${:X}:${:X}: io wr ${:X}:${:X} = ${:X}", cpu.pb>>16, cpu.pc, bank, a, v);
 		//exit(1);
 		return;
 	}
@@ -215,6 +246,7 @@ u8 snes::io_read(u8 bank, u32 a)
 		{
 			return SRAM[a&0x1fff];
 		} else if( (cart.chipset>>4)==1 ) {
+			std::println("io ext rd ${:X}", a);
 			return extram[a&0x1fff];
 		}
 		return 0;
@@ -302,9 +334,9 @@ u8 snes::io_read(u8 bank, u32 a)
 	
 	default:
 		if( a >= 0x4300 && a < 0x4380 ) return ppu.dmaregs[a&0x7f];
-		break;
+		return cart_io_read((bank<<16)|a);
 	}
-	std::println("${:X}:${:X}: io rd ${:X}:${:X}", cpu.pb>>16, cpu.pc, bank, a);
+	//std::println("${:X}:${:X}: io rd ${:X}:${:X}", cpu.pb>>16, cpu.pc, bank, a);
 	//exit(1);
 	return 0;
 }
@@ -343,18 +375,6 @@ void snes::write(u32 addr, u8 v)
 	if( (bank&0x7F) >= 0x40 || (a & 0x8000) ) return romsel_write(addr, v);
 
 	
-	if( bank >= 0x70 && bank < 0x80 && a < 0x8000 )
-	{
-		//if( (cart.chipset>>4)==1 && bank < 0x72 )
-		//{
-		//	extram[(bank&1)*32_KB + a] = v;
-		//	return;
-		//}
-		std::println("sram wr ${:X}:${:X}", bank, a);
-		SRAM[((bank*32_KB) + a) % cart.ram_size] = v;
-		save_written = true;
-		return;
-	}
 
 	std::println("${:X}: snes wr ${:X}:${:X} = ${:X}", cpu.pc, bank, a, v);
 }
@@ -367,11 +387,6 @@ u8 snes::read(u32 addr)
 	if( bank == 0x7E || bank == 0x7F ) { do_master_cycles(2); return ram[((bank&1)<<16)|a]; }
 	// as is the io region, although io/rw might fall through to cart expansion io
 	if( (bank&0x7F) < 0x40 && a < 0x8000 ) { return io_read(bank, a); }
-	
-	if( cart.mapping == MAPPING_HIROM )
-	{
-		return ROM[((bank*64_KB) + a) % ROM.size()];
-	}
 	
 	if( (bank&0x7F) >= 0x40 || (a & 0x8000) ) return romsel_read(addr);
 		
@@ -395,6 +410,11 @@ void snes::do_master_cycles(s64 master_cycles)
 			spc_div = 0;
 			snd_clock();
 		}
+	}
+	master_stamp += master_cycles;
+	if( (cart.chipset>>4)==1 )
+	{
+		gsu_run();
 	}
 }
 
@@ -511,8 +531,16 @@ bool snes::loadROM(std::string fname)
 	cart.rom_size = (ROM[hd+0x17]*32_KB);
 	cart.ram_size = (1<<ROM[hd+0x18])*1024;
 	SRAM.resize(cart.ram_size);
-	cart.ext_size = ((cart.chipset>>4)==1) ? 64_KB : 0;
+	cart.ext_size = ((cart.chipset>>4)==1) ? 32_KB : 0;
 	extram.resize(cart.ext_size);
+	
+	if( (cart.chipset>>4) == 1 )
+	{
+		romsel_read = [&](u32 a)->u8 { return superfx_romsel_read(a); };
+		romsel_write = [&](u32 a, u8 v) { superfx_romsel_write(a,v); };
+		cart_io_read = [&](u32 a)->u8 { return superfx_cart_io_read(a); };
+		cart_io_write = [&](u32 a, u8 v) { superfx_cart_io_write(a,v); };
+	}
 		
 	savefile = fname;
 	auto pos = fname.rfind('.');
