@@ -1,29 +1,56 @@
 #include <print>
+#include <iostream>
 #include <cstdlib>
 #include "snes.h"
 
-#define check14(rn) if( (rn) == 14 ) gsu.rombuf = gread(gsu.romb, gsu.r[14])
+#define check14(rn) if( (rn) == 15 ) { gsu.r[15]-=1; } else if( (rn) == 14 ) gsu.rombuf = gread(gsu.romb, gsu.r[14])
+//#define check14(rn) if( (rn) == 14 ) gsu.rombuf = gread(gsu.romb, gsu.r[14])
 #define gread(b, a) gsu_read(b, a)
 #define gwrite(a, v) gsu_write(a, v)
-#define ALT1 gsu.F.b.a1
-#define ALT2 gsu.F.b.a2
+#define ALT1 (gsu.F.b.a1)
+#define ALT2 (gsu.F.b.a2)
 #define ALT3 (gsu.F.b.a1 && gsu.F.b.a2)
 #define FROM gsu.from_reg
 #define TO gsu.to_reg
 #define setsz(V) gsu_setSZ(V)
 
+
+static int num_stops = 0;
+
 void snes::gsu_exec(u8 opc)
 {
 	u16 t = 0;
+	//std::println("GSU:${:X}:${:X}: opc ${:X}", gsu.pb, gsu.r[15], opc);
 	switch( opc )
 	{
-	case 0x00: 
+	case 0x00: /*stop*/
+		if( gsu.fetch ) 
+		{ 
+			//std::println("${:X}: doing a ${:X} as stop delay slot", gsu.r[15], gsu.fetch);
+			opc = gsu.fetch;
+			gsu.fetch = gread(gsu.pb, ++gsu.r[15]);
+			gsu_exec(opc); 
+		}
 		gsu.F.b.GO = 0;
 		gsu.F.b.IRQ = 1;
-		cpu.irq_line = true;
+		//if( (gsu.cfg & 0x80) == 0 ) 
+		{
+			cpu.irq_line = true;
+		}
+		num_stops += 1;
+		if( num_stops == 4 )
+		{
+			//std::println("stopped for 4th time");
+			//fflush(stdout);
+			//exit(1);
+		}
 		break;
-	case 0x01: break; /*nop*/
-	case 0x02: break; /*cache*/
+	case 0x01: /*nop*/
+		//std::println("nop");
+		break;
+	case 0x02: /*cache*/
+		//std::println("cache");
+		break;
 	case 0x03: // lsr
 		gsu.F.b.C = gsu.r[FROM]&1;
 		gsu.r[TO] = setsz(gsu.r[FROM]>>1);
@@ -34,102 +61,102 @@ void snes::gsu_exec(u8 opc)
 		t = gsu.F.b.C;
 		gsu.F.b.C = gsu.r[FROM]>>15;
 		gsu.r[TO] = setsz( (gsu.r[FROM]<<1)|t );
-		break;	
+		break;
 	case 0x05: // bra
-		t = gread(gsu.pb, gsu.r[15]); gsu.r[15] += 1;
-		gsu.fetch = gread(gsu.pb, gsu.r[15]);
-		gsu.r[15] += s8(t) - 1;
+		t = gsu.r[15] + s8(gsu.fetch);
+		gsu.fetch = gread(gsu.pb, ++gsu.r[15]);
+		gsu.r[15] = t;
 		gsu.stamp += 1;
 		break;
 	case 0x06: // bge
 		gsu.stamp += 1;
-		t = gread(gsu.pb, gsu.r[15]); gsu.r[15] += 1;
-		gsu.fetch = gread(gsu.pb, gsu.r[15]);
+		t = gsu.r[15] + s8(gsu.fetch);
+		gsu.fetch = gread(gsu.pb, ++gsu.r[15]);
 		if( gsu.F.b.S == gsu.F.b.V )
 		{
-			gsu.r[15] += s8(t) - 1;
+			gsu.r[15] = t;
 		}
 		break;
 	case 0x07: // blt
 		gsu.stamp += 1;
-		t = gread(gsu.pb, gsu.r[15]); gsu.r[15] += 1;
-		gsu.fetch = gread(gsu.pb, gsu.r[15]);
+		t = gsu.r[15] + s8(gsu.fetch);
+		gsu.fetch = gread(gsu.pb, ++gsu.r[15]);
 		if( gsu.F.b.S != gsu.F.b.V )
 		{
-			gsu.r[15] += s8(t) - 1;
-		}
+			gsu.r[15] = t;
+		}		
 		break;
 	case 0x08: // bne
 		gsu.stamp += 1;
-		t = gread(gsu.pb, gsu.r[15]); gsu.r[15] += 1;
-		gsu.fetch = gread(gsu.pb, gsu.r[15]);
+		t = gsu.r[15] + s8(gsu.fetch);
+		gsu.fetch = gread(gsu.pb, ++gsu.r[15]);
 		if( gsu.F.b.Z == 0 )
 		{
-			gsu.r[15] += s8(t) - 1;
+			gsu.r[15] = t;
 		}
 		break;
 	case 0x09: // beq
 		gsu.stamp += 1;
-		t = gread(gsu.pb, gsu.r[15]); gsu.r[15] += 1;
-		gsu.fetch = gread(gsu.pb, gsu.r[15]);
+		t = gsu.r[15] + s8(gsu.fetch);
+		gsu.fetch = gread(gsu.pb, ++gsu.r[15]);
 		if( gsu.F.b.Z == 1 )
 		{
-			gsu.r[15] += s8(t) - 1;
-		}
+			gsu.r[15] = t;
+		}		
 		break;
 	case 0x0A: // bpl
 		gsu.stamp += 1;
-		t = gread(gsu.pb, gsu.r[15]); gsu.r[15] += 1;
-		gsu.fetch = gread(gsu.pb, gsu.r[15]);
+		t = gsu.r[15] + s8(gsu.fetch);
+		gsu.fetch = gread(gsu.pb, ++gsu.r[15]);
 		if( gsu.F.b.S == 0 )
 		{
-			gsu.r[15] += s8(t) - 1;
-		}
+			gsu.r[15] = t;
+		}		
 		break;
 	case 0x0B: // bmi
 		gsu.stamp += 1;
-		t = gread(gsu.pb, gsu.r[15]); gsu.r[15] += 1;
-		gsu.fetch = gread(gsu.pb, gsu.r[15]);
+		t = gsu.r[15] + s8(gsu.fetch);
+		gsu.fetch = gread(gsu.pb, ++gsu.r[15]);
 		if( gsu.F.b.S == 1 )
 		{
-			gsu.r[15] += s8(t) - 1;
-		}
+			gsu.r[15] = t;
+		}		
 		break;
 	case 0x0C: // bcc
 		gsu.stamp += 1;
-		t = gread(gsu.pb, gsu.r[15]); gsu.r[15] += 1;
-		gsu.fetch = gread(gsu.pb, gsu.r[15]);
+		t = gsu.r[15] + s8(gsu.fetch);
+		gsu.fetch = gread(gsu.pb, ++gsu.r[15]);
 		if( gsu.F.b.C == 0 )
 		{
-			gsu.r[15] += s8(t) - 1;
-		}
+			gsu.r[15] = t;
+		}		
 		break;
 	case 0x0D: // bcs
 		gsu.stamp += 1;
-		t = gread(gsu.pb, gsu.r[15]); gsu.r[15] += 1;
-		gsu.fetch = gread(gsu.pb, gsu.r[15]);
+		t = gsu.r[15] + s8(gsu.fetch);
+		gsu.fetch = gread(gsu.pb, ++gsu.r[15]);
 		if( gsu.F.b.C == 1 )
 		{
-			gsu.r[15] += s8(t) - 1;
-		}
+			gsu.r[15] = t;
+		}		
 		break;
 	case 0x0E: // bvc
 		gsu.stamp += 1;
-		t = gread(gsu.pb, gsu.r[15]); gsu.r[15] += 1;
-		gsu.fetch = gread(gsu.pb, gsu.r[15]);
+		t = gsu.r[15] + s8(gsu.fetch);
+		gsu.fetch = gread(gsu.pb, ++gsu.r[15]);
 		if( gsu.F.b.V == 0 )
 		{
-			gsu.r[15] += s8(t) - 1;
-		}
+			gsu.r[15] = t;
+		}		
 		break;
 	case 0x0F: // bvs
 		gsu.stamp += 1;
-		t = gread(gsu.pb, gsu.r[15]); gsu.r[15] += 1;
-		gsu.fetch = gread(gsu.pb, gsu.r[15]);
+		t = gsu.r[15] + s8(gsu.fetch);
+		gsu.fetch = gread(gsu.pb, ++gsu.r[15]);
 		if( gsu.F.b.V == 1 )
 		{
-			gsu.r[15] += s8(t) - 1;
-		}
+			gsu.r[15] = t;
+		}		
 		break;
 	case 0x10:
 	case 0x11:
@@ -147,12 +174,13 @@ void snes::gsu_exec(u8 opc)
 	case 0x1D:
 	case 0x1E:
 	case 0x1F:
-		gsu.to_reg = opc&15;
 		if( gsu.F.b.B )
 		{
-			gsu.r[TO] = gsu.r[FROM];
-			check14(TO);
+			gsu.r[opc&15] = gsu.r[FROM];
+			check14(opc&15);
 			break;
+		} else {
+			gsu.to_reg = opc&15;
 		}
 		return;
 	case 0x20:
@@ -199,8 +227,9 @@ void snes::gsu_exec(u8 opc)
 		setsz(gsu.r[12]);
 		if( gsu.F.b.Z==0 ) 
 		{ 
-			gsu.r[15]=gsu.r[13]-1; 
-		} 
+			gsu.r[15] = gsu.r[13] - 1;
+			//std::println("looped to ${:X}", gsu.r[13]);
+		}
 		break;
 		
 	case 0x40:
@@ -224,6 +253,7 @@ void snes::gsu_exec(u8 opc)
 			gsu.r[TO] |= gread(gsu.ramb, gsu.r[opc&15]^1)<<8;
 			gsu.stamp += 10;
 		}
+		check14(TO);
 		break;
 	case 0x4C: // plot / rpix
 		if( ALT1 )
@@ -393,9 +423,9 @@ void snes::gsu_exec(u8 opc)
 			gsu.pb = gsu.r[opc&15];
 			gsu.cache_base = gsu.r[FROM] & 0xfff0;
 			//todo: doc says "cache flags cleared"
-			gsu.r[15] = gsu.r[FROM];
+			gsu.r[15] = gsu.r[FROM]-1;
 		} else {
-			gsu.r[15] = gsu.r[opc&15];
+			gsu.r[15] = gsu.r[opc&15]-1;
 		}
 		break;
 	case 0x9E: // lob
@@ -448,22 +478,24 @@ void snes::gsu_exec(u8 opc)
 	case 0xAF: // ibt / lms
 		if( ALT1 )
 		{
-			t = gread(gsu.pb, gsu.r[15]++)<<1;
+			t = gsu.fetch<<1;
+			gsu.fetch = gread(gsu.pb, ++gsu.r[15]);
 			gsu.stamp += 12;
 			gsu.r[opc&15] = gread(gsu.ramb, t++);
 			gsu.r[opc&15] |= gread(gsu.ramb, t)<<8;
 			check14(opc&15);
 		} else if( ALT2 ) {
-			t = gread(gsu.pb, gsu.r[15]++)<<1;
+			t = gsu.fetch<<1;
+			gsu.fetch = gread(gsu.pb, ++gsu.r[15]);
 			gsu.stamp += 3;
 			gwrite(t++, gsu.r[opc&15]);
 			gwrite(t, gsu.r[opc&15]>>8);
 		} else {
 			gsu.stamp += 1;
-			gsu.r[opc&15] = (s8)gread(gsu.pb, gsu.r[15]++);
+			gsu.r[opc&15] = (s8)gsu.fetch;
+			gsu.fetch = gread(gsu.pb, ++gsu.r[15]);
 			check14(opc&15);
 		}
-		gsu.fetch = gread(gsu.pb, gsu.r[15]);
 		break;
 	case 0xB0:
 	case 0xB1:
@@ -481,13 +513,14 @@ void snes::gsu_exec(u8 opc)
 	case 0xBD:
 	case 0xBE:
 	case 0xBF:
-		gsu.from_reg = opc&15;
 		if( gsu.F.b.B )
 		{
-			gsu.r[TO] = setsz(gsu.r[FROM]);
+			gsu.r[TO] = setsz(gsu.r[opc&15]);
 			gsu.F.b.V = (gsu.r[TO]>>7)&1;
 			check14(TO);
 			break;
+		} else {
+			gsu.from_reg = opc&15;
 		}
 		return;
 	case 0xC0:
@@ -538,14 +571,23 @@ void snes::gsu_exec(u8 opc)
 		check14(opc&15);
 		break;		
 	case 0xDF: // getc
-		if( ALT3 ) {
-			gsu.romb = gsu.r[FROM];
-		} else if( ALT2 ) {
+	if(!ALT2) {
+   		gsu.color= gsu.rombuf;
+  } else if(!ALT1) {
+    		gsu.ramb = 0x70 | (gsu.r[FROM]&1);
+  } else {
+		gsu.romb = gsu.r[FROM] & 0x7f;
+  }
+	
+	/*
+		if( ALT2 ) {
 			gsu.ramb = 0x70 | (gsu.r[FROM]&1);
+		} else if( ALT3 ) {
+			gsu.romb = gsu.r[FROM];
 		} else {
 			gsu.color = gsu.rombuf;
 		}
-		break;
+	*/	break;
 	case 0xE0:
 	case 0xE1:
 	case 0xE2:
@@ -597,30 +639,32 @@ void snes::gsu_exec(u8 opc)
 	case 0xFF: // iwt  / lm
 		if( ALT1 )
 		{
-			t = gread(gsu.pb, gsu.r[15]++);
-			t |= gread(gsu.pb, gsu.r[15]++)<<8;
+			t = gsu.fetch;
+			t |= gread(gsu.pb, ++gsu.r[15])<<8;
+			gsu.fetch = gread(gsu.pb, ++gsu.r[15]);
 			gsu.r[opc&15] = gread(gsu.ramb, t++);
 			gsu.r[opc&15] |= gread(gsu.ramb, t)<<8;
 			gsu.stamp += 13;
 			check14(opc&15);
 		} else if( ALT2 ) {
-			t = gread(gsu.pb, gsu.r[15]++);
-			t |= gread(gsu.pb, gsu.r[15]++)<<8;
+			t = gsu.fetch;
+			t |= gread(gsu.pb, ++gsu.r[15])<<8;
+			gsu.fetch = gread(gsu.pb, ++gsu.r[15]);
 			gwrite(t++, gsu.r[opc&15]);
 			gwrite(t, gsu.r[opc&15]>>8);
 			gsu.stamp += 2;
 		} else {
-			t = gread(gsu.pb, gsu.r[15]++);
-			t |= gread(gsu.pb, gsu.r[15]++)<<8;
+			t = gsu.fetch;
+			t |= gread(gsu.pb, ++gsu.r[15])<<8;
+			gsu.fetch = gread(gsu.pb, ++gsu.r[15]);
 			gsu.r[opc&15] = t;
 			gsu.stamp += 2;
 			check14(opc&15);
 		}
-		gsu.fetch = gread(gsu.pb, gsu.r[15]);
 		break;	
-	case 0x3D: gsu.F.b.a1 = 1; return;
-	case 0x3E: gsu.F.b.a2 = 1; return;
-	case 0x3F: gsu.F.b.a1 = gsu.F.b.a2 = 1; return;
+	case 0x3D: gsu.F.b.a1 = 1; gsu.F.b.B = 0; return;
+	case 0x3E: gsu.F.b.a2 = 1; gsu.F.b.B = 0; return;
+	case 0x3F: gsu.F.b.a1 = gsu.F.b.a2 = 1; gsu.F.b.B = 0; return;
 	default:
 		std::println("GSU Unimpl opc = ${:X}", opc);
 		exit(1);
@@ -633,16 +677,16 @@ void snes::gsu_run()
 {
 	if( gsu.F.b.GO )
 	{
-		while( gsu.F.b.GO && gsu.stamp < master_stamp )
+		while( gsu.F.b.GO && gsu.stamp*2 < master_stamp )
 		{
 			u8 opc = gsu.fetch;
-			//std::println("GSU: opc ${:X}, next fetch ${:X}:${:X}", opc, gsu.pb, gsu.r[15]);
-			gsu.fetch = gread(gsu.pb, gsu.r[15]);
+			gsu.fetch = gread(gsu.pb, ++gsu.r[15]);
 			//std::println("fetch got ${:X}\n----", gsu.fetch);
+			//std::println("GSU:${:X}: opc ${:X}", gsu.r[15], opc);
 			gsu_exec(opc);
-			gsu.r[15] += 1;
 			gsu.stamp += 1;
 		}
+		if( !gsu.F.b.GO ) gsu.stamp = master_stamp;
 	} else {
 		gsu.stamp = master_stamp;
 	}
@@ -691,6 +735,7 @@ void snes::gsu_write(u16 addr, u8 v)
 		std::println("GSU: Unimpl write ${:X}:${:X}", gsu.ramb, addr);
 		return;
 	}
+	gsu.last_rdaddr = (gsu.ramb&1<<16)|addr;
 	extram[(((gsu.ramb&1)<<16)|addr) % cart.ext_size] = v;
 }
 
@@ -708,7 +753,7 @@ void snes::gsu_plot()
 	u32 Y = gsu.r[2];
 	u32 X = gsu.r[1]++;
 	
-	//std::println("PLOT ({}, {})", X, Y);
+	std::println("PLOT ({}, {})", X, Y);
 	
 	u32 htmode = ((gsu.scm>>2)&1)|((gsu.scm>>4)&2);
 	u32 cn = 0;
@@ -745,6 +790,8 @@ void snes::gsu_plot()
 		base += (cn<<6) + (Y&7)*2;
 		break;
 	}
+	
+	if( base + 48 >= 64_KB ) return;
 
 	u8 b = (X&7)^7;
 	extram[base] &= ~BIT(b);

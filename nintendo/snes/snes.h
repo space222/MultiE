@@ -212,7 +212,7 @@ public:
 	
 	struct {
 		u8 fetch; // pipeline byte
-		u8 to_reg, from_reg, pb, ramb, romb, rombuf, color, scb, scm;
+		u8 to_reg, from_reg, pb, ramb, romb, rombuf, color, scb, scm, cfg;
 		u16 r[16];
 		u16 last_rdaddr, plotopt;
 
@@ -240,7 +240,7 @@ public:
 		
 		u8 ccache[512];
 		u16 cache_base;
-		
+		bool pipeline_flush;
 		u64 stamp;
 	} gsu;
 	void gsu_exec(u8);
@@ -250,6 +250,7 @@ public:
 	u16 gsu_add(u16,u16,u16);
 	u16 gsu_setSZ(u16);
 	void gsu_plot();
+	void dump_gsu();
 
 	u16 fbuf[512*480];
 

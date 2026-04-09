@@ -63,8 +63,8 @@ u8 snes::superfx_romsel_read(u32 addr)
 {
 	u32 bank = addr>>16;
 	u32 a = addr&0xffff;
-	if( (bank&0x7F)<0x40 && (a&0x8000) ) return ROM[((bank*32_KB)+(a&0x7fff))%ROM.size()];
-	if( (bank&0x7F)>=0x40 && (bank&0x7F)<0x60 ) return ROM[((bank*64_KB)+a) % ROM.size()];
+	if( (bank&0x7F)<0x40 ) return ROM[((bank*32_KB)+(a&0x7fff))%ROM.size()];
+	if( (bank&0x7F)<0x60 ) return ROM[((bank*64_KB)+a) % ROM.size()];
 	if( bank==0x70 || bank==0x71 ) return extram[(((bank&1)*64_KB)+a) % extram.size()];
 	if( cart.ram_size && (bank==0x78||bank==0x79) ) return SRAM[(((bank&1)*64_KB)+a) % cart.ram_size];
 	
@@ -139,6 +139,7 @@ u8 snes::superfx_cart_io_read(u32 addr)
 	case 0x3034: return gsu.pb;
 
 	case 0x3036: return gsu.romb;
+	case 0x3037: return gsu.cfg;
 
 	case 0x303C: return gsu.ramb&1;
 	}
@@ -156,41 +157,26 @@ void snes::superfx_cart_io_write(u32 addr, u8 v)
 
 	switch( a )
 	{
-	case 0x3000: gsu.r[0] &= 0xff00; gsu.r[0] |= v; return;
-	case 0x3001: gsu.r[0] &= 0xff; gsu.r[0] |= v<<8; return;
-	case 0x3002: gsu.r[1] &= 0xff00; gsu.r[1] |= v; return;
-	case 0x3003: gsu.r[1] &= 0xff; gsu.r[1] |= v<<8; return;
-	case 0x3004: gsu.r[2] &= 0xff00; gsu.r[2] |= v; return;
-	case 0x3005: gsu.r[2] &= 0xff; gsu.r[2] |= v<<8; return;
-	case 0x3006: gsu.r[3] &= 0xff00; gsu.r[3] |= v; return;
-	case 0x3007: gsu.r[3] &= 0xff; gsu.r[3] |= v<<8; return;
-	case 0x3008: gsu.r[4] &= 0xff00; gsu.r[4] |= v; return;
-	case 0x3009: gsu.r[4] &= 0xff; gsu.r[4] |= v<<8; return;
-	case 0x300A: gsu.r[5] &= 0xff00; gsu.r[5] |= v; return;
-	case 0x300B: gsu.r[5] &= 0xff; gsu.r[5] |= v<<8; return;
-	case 0x300C: gsu.r[6] &= 0xff00; gsu.r[6] |= v; return;
-	case 0x300D: gsu.r[6] &= 0xff; gsu.r[6] |= v<<8; return;
-	case 0x300E: gsu.r[7] &= 0xff00; gsu.r[7] |= v; return;
-	case 0x300F: gsu.r[7] &= 0xff; gsu.r[7] |= v<<8; return;
-	case 0x3010: gsu.r[8] &= 0xff00; gsu.r[8] |= v; return;
-	case 0x3011: gsu.r[8] &= 0xff; gsu.r[8] |= v<<8; return;
-	case 0x3012: gsu.r[9] &= 0xff00; gsu.r[9] |= v; return;
-	case 0x3013: gsu.r[9] &= 0xff; gsu.r[9] |= v<<8; return;
-	case 0x3014: gsu.r[10] &= 0xff00; gsu.r[10] |= v; return;
-	case 0x3015: gsu.r[10] &= 0xff; gsu.r[10] |= v<<8; return;
-	case 0x3016: gsu.r[11] &= 0xff00; gsu.r[11] |= v; return;
-	case 0x3017: gsu.r[11] &= 0xff; gsu.r[11] |= v<<8; return;
-	case 0x3018: gsu.r[12] &= 0xff00; gsu.r[12] |= v; return;
-	case 0x3019: gsu.r[12] &= 0xff; gsu.r[12] |= v<<8; return;
-	case 0x301A: gsu.r[13] &= 0xff00; gsu.r[13] |= v; return;
-	case 0x301B: gsu.r[13] &= 0xff; gsu.r[13] |= v<<8; return;
-	case 0x301C: gsu.r[14] &= 0xff00; gsu.r[14] |= v; return;
-	case 0x301D: gsu.r[14] &= 0xff; gsu.r[14] |= v<<8; return;
-	case 0x301E: gsu.r[15] &= 0xff00; gsu.r[15] |= v; return;
-	case 0x301F: gsu.r[15] &= 0xff; gsu.r[15] |= v<<8; gsu.fetch = gsu_read(gsu.pb, gsu.r[15]); gsu.r[15]+=1; gsu.F.b.GO = 1; return;
+	case 0x3000: case 0x3001: case 0x3002: case 0x3003: case 0x3004: case 0x3005: case 0x3006:
+	case 0x3007: case 0x3008: case 0x3009: case 0x300A: case 0x300B: case 0x300C: case 0x300D:
+	case 0x300E: case 0x300F: case 0x3010: case 0x3011: case 0x3012: case 0x3013: case 0x3014:
+	case 0x3015: case 0x3016: case 0x3017: case 0x3018: case 0x3019: case 0x301A: case 0x301B:
+	case 0x301C: case 0x301D: case 0x301E:
+		gsu.r[(a>>1)&15] &= 0xff00>>((a&1)*8);
+		gsu.r[(a>>1)&15] |= v<<((a&1)*8);
+		return;
+	case 0x301F: 
+		gsu.r[15] &= 0xff; 
+		gsu.r[15] |= v<<8; 
+		std::println("gsu started at ${:X}", gsu.r[15]); 
+		gsu.r[15] -= 1;
+		gsu.fetch = 1;
+		gsu.F.b.GO = 1; 
+		return;
 
 	case 0x3034: gsu.pb = v; return;
 	case 0x3036: gsu.romb = v; return;
+	case 0x3037: gsu.cfg = v; return;
 	case 0x3038: gsu.scb = v; return;
 	
 	case 0x303A: gsu.scm = v; return;
@@ -201,7 +187,15 @@ void snes::superfx_cart_io_write(u32 addr, u8 v)
 	std::println("${:X}:${:X}: io wr ${:X}:${:X} = ${:X}", cpu.pb>>16, cpu.pc, bank, a, v);
 }
 
-
+void snes::dump_gsu()
+{
+	FILE* fp = fopen("gsu.dump", "wb");
+	for(u32 i = 0; i < 0x100; ++i)
+	{
+		fprintf(fp, "%x: $%x\n", gsu.r[15]+i, gsu_read(gsu.pb, gsu.r[15]+i));
+	}
+	fclose(fp);
+}
 
 
 

@@ -3,6 +3,8 @@
 #include "util.h"
 #include "snes.h"
 
+static u8 toggle = 0;
+
 u16 remap(u8 vmain, u16 a)
 {
 	u8 type = (vmain>>2)&3;
@@ -34,13 +36,12 @@ u16 remap(u8 vmain, u16 a)
 
 void snes::io_write(u8 bank, u32 a, u8 v)
 {
+	a &= 0xffff;
 	if( a < 0x2000 ) { do_master_cycles(2); ram[a] = v; return; }
 	if( a >= 0x6000 && a < 0x8000 )
 	{
-		if( cart.mapping == MAPPING_HIROM )
+		if( (cart.chipset>>4)==1 ) 
 		{
-			SRAM[a&0x1fff] = v;
-		} else if( (cart.chipset>>4)==1 ) {
 			std::println("io ext wr ${:X} = ${:X}", a, v);
 			extram[a&0x1fff] = v;
 		}
@@ -239,13 +240,12 @@ void snes::io_write(u8 bank, u32 a, u8 v)
 
 u8 snes::io_read(u8 bank, u32 a)
 {
+	a &= 0xffff;
 	if( a < 0x2000 ) { do_master_cycles(2); return ram[a]; }
 	if( a >= 0x6000 && a < 0x8000 )
 	{
-		if( cart.mapping == MAPPING_HIROM )
+		if( (cart.chipset>>4)==1 ) 
 		{
-			return SRAM[a&0x1fff];
-		} else if( (cart.chipset>>4)==1 ) {
 			std::println("io ext rd ${:X}", a);
 			return extram[a&0x1fff];
 		}
@@ -257,7 +257,7 @@ u8 snes::io_read(u8 bank, u32 a)
 	case 0x4016: return 1; // joypad1 rd
 	case 0x4017: return 1; // joypad2 rd
 	
-	case 0x4212: return (ppu.scanline>239 ? 0x80:0)|(ppu.master_cycles<340?0x40:0);
+	case 0x4212: return (ppu.scanline>239 ? 0x80:0)|(ppu.master_cycles<340?0x40:0) | (toggle^=1);
 	case 0x4213: return 0xff; //???
 	
 	case 0x4214: return io.quot;
@@ -279,7 +279,7 @@ u8 snes::io_read(u8 bank, u32 a)
 	case 0x2135: return io.multres>>8;
 	case 0x2136: return io.multres>>16;
 	
-	case 0x2137: ppu.vcounter = ppu.scanline; ppu.stat78|=BIT(6); return 0; //todo: HV counter latch
+	case 0x2137: ppu.vcounter = ppu.scanline; ppu.hcounter = (ppu.master_cycles/1364.f)*511; ppu.stat78|=BIT(6); return 0; //todo: HV counter latch
 	case 0x2138:{ 
 		u8 r = 0;
 		if( ppu.internal_oamadd >= 0x200 )
@@ -310,8 +310,8 @@ u8 snes::io_read(u8 bank, u32 a)
 		       if( (ppu.vmain & BIT(7)) ) { vaddr+=incr; ppu.vmaddl=vaddr; ppu.vmaddh=vaddr>>8; }
 		      return ret; }
 	
-	case 0x213C: return 0;
-	case 0x213D:{ u8 r = ppu.vcounter>>(ppu.vcounter_ff * 8); ppu.vcounter_ff^=1; return r; } //todo: counters
+	case 0x213C:{ u8 r = ppu.hcounter>>(ppu.vcounter_ff * 8); ppu.vcounter_ff^=1; return r; }
+	case 0x213D:{ u8 r = ppu.vcounter>>(ppu.vcounter_ff * 8); ppu.vcounter_ff^=1; return r; } //todo: better counters
 		
 	case 0x213F: ppu.vcounter_ff=0; return std::exchange(ppu.stat78, ppu.stat78&~BIT(6)); //todo: counter latch values
 	

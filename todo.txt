@@ -383,15 +383,13 @@ After responding to that, a bit more SIF traffic and then everything spins waiti
 
 Nintendo SNES
 ----------------
-1. HDMA
-2. Windows
-3. Color Math
-4. manual controller read
-5. HiROM
-6. Rest of BG modes (including offset-per-tile, mode 7)
-7. Coprocessors (SuperFX, SA-1)
-Status: A number of games are playable. BG Modes 0-3 supported with sprites (but no per-tile-offset)
-Some priority issues caused by lack of windows & color math.
+1. Windows
+2. Color Math
+3. manual controller read
+4. Rest of BG modes (offset-per-tile, mode 7, hi-res)
+5. Coprocessors (SuperFX, SA-1)
+Status: A number of games are playable. most lo-res bg modes supported with sprites (but no per-tile-offset)
+Some priority issues caused by lack of windows & color math. hdma and timing need work.
 
 
 
