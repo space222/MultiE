@@ -44,7 +44,9 @@ void snes::io_write(u8 bank, u32 a, u8 v)
 		{
 			std::println("io ext wr ${:X} = ${:X}", a, v);
 			extram[a&0x1fff] = v;
+			return;
 		}
+		cart_io_write((bank<<16)+a, v);
 		return;
 	}
 	//std::println("${:X}:${:X}: io wr ${:X}:${:X} = ${:X}", cpu.pb>>16, cpu.pc, bank, a, v);
@@ -249,7 +251,7 @@ u8 snes::io_read(u8 bank, u32 a)
 			std::println("io ext rd ${:X}", a);
 			return extram[a&0x1fff];
 		}
-		return 0;
+		return cart_io_read((bank<<16)+a);
 	}
 	//std::println("${:X}:${:X}: io rd ${:X}:${:X}", cpu.pb>>16, cpu.pc, bank, a);
 	switch( a )
@@ -415,6 +417,8 @@ void snes::do_master_cycles(s64 master_cycles)
 	if( (cart.chipset>>4)==1 )
 	{
 		gsu_run();
+	} else if( cart.chipset>=3 && cart.chipset<=5 ) {
+		dspn_run();
 	}
 }
 
@@ -540,6 +544,24 @@ bool snes::loadROM(std::string fname)
 		romsel_write = [&](u32 a, u8 v) { superfx_romsel_write(a,v); };
 		cart_io_read = [&](u32 a)->u8 { return superfx_cart_io_read(a); };
 		cart_io_write = [&](u32 a, u8 v) { superfx_cart_io_write(a,v); };
+	} else 	if( cart.chipset>=3 && cart.chipset<= 5 ) {
+		FILE* fdr = fopen("./bios/dsp1.rom", "rb");
+		if( !fdr )
+		{
+			std::println("Need ./bios/dsp1.rom for DSP-1 game");
+			return false;		
+		}
+		for(u32 i = 0; i < 2048; ++i)
+		{
+			u32 p = fgetc(fdr);
+			p |= fgetc(fdr)<<8;
+			p |= fgetc(fdr)<<16;
+			dspnPROM[i] = p;		
+		}
+		[[maybe_unused]] int uuu = fread(dspnDROM, 1, 2048, fdr);
+		fclose(fdr);
+		
+		//regular Lo/HiROM functions will handle the DSP status and data regs
 	}
 		
 	savefile = fname;
@@ -550,7 +572,7 @@ bool snes::loadROM(std::string fname)
 	
 	freadall(SRAM, fopen(savefile.c_str(), "rb"));
 	save_written = false;
-	
+		
 	return true;
 }
 

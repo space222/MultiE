@@ -5,6 +5,16 @@ u8 snes::lorom_romsel_read(u32 addr)
 {
 	u32 bank = addr>>16;
 	u32 a = addr & 0xffff;
+
+	if( (cart.chipset >= 3 && cart.chipset <= 5) && ((bank&0x7F)>=0x30) && ((bank&0x7F)<=0x3F) && (a&0x8000) )
+	{ // dsp-1
+		if( a < 0xc000 )
+		{
+			return dspn_data_rd();
+		} else {
+			return dspn_stat_rd();
+		}
+	}
 	
 	if( cart.ram_size && a < 0x8000 && bank >= 0x70 && bank < 0x7E )
 	{
@@ -18,6 +28,16 @@ void snes::lorom_romsel_write(u32 addr, u8 v)
 {
 	u32 bank = addr>>16;
 	u32 a = addr & 0xffff;
+	
+	if( (cart.chipset >= 3 && cart.chipset <= 5) && ((bank&0x7F)>=0x30) && ((bank&0x7F)<=0x3F) && (a&0x8000) )
+	{ // dsp-1
+		if( a < 0xc000 )
+		{
+			dspn_data_wr(v);
+		} else {
+			//dspn_stat_wr(v);
+		}
+	}
 
 	if( cart.ram_size && a < 0x8000 && bank >= 0x70 && bank < 0x7E )
 	{
@@ -40,7 +60,15 @@ u8 snes::hirom_cart_io_read(u32 addr)
 {
 	u32 bank = addr >> 16;
 	u32 a = addr & 0xffff;
-	if( cart.ram_size && addr>=0x6000 && addr<0x8000 && bank>=0x30 && bank<0x40 )
+	if( (cart.chipset >= 3 && cart.chipset <= 5) && bank<0x20 && a>=0x6000 && a<0x8000 )
+	{ //dsp-1
+		if( a < 0x7000 )
+		{
+			return dspn_data_rd();
+		}
+		return dspn_stat_rd();
+	}
+	if( cart.ram_size && a>=0x6000 && a<0x8000 && bank>=0x30 && bank<0x40 )
 	{
 		return SRAM[((bank-0x30)*8_KB + (a&0x1fff)) % cart.ram_size];
 	}
@@ -51,7 +79,17 @@ void snes::hirom_cart_io_write(u32 addr, u8 v)
 {
 	u32 bank = addr >> 16;
 	u32 a = addr & 0xffff;
-	if( cart.ram_size && addr>=0x6000 && addr<0x8000 && bank>=0x30 && bank<0x40 )
+	if( (cart.chipset >= 3 && cart.chipset <= 5) && bank<0x20 && a>=0x6000 && a<0x8000 )
+	{ //dsp-1
+		if( a < 0x7000 )
+		{
+			dspn_data_wr(v);
+		} else {
+			dspn_stat_wr(v);
+		}
+		return;
+	}
+	if( cart.ram_size && a>=0x6000 && a<0x8000 && bank>=0x30 && bank<0x40 )
 	{
 		SRAM[((bank-0x30)*8_KB + (a&0x1fff)) % cart.ram_size] = v;
 		return;

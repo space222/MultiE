@@ -55,6 +55,12 @@ public:
 		gsu.pb = 0;
 		gsu.ramb = 0x70;
 		gsu.F.v = 0;
+		
+		dspn.PC = 0;
+		dspn.SR.v = 0;
+		dspn.Fb.v = dspn.Fa.v = 0;
+		dspn.RP = 0x3ff;
+		dspn.stamp = 0;
 	}
 	
 	s64 cpu_stamp=0;
@@ -251,7 +257,72 @@ public:
 	u16 gsu_setSZ(u16);
 	void gsu_plot();
 	void dump_gsu();
+	
+	
+	struct {
+		union {
+			struct {
+				unsigned int S0 : 1;
+				unsigned int Z : 1;
+				unsigned int C : 1;
+				unsigned int OV0 : 1;
+				unsigned int S1 : 1;
+				unsigned int OV1 : 1;
+			} PACKED b;
+			u8 v;
+		} PACKED Fa, Fb;
+		
+		union {
+			struct {
+				unsigned int P : 2;
+				unsigned int pad : 5;
+				unsigned int EI : 1;
+				unsigned int SIC : 1;
+				unsigned int SOC : 1;
+				unsigned int DRC : 1;
+				unsigned int DMA : 1;
+				unsigned int DRS : 1;
+				unsigned int USF : 2;
+				unsigned int RQM : 1;
+			} PACKED b;
+			u16 v;
+		} PACKED SR;
 
+		u8 DP;
+		u16 RP, PC, STACK[16], K, L, AccA, AccB, TR, TRB;
+		u16 DR;
+		u16 SI,SO;
+		
+		u16 ram[256];
+		int sp;
+		u16 srcval;
+		u64 stamp;
+	} dspn;
+	u32 dspnPROM[2048];
+	u16 dspnDROM[1024];
+	void dspn_run();
+	void dspn_exec();
+	u32 dspn_src(u32);
+	void dspn_dst(u32, u32);
+	u32 dspn_P(u32);
+	
+	void dspn_data_wr(u8);
+	u8 dspn_data_rd();
+	u8 dspn_stat_rd();
+	void dspn_stat_wr(u8);
+	
+	void dspn_push(u32 v)
+	{
+		dspn.STACK[dspn.sp&7] = v;
+		dspn.sp += 1;
+	}
+	
+	u32 dspn_pop()
+	{
+		dspn.sp -= 1;
+		return dspn.STACK[dspn.sp&7];
+	}
+	
 	u16 fbuf[512*480];
 
 	c65816 cpu;
