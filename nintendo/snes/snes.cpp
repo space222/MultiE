@@ -279,7 +279,7 @@ u8 snes::io_read(u8 bank, u32 a)
 	case 0x2135: return io.multres>>8;
 	case 0x2136: return io.multres>>16;
 	
-	case 0x2137: ppu.vcounter = ppu.scanline; ppu.hcounter = (ppu.master_cycles/1364.f)*511; ppu.stat78|=BIT(6); return 0; //todo: HV counter latch
+	case 0x2137: ppu.vcounter = ppu.scanline; ppu.hcounter = (ppu.master_cycles/1364.f)*340; ppu.stat78|=BIT(6); return 0; //todo: HV counter latch
 	case 0x2138:{ 
 		u8 r = 0;
 		if( ppu.internal_oamadd >= 0x200 )
