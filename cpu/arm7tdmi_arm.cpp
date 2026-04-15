@@ -804,11 +804,12 @@ void arm7_ldst_m(arm& cpu, u32 opc)
 	const bool S = opc & BIT(22);
 	const bool W = opc & BIT(21);
 	const bool L = opc & BIT(20);
-	const int Rn = (opc>>16)&15;
+	const u32 Rn = (opc>>16)&15;
 	const u32 rlist = opc&0xffff;
 	
 	u32 base = cpu.r[Rn] - (U ? 0 : std::popcount(rlist)*4);
 	u32 start = base;
+	u32 end = start + std::popcount(rlist)*4;
 	ARM_CYCLE ctype = ARM_CYCLE::N;
 	
 	if( !rlist )
@@ -820,10 +821,12 @@ void arm7_ldst_m(arm& cpu, u32 opc)
 				cpu.r[15] = cpu.read(base&~3, 32, ARM_CYCLE::N);
 				cpu.flushp();
 			} else {
+				base = cpu.r[Rn] - (U ? 0 : 0x40);
+				if( Pre ) base += 4;
 				cpu.write(base&~3, cpu.r[15]+4, 32, ARM_CYCLE::N);
 			}
+			cpu.r[Rn] += U ? 0x40 : -0x40;
 		}
-		cpu.r[Rn] += 0x40;//(U ? 0x40 : -0x40);
 		return;
 	}
 	
@@ -849,7 +852,12 @@ void arm7_ldst_m(arm& cpu, u32 opc)
 				}
 			}
 		} else {
-			cpu.write(base&~3, (S ? cpu.getUserReg(i) : cpu.r[i]) + (i==15 ? 4:0), 32, ctype);
+			u32 val = (S ? cpu.getUserReg(i) : cpu.r[i]) + (i==15 ? 4:0);
+			if( cpu.armV<5 && (rlist & BIT(Rn)) && Rn != std::countr_zero(rlist) )
+			{
+				val = U ? end : start;
+			}
+			cpu.write(base&~3, val, 32, ctype);
 		}
 		ctype = ARM_CYCLE::S;
 		if( !Pre ) base += 4;	
@@ -857,15 +865,18 @@ void arm7_ldst_m(arm& cpu, u32 opc)
 	
 	if( W )
 	{
-		if( L && (rlist & BIT(Rn)) )
+		if( L )
 		{
-			if( cpu.armV < 5 )
+			if( rlist & BIT(Rn) )
 			{
-				return;
-			} else {
-				bool islastreg = Rn == (15-std::countl_zero(rlist));
-				bool isonlyreg = (rlist == BIT(Rn));
-				if( !(isonlyreg || !islastreg) ) return;
+				if( cpu.armV < 5 )
+				{
+					return;
+				} else {
+					bool islastreg = Rn == (15u-std::countl_zero(rlist));
+					bool isonlyreg = (rlist == BIT(Rn));
+					if( !(isonlyreg || !islastreg) ) return;
+				}
 			}
 		}
 		cpu.r[Rn] = (U ? base : start);
