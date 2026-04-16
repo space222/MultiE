@@ -142,8 +142,8 @@ Status: YM2612 uses the Nuken OPN library... Poorly? Fantastic Dizzy and UMK3 la
 
 GBA Todo List
 ----------------
-1. Use the newer input settings
-2. complete arm.gba
+1. figure out why solution for tests 522+ in arm.gba result in STMxx fails in armwrestler
+2. Use the newer input settings
 3. psg sound
 4. have rtc actually return date&time rather than set values to make Emerald not complain.
 5. implement mode 5, affine support for mode 3, and write a blender function for modes 3&5.

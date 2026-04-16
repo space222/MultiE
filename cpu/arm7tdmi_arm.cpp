@@ -14,10 +14,15 @@ void arm7_mul(arm& cpu, u32 opc)
 	const u32 Rn = cpu.r[(opc>>12)&15];
 	const u32 Rm = cpu.r[opc&15];
 	u32& Rd = cpu.r[(opc>>16)&15];
-	Rd = Rs * Rm;
-	if( opc & BIT(21) ) Rd += Rn;
-	if( SBIT ) { setNZ(Rd); }
-	if( ((opc>>16)&15) == 15 ) cpu.flushp();
+	if( ((opc>>16)&15) != 15 )
+	{
+		Rd = Rs * Rm;
+		if( opc & BIT(21) ) Rd += Rn;
+		if( SBIT ) { setNZ(Rd); }
+	} else {
+		//std::println("mul(${:X}) Rd{}, Rs{}, Rn{}, Rm{}", opc, (opc>>16)&15, (opc>>8)&15, (opc>>12)&15, opc&15);
+	}
+	//if( ((opc>>16)&15) == 15 ) cpu.flushp();
 }
 
 void arm7_mul_long(arm& cpu, u32 opc)
@@ -809,8 +814,10 @@ void arm7_ldst_m(arm& cpu, u32 opc)
 	
 	u32 base = cpu.r[Rn] - (U ? 0 : std::popcount(rlist)*4);
 	u32 start = base;
-	u32 end = start + std::popcount(rlist)*4;
+	u32 end = U ? start + std::popcount(rlist)*4 : base;
 	ARM_CYCLE ctype = ARM_CYCLE::N;
+	
+	const u32 first = std::countr_zero(rlist);
 	
 	if( !rlist )
 	{
@@ -825,7 +832,7 @@ void arm7_ldst_m(arm& cpu, u32 opc)
 				if( Pre ) base += 4;
 				cpu.write(base&~3, cpu.r[15]+4, 32, ARM_CYCLE::N);
 			}
-			cpu.r[Rn] += U ? 0x40 : -0x40;
+			if(W) cpu.r[Rn] += U ? 0x40 : -0x40;
 		}
 		return;
 	}
@@ -853,9 +860,9 @@ void arm7_ldst_m(arm& cpu, u32 opc)
 			}
 		} else {
 			u32 val = (S ? cpu.getUserReg(i) : cpu.r[i]) + (i==15 ? 4:0);
-			if( cpu.armV<5 && (rlist & BIT(Rn)) && Rn != std::countr_zero(rlist) )
+			if( cpu.armV<5 && W && i == first )
 			{
-				val = U ? end : start;
+				cpu.r[Rn] = end;
 			}
 			cpu.write(base&~3, val, 32, ctype);
 		}
@@ -878,8 +885,8 @@ void arm7_ldst_m(arm& cpu, u32 opc)
 					if( !(isonlyreg || !islastreg) ) return;
 				}
 			}
-		}
-		cpu.r[Rn] = (U ? base : start);
+			cpu.r[Rn] = (U ? base : start);
+		}		
 	}
 }
 

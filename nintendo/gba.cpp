@@ -271,6 +271,16 @@ gba::gba() : sched(new Scheduler(this)), lcd(vram, palette, oam)
 	setVsync(false);
 }
 
+void dump_log(arm& cpu)
+{
+	static FILE* fp = fopen("armlog.bin", "wb");
+	if( cpu.r[15] < 0x40000 ) return;
+	for(u32 i = 0; i < 16; ++i) fwrite(&cpu.r[i], 1, 4, fp);
+	fwrite(&cpu.cpsr.v, 1, 4, fp);
+	fwrite(&cpu.cpsr.v, 1, 4, fp);
+	fflush(fp);
+}
+
 void gba::run_frame()
 {
 	frame_complete = false;
@@ -278,6 +288,7 @@ void gba::run_frame()
 	{
 		if( !halted )
 		{
+			//dump_log(cpu);
 			cpu.step();
 		} else {
 			if( sched->next_stamp() == 0xffffFFFFffffFFFFull )
