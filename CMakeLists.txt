@@ -34,6 +34,7 @@ sega/dc/sound.cpp cpu/arm7di.cpp cpu/8086.cpp cpu/286.cpp ibm/ibmpc.cpp ibm/ibmp
 sony/ps2/iop.cpp cpu/EEngine.cpp sony/ps2/gs.cpp cpu/6809.cpp other/trs80cc3.cpp other/trs80cc3_fdc.cpp
 other/vectrex.cpp cpu/65816.cpp nintendo/snes/snes.cpp nintendo/snes/ppu.cpp cpu/spc700.cpp nintendo/snes/snd.cpp
 nintendo/snes/superfx.cpp nintendo/snes/cart.cpp nintendo/snes/dspn.cpp nintendo/pokemini.cpp cpu/s1c88.cpp
+cpu/arm946e.cpp nintendo/ds/nds.cpp nintendo/ds/arm7.cpp nintendo/ds/arm9.cpp
 #stub/gdb_stub.cpp
 )
 

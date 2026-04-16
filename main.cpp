@@ -57,6 +57,7 @@
 #include "other/vectrex.h"
 #include "nintendo/snes/snes.h"
 #include "nintendo/pokemini.h"
+#include "nintendo/ds/nds.h"
 void try_kirq();
 void gdb_start();
 extern std::atomic<int> gdb_active;
@@ -341,7 +342,7 @@ void imgui_run()
 						}
 						else newinstance = true;
 						crt_scale = 2;
-					}				
+					}
 				}
 				if( ImGui::MenuItem("NES") )
 				{
@@ -560,6 +561,22 @@ void imgui_run()
 			}
 			if( ImGui::BeginMenu("Alpha") )
 			{
+				if( ImGui::MenuItem("Nintendo DS") )
+				{
+					std::string f = getOpenFile("Nintendo DS");
+					if( !f.empty() )
+					{
+						delete sys;
+						sys = new nds;
+						if( ! sys->loadROM(f) ) 
+						{
+							printf("unable to load ROM\n");
+							exit(1);
+						}
+						else newinstance = true;
+						crt_scale = 2.f;
+					}				
+				}			
 				if( ImGui::MenuItem("Pokemon Mini") )
 				{
 					std::string f = getOpenFile("Pokemon Mini");
