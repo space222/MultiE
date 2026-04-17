@@ -27,6 +27,9 @@ pif = "bios/pifdata.bin"
 bios = "bios/GBABIOS.BIN"
 player1 = ["key:z","key:x", "key:a","key:s", "key:q", "key:w", "key:up","key:down","key:left","key:right" ]
 
+[nds]
+player1 = ["key:z","key:x", "key:a","key:s", "key:q", "key:w", "key:up","key:down","key:left","key:right" ]
+
 [gamecube]
 bios = "./bios/gc-ntsc-12.bin"
 

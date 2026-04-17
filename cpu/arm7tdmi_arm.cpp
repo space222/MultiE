@@ -734,6 +734,7 @@ void arm7_ldst_reg(arm& cpu, u32 opc)
 			if( cpu.armV >= 5 && (val & 1) )
 			{
 				cpu.cpsr.b.T = 1;
+				cpu.r[15] &= ~1;
 			}
 			cpu.flushp();
 		}
@@ -784,6 +785,7 @@ void arm7_ldst_imm(arm& cpu, u32 opc)
 			if( cpu.armV >= 5 && (val & 1) )
 			{
 				cpu.cpsr.b.T = 1;
+				cpu.r[15] &= ~1;
 			}		
 			cpu.flushp();
 		}
@@ -886,7 +888,9 @@ void arm7_ldst_m(arm& cpu, u32 opc)
 				}
 			}
 			cpu.r[Rn] = (U ? base : start);
-		}		
+		} else if( cpu.armV>=5 ) {
+			cpu.r[Rn] = (U ? base : start);
+		}
 	}
 }
 

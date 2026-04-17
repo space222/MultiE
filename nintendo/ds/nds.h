@@ -23,11 +23,15 @@ public:
 	
 	u32 arm9_fetch(u32, int, ARM_CYCLE);
 	
+	u32 arm9_io_read(u32 a, int sz);
+	
 	u32 arm7_read(u32, int, ARM_CYCLE);
 	void arm7_write(u32, u32, int, ARM_CYCLE);
 
 	u32 arm9_read(u32, int, ARM_CYCLE);
 	void arm9_write(u32, u32, int, ARM_CYCLE);
+	
+	u16 keys();
 
 	std::vector<u8> ROM;
 

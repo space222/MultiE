@@ -37,10 +37,94 @@ void arm7_ldst_m(arm& cpu, u32 opc);
 void arm7_bx(arm&, u32);
 void arm7_mul_long(arm&, u32);
 
-arm7_instr arm946e::decode_arm(u32 cc)
+void arm9_stcldc(arm& cpu, u32 opc)
 {
+	
+}
+
+void arm9_cdp(arm& cpu, u32 opc)
+{
+	
+}
+
+void arm9_mcr(arm& cpu, u32 opc)
+{
+	u32 cp_op = (opc>>21)&7;
+	u32 Cn = (opc>>16)&15;
+	u32 Rd = (opc>>12)&15;
+	u32 Pn = (opc>>8)&15;
+	u32 CP = (opc>>5)&7;
+	u32 Cm = opc&15;
+	if( Pn != 15 ) return; // ??
+	
+	if( opc & BIT(20) )
+	{ // cop to arm
+		if( cp_op == 0 && Cn == 0 && Cm == 0 && CP == 1 )
+		{
+			cpu.r[Rd] = 0x0F0D2112;
+		} else {
+			std::println("copread P{}, cp_op{}, Cn{}, Cm{}, CP{}, Rd(${:X})", Pn, cp_op, Cn, Cm, CP, cpu.r[Rd]);
+		}
+	} else {
+		std::println("copwrite P{}, cp_op{}, Cn{}, Cm{}, CP{}, Rd(${:X})", Pn, cp_op, Cn, Cm, CP, cpu.r[Rd]);	
+	}
+}
+
+void arm9_blx(arm& cpu, u32 opc)
+{
+	std::println("BLX!");
+	//exit(1);
+}
+
+void arm9_clz(arm& cpu, u32 opc)
+{
+	const u32 Rd = (opc>>12)&15;
+	const u32 Rm = (opc&15);
+	cpu.r[Rd] = std::countl_zero(cpu.r[Rm]);
+}
+
+void arm9_qadd(arm& cpu, u32 opc)
+{
+	s32 Rn = cpu.r[(opc>>16)&15];
+	s32 Rm = cpu.r[opc&15];
+	u32& Rd = cpu.r[(opc>>12)&15];
+	
+	if( opc & BIT(22) ) { Rn *= 2; }
+	
+	s64 res = Rm;
+	if( opc & BIT(21) )
+	{
+		res -= Rn;
+	} else {
+		res += Rn;
+	}
+	
+	if( res > 0x7FFFffffLL  )
+	{
+		res = 0x7FFFffff;
+		cpu.cpsr.b.Q = 1;
+	} else if( res < -0x80000000LL ) {
+		res = 0x80000000u;
+		cpu.cpsr.b.Q = 1;
+	}
+	
+	Rd = res;
+}
+
+
+arm7_instr arm946e::decode_arm(u32 opcode)
+{
+	//todo: with v5+ some opcodes can no longer be decoded with only the 12bits used later on
+	//	or can they?
+
+
+
+	u32 cc = ((opcode>>16)&0xff0) | ((opcode>>4)&15);
 	if( (cc&0xfcf) == 9 ) { return arm7_mul; }
 	if( (cc&0xf8f) == 0x89 ) { return arm7_mul_long; }
+	//todo: fit the half-word muls here
+	
+	
 	if( (cc&0xfbf) == 0x109) { return arm7_single_swap; }
 
 	if( (cc&0xe0f) == 0xB ) { return arm7_xfer_half; }
@@ -51,7 +135,14 @@ arm7_instr arm946e::decode_arm(u32 cc)
 	if( (cc&0xfb0) == 0x320 ) { return arm7_msr_imm; }
 
 	if( (cc&0xfff) == 0x121 ) { return arm7_bx; }
-
+	
+	// 0001 0110 0001  CLZ
+	if( (cc&0xfff) == 0x161 ) { return arm9_clz; }
+	// 0001 0010 0011  BLX (register)
+	if( (cc&0xfff) == 0x123 ) { return arm9_blx; }
+	// 0001 0..0 0101 QADD,etc
+	if( (cc&0xf9f) == 0x105 ) { return arm9_qadd; }
+	
 	if( (cc&0xfb0) == 0x300 ) { return undef_instr; } // the undef in the middle of dataproc
 	if( (cc&0xe00) == 0x000 || (cc&0xe00) == 0x200 )
 	{  // data proccessing
@@ -93,6 +184,10 @@ arm7_instr arm946e::decode_arm(u32 cc)
 			cpu.flushp();
 		};
 	}
+	
+	if( (cc&0xe00) == 0xc00 ) { return arm9_stcldc; }
+	if( (cc&0xf01) == 0xe00 ) { return arm9_cdp; }
+	if( (cc&0xf01) == 0xe01 ) { return arm9_mcr; }
 
 	if( (cc&0xf00) == 0xf00 )
 	{   // SWI
@@ -113,10 +208,18 @@ arm7_instr arm946e::decode_arm(u32 cc)
 
 void arm946e::flushp() 
 {
-	r[15] &= ~3;
-	decode = read(r[15], 32, ARM_CYCLE::N);
-	r[15] += 4;
-	fetch = read(r[15], 32, ARM_CYCLE::S);
+	if( cpsr.b.T )
+	{
+		r[15] &= ~1;
+		decode = inst_fetch(r[15], 16, ARM_CYCLE::N);
+		r[15] += 2;
+		fetch = inst_fetch(r[15], 16, ARM_CYCLE::S);	
+	} else {
+		r[15] &= ~3;
+		decode = inst_fetch(r[15], 32, ARM_CYCLE::N);
+		r[15] += 4;
+		fetch = inst_fetch(r[15], 32, ARM_CYCLE::S);
+	}
 }
 
 void arm946e::step()
@@ -139,7 +242,7 @@ void arm946e::step()
 	fetch = inst_fetch(r[15]&(cpsr.b.T?~1:~3), (cpsr.b.T ? 16 : 32), ARM_CYCLE::X);
 	u32 opc = execute;
 	
-	//if( r[15] > 0x08000740 ) std::println("${:X}:{:X}: opc = ${:X}", r[15] - (cpsr.b.T?4:8), u32(cpsr.b.T), opc);
+	//std::println("${:X}:{:X}: opc = ${:X}", r[15] - (cpsr.b.T?4:8), u32(cpsr.b.T), opc);
 	
 	if( r[15] >= 0x10000000u )
 	{
@@ -151,9 +254,14 @@ void arm946e::step()
 	{
 		decode_thumb(opc)(*this, opc);
 	} else {
+		if( (opc>>28) == 0xF )
+		{
+			std::println("condF! opc = ${:X}", opc);
+			exit(1);
+		}
 		if( isCond(opc>>28) ) 
 		{
- 			decode_arm(((opc>>16)&0xff0) | ((opc>>4)&15))(*this, opc);
+ 			decode_arm(opc)(*this, opc);
 		}
 	}
 	stamp+=1;
@@ -419,8 +527,16 @@ arm7_instr arm946e::decode_thumb(u16 opc)
 		}
 		return (opc&BIT(11)) ? thumb15_ldmia : thumb15_stmia;
 	case 7:
-		if( opc&BIT(12) ) return thumb19_bl;
-		return thumb18_b;
+		switch( ((opc>>11)&3) )
+		{
+		case 0: return thumb18_b;
+		
+		
+		case 3: return thumb19_bl;
+		default:
+			std::println("branch thumb opcode ${:X}", opc);
+			exit(1);
+		}
 	default: break;
 	}
 	std::println("thumb_decode error");
