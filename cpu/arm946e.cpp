@@ -420,7 +420,22 @@ void thumb15_ldmia(arm&, u32);
 void thumb16_bcc(arm&, u32);
 void thumb17_swi(arm&, u32);
 void thumb18_b(arm&, u32);
-void thumb19_bl(arm&, u32);
+
+void arm9_thumb19_bl(arm& cpu, u32 opc)
+{
+	if( ((opc>>11)&3) == 0b10 )
+	{
+		cpu.r[14] = cpu.r[15] + ((opc&0x7ff)<<12) + ((opc&0x400)?0xff800000u:0);
+	} else {
+		u32 temp = (cpu.r[15]-2)|1;
+		cpu.r[15] = cpu.r[14] + ((opc&0x7ff)<<1);
+		//std::println("thumb bl to ${:X}", cpu.r[15]);
+		cpu.r[15] |= 1;
+		cpu.r[14] = temp;
+		if( (opc&BIT(12)) == 0 ) { cpu.r[15] &= ~3; cpu.cpsr.b.T = 0; }
+		cpu.flushp();
+	}
+}
 
 arm7_instr arm946e::decode_thumb(u16 opc)
 {
@@ -527,16 +542,11 @@ arm7_instr arm946e::decode_thumb(u16 opc)
 		}
 		return (opc&BIT(11)) ? thumb15_ldmia : thumb15_stmia;
 	case 7:
-		switch( ((opc>>11)&3) )
+		if( ((opc>>11)&3) == 0 )
 		{
-		case 0: return thumb18_b;
-		
-		
-		case 3: return thumb19_bl;
-		default:
-			std::println("branch thumb opcode ${:X}", opc);
-			exit(1);
+			return thumb18_b;
 		}
+		return arm9_thumb19_bl;
 	default: break;
 	}
 	std::println("thumb_decode error");

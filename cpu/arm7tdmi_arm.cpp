@@ -878,14 +878,16 @@ void arm7_ldst_m(arm& cpu, u32 opc)
 		{
 			if( rlist & BIT(Rn) )
 			{
-				if( cpu.armV < 5 )
+				if( cpu.armV >= 5 )
 				{
-					return;
-				} else {
-					bool islastreg = Rn == (15u-std::countl_zero(rlist));
+					bool islastreg = (Rn == (15u-std::countl_zero(u16(rlist))));
 					bool isonlyreg = (rlist == BIT(Rn));
-					if( !(isonlyreg || !islastreg) ) return;
+					if( (isonlyreg || !islastreg) )
+					{
+						cpu.r[Rn] = (U ? base : start);
+					}
 				}
+				return;
 			}
 			cpu.r[Rn] = (U ? base : start);
 		} else if( cpu.armV>=5 ) {
