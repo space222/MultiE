@@ -72,8 +72,16 @@ void arm9_mcr(arm& cpu, u32 opc)
 
 void arm9_blx(arm& cpu, u32 opc)
 {
-	std::println("BLX!");
-	//exit(1);
+	u32 retval = cpu.r[15] - 4;
+	
+	//u32 L = cpu.r[15] - 8;
+	cpu.r[15] = cpu.r[opc&15];
+	//std::println("${:X}: BLX to ${:X}", L, cpu.r[15]);
+	cpu.cpsr.b.T = cpu.r[15]&1;
+	cpu.r[15] &= ((cpu.r[15]&1)?~1:~3);
+	cpu.flushp();
+	 
+	cpu.r[14] = retval;
 }
 
 void arm9_clz(arm& cpu, u32 opc)
@@ -116,7 +124,7 @@ arm7_instr arm946e::decode_arm(u32 opcode)
 {
 	//todo: with v5+ some opcodes can no longer be decoded with only the 12bits used later on
 	//	or can they?
-
+	
 
 
 	u32 cc = ((opcode>>16)&0xff0) | ((opcode>>4)&15);
@@ -133,7 +141,6 @@ arm7_instr arm946e::decode_arm(u32 opcode)
 	if( (cc&0xfbf) == 0x100 ) { return arm7_mrs; }
 	if( (cc&0xfbf) == 0x120 ) { return arm7_msr_reg; }
 	if( (cc&0xfb0) == 0x320 ) { return arm7_msr_imm; }
-
 	if( (cc&0xfff) == 0x121 ) { return arm7_bx; }
 	
 	// 0001 0110 0001  CLZ
@@ -257,10 +264,18 @@ void arm946e::step()
 		if( (opc>>28) == 0xF )
 		{
 			std::println("condF! opc = ${:X}", opc);
-			exit(1);
-		}
-		if( isCond(opc>>28) ) 
-		{
+			if( ((opc>>25)&7) == 5 )
+			{
+				u32 retval = r[15] - 4;
+				s32 offs = s32(opc<<8)>>8;
+				u32 L = r[15] - 8;
+				r[15] += offs*4 + ((opc&BIT(24)) ? 2:0);
+				std::println("${:X}: BLX imm to ${:X}", L, r[15]);
+				cpsr.b.T = 1;
+				flushp();
+		 		r[14] = retval;
+	 		}
+		} else if( isCond(opc>>28) ) {
  			decode_arm(opc)(*this, opc);
 		}
 	}
@@ -439,6 +454,7 @@ void arm9_thumb19_bl(arm& cpu, u32 opc)
 
 arm7_instr arm946e::decode_thumb(u16 opc)
 {
+	//std::println("${:X}: thumbopc ${:X}", r[15]-4, opc);
 	switch( opc>>13 )
 	{
 	case 0:

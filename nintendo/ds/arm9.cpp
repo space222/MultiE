@@ -8,13 +8,16 @@ static u16 toggle = 0;
 u32 nds::arm9_io_read(u32 a, int sz)
 {
 	if( a == 0x04000004u ) return (toggle^=7);
-	if( a == 0x04000130u ) return keys();
+	if( a == 0x04000130u ) return keystate;// keys();
 	return 0;
 }
+
+extern bool enditall;
 
 u32 nds::arm9_read(u32 a, int sz, ARM_CYCLE)
 {
 	//todo: actual dtcm
+	if( a == 0x1F ) { enditall = true; return 5;}
 	if( a >= 0x800000 && a < 0x1000000 ) return sized_read(itcm, a&0x7fff, sz);
 
 	if( a >= 0x04000000u && a < 0x05000000u )

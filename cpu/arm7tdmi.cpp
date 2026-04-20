@@ -338,6 +338,7 @@ void thumb5_bx(arm& cpu, u32 opc)
 {
 	const u32 s = cpu.r[(opc>>3)&15];
 	u32 retaddr = (cpu.r[15]-2)|1;
+	//std::println("${:X}: thumb5_bx to r{} ${:X}", cpu.r[15]-4, (opc>>3)&15, s);
 	cpu.r[15] = s;
 	if( !(s&1) )
 	{
@@ -345,7 +346,7 @@ void thumb5_bx(arm& cpu, u32 opc)
 		cpu.r[15] &= ~2;
 	}
 	cpu.r[15] &= ~1;
-	if( cpu.armV >= 5 ) { cpu.r[14] = retaddr; }
+	if( cpu.armV >= 5 && (opc&BIT(7)) ) { cpu.r[14] = retaddr; } 
 	cpu.flushp();
 }
 

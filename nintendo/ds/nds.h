@@ -32,6 +32,7 @@ public:
 	void arm9_write(u32, u32, int, ARM_CYCLE);
 	
 	u16 keys();
+	u16 keystate = 0x3ff;
 
 	std::vector<u8> ROM;
 

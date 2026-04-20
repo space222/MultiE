@@ -1,13 +1,37 @@
 #include <print>
+#include <deque>
 #include "Settings.h"
 #include "util.h"
 #include "nds.h"
 
+std::deque<u32> last10;
+
+bool enditall = false;
+bool last10out = false;
 void nds::run_frame()
 {
-	for(u32 i = 0; i < 500000; ++i)
+	keystate = keys();
+	for(u32 i = 0; i < 66000000/60; ++i)
 	{
 		//arm7.step();
+		last10.push_back(arm9.r[15] | arm9.cpsr.b.T);
+		if( last10.size() > 10 )
+		{
+			last10.pop_front();
+		}
+		if( arm9.r[15] >= 0x2002e08 && arm9.r[15] < 0x2004e0c )
+		{
+			if( !last10out )
+			{
+				for(u32 A : last10)
+				{	
+					std::println("L10 = ${:X}", (A - ((A&1)?4:8)) & ((A&1)?~1:~3) );
+				}
+				last10out = true;
+			}
+			std::println("pc = ${:X}", arm9.r[15] - (arm9.cpsr.b.T ? 4:8));
+			exit(1);
+		}
 		arm9.step();
 	}
 	
