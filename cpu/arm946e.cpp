@@ -306,7 +306,7 @@ bool arm946e::isCond(u8 cc)
 	case 14: return true;
 	default: break;
 	}
-	return false; 
+	return true; 
 }
 
 void arm946e::switch_to_mode(u32 mode) 

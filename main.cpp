@@ -58,9 +58,15 @@
 #include "nintendo/snes/snes.h"
 #include "nintendo/pokemini.h"
 #include "nintendo/ds/nds.h"
+#include "avi_rec.h"
 void try_kirq();
 void gdb_start();
 extern std::atomic<int> gdb_active;
+
+std::string capturefile = "out.avi";
+bool capture_started = false;
+AVI* cap_avi = nullptr;
+int captured_frames = 0;
 
 namespace fs = std::filesystem;
 std::unordered_map<std::string, std::string> cli_options;
@@ -106,6 +112,8 @@ float audio_get()
 	return last_sample;
 }
 
+std::vector<s16> capbuf;
+
 void audio_callback(void*, Uint8 *stream, int len)
 {
 	if(! sys )
@@ -119,6 +127,15 @@ void audio_callback(void*, Uint8 *stream, int len)
 	for(int i = 0; i < len; ++i)
 	{
 		buf[i] = audio_get();
+		if( capture_started )
+		{
+			capbuf.push_back(buf[i]*32767);
+			if( capbuf.size() >= 44100/60 )
+			{
+				cap_avi->samples(capbuf.data());
+				capbuf.clear();
+			}
+		}		
 	}
 }
 
@@ -138,6 +155,18 @@ void copy_fb()
 		memcpy(pixels, sys->framebuffer(), sys->fb_width()*sys->fb_height()*mult);
 	}
 	SDL_UnlockTexture(Screen);
+	if( capture_started )
+	{
+		cap_avi->frame(sys->framebuffer());
+		captured_frames += 1;
+		if( captured_frames >= 3600 )
+		{
+			capture_started = false;
+			cap_avi->close();
+			capbuf.clear();
+			captured_frames = 0;
+		}
+	}
 }
 
 
@@ -920,6 +949,24 @@ void imgui_run()
 			ImGui::MenuItem("Volume", nullptr, &volume_open);
 			ImGui::Separator();
 			ImGui::MenuItem("Mute", nullptr, &Settings::mute);
+			ImGui::Separator();
+			if( capture_started )
+			{
+				if( ImGui::MenuItem("End Capture") )
+				{
+					capture_started = false;
+					cap_avi->close();
+				}
+			} else {
+				if( ImGui::MenuItem("Start Capture") && sys )
+				{
+					Paused = false;
+					capture_started = true;
+					if( cap_avi ) delete cap_avi;
+					cap_avi = new AVI;
+					cap_avi->init(capturefile, sys->fb_width(), sys->fb_height(), sys->fb_bpp(), sys->fb_bpp(), 1, 44100);
+				}
+			}
 			ImGui::EndMenu();
 		}
 		

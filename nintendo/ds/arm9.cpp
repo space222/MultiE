@@ -47,6 +47,7 @@ void nds::arm9_write(u32 a, u32 v, int sz, ARM_CYCLE)
 		return sized_write(vram, a-0x06800000u, v, sz);
 	}
 
+	if( a == 0x04000180 ) return;
 	std::println("arm9 wr{} ${:X} = ${:X}", sz, a, v);
 }
 

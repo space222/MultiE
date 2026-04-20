@@ -834,8 +834,8 @@ void arm7_ldst_m(arm& cpu, u32 opc)
 				if( Pre ) base += 4;
 				cpu.write(base&~3, cpu.r[15]+4, 32, ARM_CYCLE::N);
 			}
-			if(W) cpu.r[Rn] += U ? 0x40 : -0x40;
 		}
+		if(W) cpu.r[Rn] += U ? 0x40 : -0x40;
 		return;
 	}
 	
