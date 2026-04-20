@@ -100,6 +100,12 @@ void AVI::frame(void* data, uint32_t w, uint32_t h, uint32_t format)
 			u8 B = D[i]&0x1f;
 			D[i] = (B<<10)|(G<<5)|R;
 		}
+	} else if( outbpp == 32 && inbpp == 32 ) {
+		u32* D = (u32*) data;
+		for(u32 i = 0; i < width*height; ++i)
+		{
+			D[i] >>= 8;
+		}
 	}
 	ostr(fp, "00db");
 	o32(fp, width*height*(outbpp/8));
