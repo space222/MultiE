@@ -47,8 +47,9 @@ void arm9_cdp(arm& cpu, u32 opc)
 	
 }
 
-void arm9_mcr(arm& cpu, u32 opc)
+void arm9_mcr(arm& cpu_, u32 opc)
 {
+	arm946e& cpu = *dynamic_cast<arm946e*>(&cpu_);
 	u32 cp_op = (opc>>21)&7;
 	u32 Cn = (opc>>16)&15;
 	u32 Rd = (opc>>12)&15;
@@ -62,10 +63,23 @@ void arm9_mcr(arm& cpu, u32 opc)
 		if( cp_op == 0 && Cn == 0 && Cm == 0 && CP == 1 )
 		{
 			cpu.r[Rd] = 0x0F0D2112;
+		} else if( cp_op == 0 && Cn == 9 && Cm == 1 && CP == 0 ) {
+			cpu.r[Rd] = cpu.dtcm.p15_910;
 		} else {
 			std::println("copread P{}, cp_op{}, Cn{}, Cm{}, CP{}, Rd(${:X})", Pn, cp_op, Cn, Cm, CP, cpu.r[Rd]);
 		}
+		return;
 	} else {
+		if( cp_op == 0 && Cn == 9 && Cm == 1 && CP == 0 )
+		{
+			//todo: DTCM base
+			u32 v = cpu.r[Rd];
+			cpu.dtcm.base = v & ~0xfff;
+			cpu.dtcm.size = 512 << ((v>>1)&0x1F);
+			cpu.dtcm.p15_910 = v;
+			std::println("DTCM base=${:X}, size={}KB", cpu.dtcm.base, cpu.dtcm.size);
+			return;
+		}
 		std::println("copwrite P{}, cp_op{}, Cn{}, Cm{}, CP{}, Rd(${:X})", Pn, cp_op, Cn, Cm, CP, cpu.r[Rd]);	
 	}
 }
@@ -95,9 +109,21 @@ void arm9_qadd(arm& cpu, u32 opc)
 {
 	s32 Rn = cpu.r[(opc>>16)&15];
 	s32 Rm = cpu.r[opc&15];
-	u32& Rd = cpu.r[(opc>>12)&15];
 	
-	if( opc & BIT(22) ) { Rn *= 2; }
+	if( opc & BIT(22) ) 
+	{ 
+		s64 doub = Rn;
+		doub *= 2;
+		if( doub > 0x7FFFffffLL  )
+		{
+			doub = 0x7FFFffffu;
+			cpu.cpsr.b.Q = 1;
+		} else if( doub < -0x80000000LL ) {
+			doub = 0x80000000u;
+			cpu.cpsr.b.Q = 1;
+		}	
+		Rn = doub;
+	}
 	
 	s64 res = Rm;
 	if( opc & BIT(21) )
@@ -109,16 +135,142 @@ void arm9_qadd(arm& cpu, u32 opc)
 	
 	if( res > 0x7FFFffffLL  )
 	{
-		res = 0x7FFFffff;
+		res = 0x7FFFffffu;
 		cpu.cpsr.b.Q = 1;
 	} else if( res < -0x80000000LL ) {
 		res = 0x80000000u;
 		cpu.cpsr.b.Q = 1;
 	}
 	
-	Rd = res;
+	cpu.r[(opc>>12)&15] = res;
 }
 
+void arm9_SMLAxy(arm& cpu, u32 opc)
+{
+	const bool x = (opc&BIT(5));
+	const bool y = (opc&BIT(6));
+	const u32 Rd = (opc>>16)&15;
+	const u32 Rn = (opc>>12)&15;
+	const u32 Rs = (opc>>8 )&15;
+	const u32 Rm =  opc & 15;
+	
+	s16 HalfRm = (x ? (cpu.r[Rm]>>16) : cpu.r[Rm]);
+	s16 HalfRs = (y ? (cpu.r[Rs]>>16) : cpu.r[Rs]);
+	s64 res = HalfRm;
+	res *= HalfRs;
+	res += s32(cpu.r[Rn]);
+	if( res > 0x7fffFFFFLL || res < -0x80000000LL ) { cpu.cpsr.b.Q = 1; }
+	cpu.r[Rd] = res;
+}
+
+void arm9_SMLAWy(arm& cpu, u32 opc)
+{
+	const bool x = (opc&BIT(5));
+	const bool y = (opc&BIT(6));
+	const u32 Rd = (opc>>16)&15;
+	const u32 Rn = (opc>>12)&15;
+	const u32 Rs = (opc>>8 )&15;
+	const u32 Rm =  opc & 15;
+	
+	s16 HalfRs = (y ? (cpu.r[Rs]>>16) : cpu.r[Rs]);
+	s64 res = s32(cpu.r[Rm]);
+	res *= HalfRs;
+	res >>= 16;
+	res += s32(cpu.r[Rn]);
+	if( res > 0x7fffFFFFLL || res < -0x80000000LL ) { cpu.cpsr.b.Q = 1; }
+	cpu.r[Rd] = res;
+}
+
+void arm9_SMULWy(arm& cpu, u32 opc)
+{
+	const bool x = (opc&BIT(5));
+	const bool y = (opc&BIT(6));
+	const u32 Rd = (opc>>16)&15;
+	const u32 Rs = (opc>>8 )&15;
+	const u32 Rm =  opc & 15;
+	
+	s16 HalfRs = (y ? (cpu.r[Rs]>>16) : cpu.r[Rs]);
+	s64 res = s32(cpu.r[Rm]);
+	res *= HalfRs;
+	res >>= 16;
+	cpu.r[Rd] = res;
+}
+
+void arm9_SMLALxy(arm& cpu, u32 opc)
+{
+	const bool x = (opc&BIT(5));
+	const bool y = (opc&BIT(6));
+	const u32 RdHi = (opc>>16)&15;
+	const u32 RdLo = (opc>>12)&15;
+	const u32 Rs = (opc>>8 )&15;
+	const u32 Rm =  opc & 15;
+	
+	s16 HalfRm = (x ? (cpu.r[Rm]>>16) : cpu.r[Rm]);
+	s16 HalfRs = (y ? (cpu.r[Rs]>>16) : cpu.r[Rs]);
+	s64 res = s64(cpu.r[RdHi])<<32;
+	res |= cpu.r[RdLo];
+	res += (HalfRs*HalfRm);
+	//if( res > 0x7fffFFFFLL || res < -0x80000000LL ) { cpu.cpsr.b.Q = 1; }
+	cpu.r[RdHi] = res>>32;
+	cpu.r[RdLo] = res;
+}
+
+void arm9_SMULxy(arm& cpu, u32 opc)
+{
+	const bool x = (opc&BIT(5));
+	const bool y = (opc&BIT(6));
+	const u32 Rd = (opc>>16)&15;
+	const u32 Rs = (opc>>8 )&15;
+	const u32 Rm =  opc & 15;
+	
+	s16 HalfRm = (x ? (cpu.r[Rm]>>16) : cpu.r[Rm]);
+	s16 HalfRs = (y ? (cpu.r[Rs]>>16) : cpu.r[Rs]);
+	s64 res = HalfRm;
+	res *= HalfRs;
+	cpu.r[Rd] = res;
+}
+
+void arm9_xfer_double(arm& cpu, u32 opc)
+{
+	u32 offs = (opc&BIT(22)) ? (((opc>>4)&0xf0)|(opc&15)) : cpu.r[opc&15];
+	u32 n = (opc>>16)&15;
+	u32 d = (opc>>12)&15;
+	u32 base = cpu.r[n];
+	const bool up = opc & BIT(23);
+	const bool pre = opc & BIT(24);
+	const bool wback = !pre || (opc & BIT(21));
+	
+	if( pre )
+	{
+		base += up ? offs : -offs;
+	}
+	
+	if( opc & BIT(20) )
+	{
+		cpu.r[d++] = cpu.read(base&~3, 32, ARM_CYCLE::N);
+		base += up ? offs : -offs;
+		cpu.r[d&0xF] = cpu.read(base&~3, 32, ARM_CYCLE::N);
+		if( d == 15 )
+		{
+			if( cpu.armV >= 5 && (cpu.r[15]&1) )
+			{ //todo: most v5 loads can change modes but confirm this one can
+				cpu.cpsr.b.T = 1;
+			}		
+			cpu.flushp();
+		}
+	} else {
+		cpu.write(base&~3, cpu.r[d], 32, ARM_CYCLE::N);
+		base += up ? offs : -offs;
+		cpu.write(base&~3, cpu.r[d], 32, ARM_CYCLE::N);		
+	}
+	
+	if( !pre )
+	{
+		base += up ? offs : -offs;
+	}
+	
+	if( wback && (n != d || !(opc&BIT(20))) ) cpu.r[n] = base;	
+}
 
 arm7_instr arm946e::decode_arm(u32 opcode)
 {
@@ -130,12 +282,22 @@ arm7_instr arm946e::decode_arm(u32 opcode)
 	u32 cc = ((opcode>>16)&0xff0) | ((opcode>>4)&15);
 	if( (cc&0xfcf) == 9 ) { return arm7_mul; }
 	if( (cc&0xf8f) == 0x89 ) { return arm7_mul_long; }
-	//todo: fit the half-word muls here
 	
+	//.... 0001 0000 1..0  SMLAxy
+	if( (cc&0xff9) == 0x108 ) { return arm9_SMLAxy; }
+	//.... 0001 0010 1.00  SMLAWy
+	if( (cc&0xffb) == 0x128 ) { return arm9_SMLAWy; }
+	//.... 0001 0010 1.10  SMULWy
+	if( (cc&0xffb) == 0x12A ) { return arm9_SMULWy; }
+	//.... 0001 0100 1..0  SMLALxy
+	if( (cc&0xff9) == 0x148 ) { return arm9_SMLALxy; }
+	//.... 0001 0110 1..0  SMULxy
+	if( (cc&0xff9) == 0x168 ) { return arm9_SMULxy; }
 	
 	if( (cc&0xfbf) == 0x109) { return arm7_single_swap; }
 
 	if( (cc&0xe0f) == 0xB ) { return arm7_xfer_half; }
+	if( (cc&0xe1d) == 0x0D ){ return arm9_xfer_double; }
 	if( (cc&0xe1d) == 0x1D ){ return arm7_xfer_signed; }
 	
 	if( (cc&0xfbf) == 0x100 ) { return arm7_mrs; }
@@ -239,7 +401,8 @@ void arm946e::step()
 		cpsr.b.I = 1;
 		r[14] = r[15] + (cpsr.b.T?2:0);
 		cpsr.b.T = 0;
-		r[15] = 0x18;
+		r[15] = 0xFFFF0018u;
+		//std::println("ARM9 IRQ");
 		flushp();
 	}
 
@@ -251,26 +414,20 @@ void arm946e::step()
 	
 	//std::println("${:X}:{:X}: opc = ${:X}", r[15] - (cpsr.b.T?4:8), u32(cpsr.b.T), opc);
 	
-	if( r[15] >= 0x10000000u )
-	{
-		std::println("${:X} too big, halting", (r[15]&(cpsr.b.T?~1:~3)) - (cpsr.b.T?4:8));
-		exit(1);
-	}
-	
 	if( cpsr.b.T )
 	{
 		decode_thumb(opc)(*this, opc);
 	} else {
 		if( (opc>>28) == 0xF )
 		{
-			std::println("condF! opc = ${:X}", opc);
+			//std::println("condF! opc = ${:X}", opc);
 			if( ((opc>>25)&7) == 5 )
 			{
 				u32 retval = r[15] - 4;
 				s32 offs = s32(opc<<8)>>8;
 				u32 L = r[15] - 8;
 				r[15] += offs*4 + ((opc&BIT(24)) ? 2:0);
-				std::println("${:X}: BLX imm to ${:X}", L, r[15]);
+				//std::println("${:X}: BLX imm to ${:X}", L, r[15]);
 				cpsr.b.T = 1;
 				flushp();
 		 		r[14] = retval;

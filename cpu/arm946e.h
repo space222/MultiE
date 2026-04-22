@@ -17,6 +17,10 @@ public:
 
 	arm7_instr thumb_funcs[0x400];
 	arm7_instr arm_funcs[0x1000];
+	
+	struct {
+		u32 base, size, p15_910;	
+	} dtcm;
 
 	u32 fetch, decode, execute;
 		

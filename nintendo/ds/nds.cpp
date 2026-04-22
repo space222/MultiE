@@ -6,33 +6,19 @@
 
 std::deque<u32> last10;
 
+extern u16 toggle;
+
 bool enditall = false;
 bool last10out = false;
 void nds::run_frame()
 {
 	keystate = keys();
+	toggle = 0;
 	for(u32 i = 0; i < 66000000/60; ++i)
 	{
-		//arm7.step();
-		last10.push_back(arm9.r[15] | arm9.cpsr.b.T);
-		if( last10.size() > 10 )
-		{
-			last10.pop_front();
-		}
-		if( arm9.r[15] >= 0x2002e08 && arm9.r[15] < 0x2004e0c )
-		{
-			if( !last10out )
-			{
-				for(u32 A : last10)
-				{	
-					std::println("L10 = ${:X}", (A - ((A&1)?4:8)) & ((A&1)?~1:~3) );
-				}
-				last10out = true;
-			}
-			std::println("pc = ${:X}", arm9.r[15] - (arm9.cpsr.b.T ? 4:8));
-			exit(1);
-		}
+		if( i == (66000000/60)*0.9 ) toggle = 7;
 		arm9.step();
+		if( i & 1 ) arm7.step();
 	}
 	
 	memcpy(fbuf, vram, 256*192*2);
@@ -43,7 +29,8 @@ void nds::reset()
 {
 	//arm7.reset();
 	//arm9.reset();
-	
+	arm9.dtcm.base = 0x800000;
+	arm9.dtcm.size = 0x4000;
 }
 
 bool nds::loadROM(std::string fname)
@@ -104,7 +91,7 @@ bool nds::loadROM(std::string fname)
 	return true;
 }
 
-u16 nds::keys()
+u32 nds::keys()
 {
 	u16 val = 0x3ff;
 	if( getInputState(1, 4) ) val ^= BIT(9);

@@ -23,16 +23,35 @@ public:
 	
 	u32 arm9_fetch(u32, int, ARM_CYCLE);
 	
-	u32 arm9_io_read(u32 a, int sz);
-	
+	u32 arm7_io_read(u32, int);
+	void arm7_io_write(u32, u32, int);
+	u32 arm9_io_read(u32, int);
+	void arm9_io_write(u32, u32, int);
+		
 	u32 arm7_read(u32, int, ARM_CYCLE);
 	void arm7_write(u32, u32, int, ARM_CYCLE);
 
 	u32 arm9_read(u32, int, ARM_CYCLE);
 	void arm9_write(u32, u32, int, ARM_CYCLE);
 	
-	u16 keys();
-	u16 keystate = 0x3ff;
+	void arm9_raise_irq(u32 bit);
+	void arm9_clear_irq(u32 bit);
+	void arm7_raise_irq(u32 bit);
+	void arm7_clear_irq(u32 bit);
+	const u32 IRQ_IPCSYNC_BIT = BIT(16);
+	
+	struct {
+		u32 IME, IF, IE;
+		u8 halted;
+	} irq7, irq9;
+	
+	u32 keys();
+	u32 keystate = 0xffffFFFFu;
+	
+	struct {
+		u8 to_arm7, to_arm9;
+		u16 ipcsync7, ipcsync9;
+	} ipc;
 
 	std::vector<u8> ROM;
 
