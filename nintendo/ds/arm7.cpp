@@ -13,6 +13,34 @@ u32 nds::arm7_io_read(u32 a, int sz)
 	if( a == 0x04000210 ) return irq7.IE;
 	if( a == 0x04000214 ) return irq7.IF;
 
+	if( a == 0x04100000 )
+	{ // IPC Receive FIFO
+		if( !(ipc.fifocnt7 & BIT(15)) )
+		{
+			if( ipc.q2arm7.empty() ) 
+			{
+				return ipc.last_q2arm7;
+			}
+			return ipc.q2arm7.front();
+		}
+		if( ipc.q2arm7.empty() )
+		{
+			ipc.fifocnt7 |= BIT(14);
+			return ipc.last_q2arm7;
+		}
+		u32 val = ipc.q2arm7.front(); ipc.q2arm7.pop_front();
+		if( ipc.q2arm7.empty() )
+		{
+			u32 oldstat = ipc.fifocnt9 & 1; // empty status
+			ipc.fifocnt9 |= 1;
+			if( oldstat==0 && (ipc.fifocnt9&5)==5 )
+			{
+				arm9_raise_irq(IRQ_IPC_SEND_EMPTY);
+			}
+			ipc.fifocnt7 |= BIT(8);	
+		}
+		return ipc.last_q2arm7 = val;
+	}
 	return 0;
 }
 

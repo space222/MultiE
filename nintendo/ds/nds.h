@@ -1,6 +1,7 @@
 #pragma once
 #include <print>
 #include <vector>
+#include <deque>
 #include "console.h"
 #include "Scheduler.h"
 #include "arm7tdmi.h"
@@ -39,6 +40,8 @@ public:
 	void arm7_raise_irq(u32 bit);
 	void arm7_clear_irq(u32 bit);
 	const u32 IRQ_IPCSYNC_BIT = BIT(16);
+	const u32 IRQ_IPC_SEND_EMPTY = BIT(17);
+	const u32 IRQ_IPC_RECV_EMPTY = BIT(18);
 	
 	struct {
 		u32 IME, IF, IE;
@@ -51,7 +54,20 @@ public:
 	struct {
 		u8 to_arm7, to_arm9;
 		u16 ipcsync7, ipcsync9;
+		std::deque<u32> q2arm7, q2arm9;
+		u32 last_q2arm7, last_q2arm9;
+		
+		u32 fifocnt7, fifocnt9;
 	} ipc;
+	
+	struct {
+		u64 div_num, div_den, div_quot, div_rem;
+		u64 sqrt_param;
+		u32 sqrt_res;
+		u32 divcnt, sqrtcnt;
+	} dsmath;
+	void dsmath_div();
+	void dsmath_sqrt();
 
 	std::vector<u8> ROM;
 

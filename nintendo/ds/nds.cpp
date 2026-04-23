@@ -107,4 +107,75 @@ u32 nds::keys()
 	return val;
 }
 
+void nds::dsmath_div()
+{
+	dsmath.divcnt &= 3;
+	u32 mode = dsmath.divcnt&3;
+	if( mode == 3 ) mode = 1;
+	dsmath.divcnt |= ((dsmath.div_den==0) ? BIT(14):0);
+	
+	switch( mode )
+	{
+	case 0: // 32/32=32
+		if( u32(dsmath.div_den) == 0 )
+		{
+			dsmath.div_quot = ( (s32(dsmath.div_num) < 0) ? 0xFFFFffff00000001ull : 0xffffFFFFull );
+			dsmath.div_rem = s32(dsmath.div_num);
+		} else if( u32(dsmath.div_num) == 0x80000000u && s32(dsmath.div_den) == -1 ) {
+			dsmath.div_quot = 0x80000000u;
+			dsmath.div_rem = 0;
+		} else {
+			dsmath.div_quot = s64( s32(dsmath.div_num) / s32(dsmath.div_den) );
+			dsmath.div_rem  = s64( s32(dsmath.div_num) % s32(dsmath.div_den) );
+		}
+		break;
+	case 1: // 64/32=64
+		if( u32(dsmath.div_den) == 0 )
+		{
+			dsmath.div_quot = s64(dsmath.div_num) < 0 ? 1:-1;
+			dsmath.div_rem = dsmath.div_num;
+		} else if( dsmath.div_num == BITL(63) && s32(dsmath.div_den) == -1 ) {
+			dsmath.div_quot = BITL(63);
+			dsmath.div_rem = 0;
+		} else {
+			dsmath.div_quot = s64(dsmath.div_num) / s32(dsmath.div_den);
+			dsmath.div_rem  = s64(dsmath.div_num) % s32(dsmath.div_den);
+		}
+		break;
+	case 2: // 64/64=64
+		if( dsmath.div_den == 0 )
+		{
+			dsmath.div_quot = s64(dsmath.div_num) < 0 ? 1:-1;
+			dsmath.div_rem = dsmath.div_num;
+		} else if( dsmath.div_num == BITL(63) && s64(dsmath.div_den) == -1 ) {
+			dsmath.div_quot = BITL(63);
+			dsmath.div_rem = 0;
+		} else {
+			dsmath.div_quot = s64(dsmath.div_num) / s64(dsmath.div_den);
+			dsmath.div_rem  = s64(dsmath.div_num) % s64(dsmath.div_den);
+		}		
+		break;	
+	}
+}
+
+void nds::dsmath_sqrt()
+{
+	dsmath.sqrtcnt &= 1;
+	if( dsmath.sqrtcnt & 1 )
+	{
+		dsmath.sqrt_res = sqrtl(dsmath.sqrt_param);
+	} else {
+		dsmath.sqrt_res = sqrtl(u32(dsmath.sqrt_param));
+	}
+}
+
+
+
+
+
+
+
+
+
+
 
