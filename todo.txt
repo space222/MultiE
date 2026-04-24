@@ -154,9 +154,16 @@ Status: Most games are playable with saving supported.
 
 Nintendo DS Todo List
 ------------------------
-1. Few more arm7/9 edge case differences (ldm/stm specifically)
-2. The extra arm9 instructions
-3. The rest of the hardware
+1. IPC FIFO
+2. Add scheduling, display timing+irqs
+3. Try to get libnds examples to boot, keep trying BIOS and eventually boot firmware
+4. Timers are the same as GBA (except Hz), the 4 for each cpu
+5. DMA?
+6. Bang out sound? It doesn't even have irqs
+7. VRAM mapping + 2D
+8. 3D
+9. Wifi?
+Status: Working through Rockwrestler, WRAMCNT should work but the test needs IPCFIFO.
 
 
 
@@ -164,7 +171,8 @@ Casio PV-1000 Todo List
 --------------------------
 1. Throw in some sound
 2. Be more precise with the nesdev obscure wiki info
-Status: Everything I have shows a title screen, but only Super Cobra is playable.
+Status: More things get past title screen, but I have no idea how to play.
+Older Status: Everything I have shows a title screen, but only Super Cobra is playable.
 
 
 

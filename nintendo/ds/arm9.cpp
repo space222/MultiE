@@ -16,7 +16,7 @@ u32 nds::arm9_io_read(u32 a, int sz)
 	if( a == 0x04000208 ) return irq9.IME;
 	if( a == 0x04000210 ) return irq9.IE;
 	if( a == 0x04000214 ) return irq9.IF;
-	
+	if( a == 0x04000247 ) return wramcnt;
 	if( a == 0x04100000 )
 	{ // IPC Receive FIFO
 		if( !(ipc.fifocnt9 & BIT(15)) )
@@ -60,7 +60,7 @@ u32 nds::arm9_io_read(u32 a, int sz)
 	if( a == 0x040002B4 ) return dsmath.sqrt_res;
 	if( a == 0x040002B8 ) return dsmath.sqrt_param;
 	if( a == 0x040002BC ) return dsmath.sqrt_param>>32;
-	std::println("IO Rd{} ${:X}", sz, a);
+	std::println("arm9 IO Rd{} ${:X}", sz, a);
 	return 0;
 }
 
@@ -80,6 +80,7 @@ void nds::arm9_io_write(u32 a, u32 v, int sz)
 	if( a == 0x04000208 ) { irq9.IME = v&1; return; }
 	if( a == 0x04000210 ) { irq9.IE = v&0xffFFffu; arm9.irq_line = irq9.IME && (irq9.IE & irq9.IF); return; }
 	if( a == 0x04000214 ) { irq9.IF &= ~v; arm9.irq_line = irq9.IME && (irq9.IE & irq9.IF); return; }
+	if( a == 0x04000247 ) { wramcnt = v&3; return; }
 
 	if( a == 0x04000280 )
 	{
@@ -135,7 +136,7 @@ void nds::arm9_io_write(u32 a, u32 v, int sz)
 		dsmath_sqrt();
 		return;
 	}
-	std::println("IO Wr{} ${:X} = ${:X}", sz, a, v);
+	std::println("arm9 IO Wr{} ${:X} = ${:X}", sz, a, v);
 }
 
 extern bool enditall;
@@ -145,6 +146,17 @@ u32 nds::arm9_read(u32 a, int sz, ARM_CYCLE)
 	//todo: actual dtcm
 	if( a >= arm9.dtcm.base && a < arm9.dtcm.base+arm9.dtcm.size ) return sized_read(dtcm, a&0x3fff, sz);
 
+	if( a >= 0x03000000u && a < 0x04000000u )
+	{
+		switch( wramcnt&3 )
+		{
+		case 0: a &= 0x7fff; break; 		
+		case 1: a = 0x4000 + (a&0x3fff); break;		
+		case 2: a &= 0x3fff; break;		
+		case 3: return 0;	
+		}
+		return sized_read(shared_wram, a, sz);	
+	}
 	if( a >= 0x04000000u && a < 0x05000000u )
 	{
 		return arm9_io_read(a, sz);
@@ -168,6 +180,17 @@ void nds::arm9_write(u32 a, u32 v, int sz, ARM_CYCLE)
 	if( a >= 0x02000000u && a < 0x03000000u )
 	{
 		return sized_write(mainram, a&(4_MB-1), v, sz);
+	}
+	if( a >= 0x03000000u && a < 0x04000000u )
+	{
+		switch( wramcnt&3 )
+		{
+		case 0: a &= 0x7fff; break; 		
+		case 1: a = 0x4000 + (a&0x3fff); break;		
+		case 2: a &= 0x3fff; break;		
+		case 3: return;	
+		}
+		return sized_write(shared_wram, a, v, sz);	
 	}
 	if( a >= 0x04000000u && a < 0x05000000u )
 	{

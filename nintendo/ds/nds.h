@@ -10,6 +10,7 @@
 class nds : public console
 {
 public:
+	nds() : sched(this) {}
 	u32 fb_width() override { return 256; }
 	u32 fb_height() override { return 192*2; }
 	u32 fb_bpp() override { return 16; }
@@ -18,6 +19,9 @@ public:
 	void run_frame() override;	
 	void reset() override;
 	bool loadROM(std::string) override;
+	void event(u64 oldstamp, u32 code) override;
+	
+	Scheduler sched;
 
 	arm7tdmi arm7;
 	arm946e  arm9;
@@ -68,6 +72,8 @@ public:
 	} dsmath;
 	void dsmath_div();
 	void dsmath_sqrt();
+	
+	u8 wramcnt;
 
 	std::vector<u8> ROM;
 
@@ -77,7 +83,8 @@ public:
 	u8 vram[656_KB];
 	u8 arm9_bios[32_KB];
 	u8 arm7_bios[16_KB];
-	u8 arm7_wram[96_KB];
+	u8 shared_wram[32_KB];
+	u8 arm7_wram[64_KB];
 	u16 fbuf[256*192*2];
 };
 

@@ -12,7 +12,7 @@ u32 nds::arm7_io_read(u32 a, int sz)
 	if( a == 0x04000208 ) return irq7.IME;
 	if( a == 0x04000210 ) return irq7.IE;
 	if( a == 0x04000214 ) return irq7.IF;
-
+	if( a == 0x04000241 ) return wramcnt;
 	if( a == 0x04100000 )
 	{ // IPC Receive FIFO
 		if( !(ipc.fifocnt7 & BIT(15)) )
@@ -67,6 +67,17 @@ u32 nds::arm7_read(u32 a, int sz, ARM_CYCLE)
 {
 	if( a < 0x02000000 ) return sized_read(arm7_bios, a&0x3fff, sz);
 	if( a < 0x03000000 ) return sized_read(mainram, a&(4_MB-1), sz);
+	if( a >= 0x03000000u && a < 0x03800000u )
+	{
+		switch( wramcnt&3 )
+		{
+		case 3: a &= 0x7fff; break; 		
+		case 2: a = 0x4000 + (a&0x3fff); break;
+		case 1: a &= 0x3fff; break;
+		case 0: return sized_read(arm7_wram, a&0xffff, sz);	
+		}
+		return sized_read(shared_wram, a, sz);	
+	}
 	if( a >= 0x03800000 && a < 0x04000000 ) return sized_read(arm7_wram, a&0xffff, sz);
 	if( a >= 0x04000000 && a < 0x05000000 ) return arm7_io_read(a, sz);
 	std::println("arm7 rd{} ${:X}", sz, a);
@@ -77,6 +88,17 @@ void nds::arm7_write(u32 a, u32 v, int sz, ARM_CYCLE)
 {
 	if( a < 0x02000000 ) return; // no write to bios
 	if( a < 0x03000000 ) return sized_write(mainram, a&(4_MB-1), v, sz);
+	if( a >= 0x03000000u && a < 0x03800000u )
+	{
+		switch( wramcnt&3 )
+		{
+		case 3: a &= 0x7fff; break; 		
+		case 2: a = 0x4000 + (a&0x3fff); break;
+		case 1: a &= 0x3fff; break;
+		case 0: return sized_write(arm7_wram, a&0xffff, v, sz);	
+		}
+		return sized_write(shared_wram, a, v, sz);	
+	}
 	if( a >= 0x03800000 && a < 0x04000000 ) return sized_write(arm7_wram, a&0xffff, v, sz);
 	if( a >= 0x04000000 && a < 0x05000000 ) return arm7_io_write(a, v, sz);
 	std::println("${:X}: arm7 wr{} ${:X} = ${:X}", arm7.r[15] - (arm7.cpsr.b.T ? 4:8), sz, a, v);

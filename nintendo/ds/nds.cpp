@@ -31,6 +31,7 @@ void nds::reset()
 	//arm9.reset();
 	arm9.dtcm.base = 0x800000;
 	arm9.dtcm.size = 0x4000;
+	wramcnt = 3;
 }
 
 bool nds::loadROM(std::string fname)
@@ -169,6 +170,12 @@ void nds::dsmath_sqrt()
 	}
 }
 
+void nds::event(u64 oldstamp, u32 code)
+{
+
+
+
+}
 
 
 

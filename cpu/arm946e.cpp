@@ -366,7 +366,7 @@ arm7_instr arm946e::decode_arm(u32 opcode)
 			cpu.cpsr.b.M = ARM_MODE_SUPER;
 			cpu.cpsr.b.I = 1;
 			cpu.r[14] = cpu.r[15]-4;
-			cpu.r[15] = 8;
+			cpu.r[15] = 0xffff0008;
 			cpu.flushp();
 		};
 	}
