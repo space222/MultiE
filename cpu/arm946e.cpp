@@ -80,6 +80,11 @@ void arm9_mcr(arm& cpu_, u32 opc)
 			std::println("DTCM base=${:X}, size={}KB", cpu.dtcm.base, cpu.dtcm.size);
 			return;
 		}
+		if( cp_op == 0 && Cn == 7 && Cm == 0 && CP == 4 )
+		{
+			cpu.halted = true;
+			return;
+		}
 		std::println("copwrite P{}, cp_op{}, Cn{}, Cm{}, CP{}, Rd(${:X})", Pn, cp_op, Cn, Cm, CP, cpu.r[Rd]);	
 	}
 }

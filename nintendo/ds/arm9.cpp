@@ -7,7 +7,8 @@ u16 toggle = 0;
 
 u32 nds::arm9_io_read(u32 a, int sz)
 {
-	if( a == 0x04000004u ) return toggle;
+	if( a == 0x04000004u ) return disp.stat;
+	if( a == 0x04000006u ) return disp.scanline;
 	if( a == 0x04000130u ) return (sz == 8) ? keystate&0xff : keystate;// keys();
 	if( a == 0x04000180 )
 	{ // IPCSYNC
@@ -17,6 +18,8 @@ u32 nds::arm9_io_read(u32 a, int sz)
 	if( a == 0x04000210 ) return irq9.IE;
 	if( a == 0x04000214 ) return irq9.IF;
 	if( a == 0x04000247 ) return wramcnt;
+	if( a >= 0x04000240 && a <= 0x04000249 ) { return sized_read(vmap_bytes, a-0x04000240, sz); }
+
 	if( a == 0x04100000 )
 	{ // IPC Receive FIFO
 		if( !(ipc.fifocnt9 & BIT(15)) )
@@ -66,6 +69,14 @@ u32 nds::arm9_io_read(u32 a, int sz)
 
 void nds::arm9_io_write(u32 a, u32 v, int sz)
 {
+	if( a == 0x04000004 )
+	{
+		if( sz != 16 ) { std::println("dispstat wr{} isn't 16", sz); exit(1); }
+		disp.stat &= 7;
+		disp.stat |= (v&~7);
+		return;
+	}
+
 	if( a == 0x04000180 )
 	{ // IPCSYNC
 		ipc.to_arm7 = (v>>8)&15;
@@ -80,8 +91,15 @@ void nds::arm9_io_write(u32 a, u32 v, int sz)
 	if( a == 0x04000208 ) { irq9.IME = v&1; return; }
 	if( a == 0x04000210 ) { irq9.IE = v&0xffFFffu; arm9.irq_line = irq9.IME && (irq9.IE & irq9.IF); return; }
 	if( a == 0x04000214 ) { irq9.IF &= ~v; arm9.irq_line = irq9.IME && (irq9.IE & irq9.IF); return; }
-	if( a == 0x04000247 ) { wramcnt = v&3; return; }
-
+	
+	if( a >= 0x04000240 && a <= 0x04000249 )
+	{
+		sized_write(vmap_bytes, a-0x04000240, v, sz);
+		wramcnt = vmap_bytes[7]&3;
+		remap_vram();
+		return;
+	}
+	
 	if( a == 0x04000280 )
 	{
 		dsmath.divcnt = v&3;
@@ -145,7 +163,10 @@ u32 nds::arm9_read(u32 a, int sz, ARM_CYCLE)
 {
 	//todo: actual dtcm
 	if( a >= arm9.dtcm.base && a < arm9.dtcm.base+arm9.dtcm.size ) return sized_read(dtcm, a&0x3fff, sz);
-
+	if( a >= 0x01000000u && a < 0x02000000u )
+	{ //todo: real'er itcm
+		return sized_read(itcm, a&(32_KB-1), sz);
+	}
 	if( a >= 0x03000000u && a < 0x04000000u )
 	{
 		switch( wramcnt&3 )
@@ -177,6 +198,10 @@ u32 nds::arm9_read(u32 a, int sz, ARM_CYCLE)
 void nds::arm9_write(u32 a, u32 v, int sz, ARM_CYCLE)
 {
 	if( a >= arm9.dtcm.base && a < arm9.dtcm.base+arm9.dtcm.size ) return sized_write(dtcm, a&0x3fff, v, sz);
+	if( a >= 0x01000000u && a < 0x02000000u )
+	{ //todo: real'er itcm
+		return sized_write(itcm, a&(32_KB-1), v, sz);
+	}
 	if( a >= 0x02000000u && a < 0x03000000u )
 	{
 		return sized_write(mainram, a&(4_MB-1), v, sz);
@@ -203,11 +228,15 @@ void nds::arm9_write(u32 a, u32 v, int sz, ARM_CYCLE)
 	}
 
 	if( a == 0x04000180 ) return;
-	std::println("arm9 wr{} ${:X} = ${:X}", sz, a, v);
+	std::println("arm9 wr{} ${:X} = ${:X} '{:c}'", sz, a, v, (char)v);
 }
 
 u32 nds::arm9_fetch(u32 a, int sz, ARM_CYCLE)
 {
+	if( a >= 0x01000000u && a < 0x02000000u )
+	{
+		return sized_read(itcm, a&(32_KB-1), sz);
+	}
 	if( a >= 0x02000000u && a < 0x03000000u )
 	{
 		return sized_read(mainram, a&(4_MB-1), sz);
@@ -221,7 +250,7 @@ void nds::arm9_raise_irq(u32 bit)
 {
 	irq9.IF |= bit;
 	arm9.irq_line = irq9.IME && (irq9.IF & irq9.IE);
-	if( arm9.irq_line ) { irq9.halted = 0; }
+	if( arm9.irq_line ) { arm9.halted = 0; }
 }
 
 void nds::arm9_clear_irq(u32 bit)
@@ -229,5 +258,55 @@ void nds::arm9_clear_irq(u32 bit)
 	irq9.IF &= ~bit;
 	arm9.irq_line = irq9.IME && (irq9.IF & irq9.IE);
 }
+
+void nds::remap_vram()
+{
+	for(u32 i = 0; i < 512/4; ++i) engineA_bg[i] = nullptr;
+	for(u32 i = 0; i < 128/4; ++i) engineB_bg[i] = nullptr;
+	for(u32 i = 0; i < 256/4; ++i) engineA_obj[i] = nullptr;
+	for(u32 i = 0; i < 128/4; ++i) engineB_obj[i] = nullptr;
+	
+	if( vmap_bytes[0] & 0x80 )
+	{
+		u32 mst = vmap_bytes[0] & 7;
+		u32 ofs = (vmap_bytes[0]>>3)&3;
+		if( mst == 1 || mst == 2 )
+		{
+			if( mst == 2 ) ofs &= 1;
+			u8** temp = 0x20*ofs + ((mst==1) ? engineA_bg : engineA_obj);
+			for(u32 i = 0; i < 32; ++i) temp[i] = vram+i*0x1000;
+		}
+	}
+	if( vmap_bytes[1] & 0x80 )
+	{
+		u32 mst = vmap_bytes[1] & 7;
+		u32 ofs = (vmap_bytes[1]>>3)&3;
+		if( mst == 1 || mst == 2 )
+		{
+			if( mst == 2 ) ofs &= 1;
+			u8** temp = 0x20*ofs + ((mst==1) ? engineA_bg : engineA_obj);
+			for(u32 i = 0; i < 32; ++i) temp[i] = vram+0x20000+i*0x1000;
+		}
+	}
+	
+	
+	
+	
+	
+	
+	
+	
+}
+
+
+
+
+
+
+
+
+
+
+
 
 

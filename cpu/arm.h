@@ -50,7 +50,7 @@ public:
 	u32 r13_und, r14_und;
 	u32 r13_svc, r14_svc;
 	u32 spsr_svc, spsr_irq, spsr_fiq, spsr_abt, spsr_und;
-	bool irq_line;
+	bool irq_line, halted;
 	
 	void setUserReg(u32 reg, u32 val)
 	{

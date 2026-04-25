@@ -155,15 +155,15 @@ Status: Most games are playable with saving supported.
 Nintendo DS Todo List
 ------------------------
 1. IPC FIFO
-2. Add scheduling, display timing+irqs
-3. Try to get libnds examples to boot, keep trying BIOS and eventually boot firmware
-4. Timers are the same as GBA (except Hz), the 4 for each cpu
-5. DMA?
-6. Bang out sound? It doesn't even have irqs
-7. VRAM mapping + 2D
-8. 3D
-9. Wifi?
+2. Try to get libnds examples to boot, keep trying BIOS and eventually boot firmware
+3. Timers are the same as GBA (except Hz), the 4 for each cpu
+4. DMA?
+5. Bang out sound? It doesn't even have irqs
+6. VRAM mapping + 2D
+7. 3D
+8. Wifi?
 Status: Working through Rockwrestler, WRAMCNT should work but the test needs IPCFIFO.
+libnds examples boot, but not enough of the system done to get useful output there yet.
 
 
 

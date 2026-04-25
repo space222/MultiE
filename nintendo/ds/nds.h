@@ -22,7 +22,10 @@ public:
 	void event(u64 oldstamp, u32 code) override;
 	
 	Scheduler sched;
-
+	const u32 EVENT_HBLANK_START = 1;
+	const u32 EVENT_NEXT_SCANLINE = 2;
+	bool frame_complete;
+	
 	arm7tdmi arm7;
 	arm946e  arm9;
 	
@@ -46,10 +49,12 @@ public:
 	const u32 IRQ_IPCSYNC_BIT = BIT(16);
 	const u32 IRQ_IPC_SEND_EMPTY = BIT(17);
 	const u32 IRQ_IPC_RECV_EMPTY = BIT(18);
+	const u32 IRQ_VBLANK_BIT = BIT(0);
+	const u32 IRQ_HBLANK_BIT = BIT(1);
+	const u32 IRQ_VCOUNT_BIT = BIT(2);
 	
 	struct {
 		u32 IME, IF, IE;
-		u8 halted;
 	} irq7, irq9;
 	
 	u32 keys();
@@ -74,6 +79,24 @@ public:
 	void dsmath_sqrt();
 	
 	u8 wramcnt;
+	
+	struct {
+		u32 scanline;
+		u32 stat;
+	} disp;
+	const u32 DISPSTAT_VBLANK_FLAG = BIT(0);
+	const u32 DISPSTAT_HBLANK_FLAG = BIT(1);
+	const u32 DISPSTAT_VCOUNT_FLAG = BIT(2);
+	const u32 DISPSTAT_VBLANK_IRQ_EN = BIT(3);
+	const u32 DISPSTAT_HBLANK_IRQ_EN = BIT(4);
+	const u32 DISPSTAT_VCOUNT_IRQ_EN = BIT(5);
+	
+	u8* engineA_bg[512 / 4];
+	u8* engineB_bg[128 / 4];
+	u8* engineA_obj[256 / 4];
+	u8* engineB_obj[128 / 4];
+	u8 vmap_bytes[11];
+	void remap_vram();
 
 	std::vector<u8> ROM;
 

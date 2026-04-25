@@ -13,14 +13,32 @@ bool last10out = false;
 void nds::run_frame()
 {
 	keystate = keys();
-	toggle = 0;
-	for(u32 i = 0; i < 66000000/60; ++i)
-	{
-		if( i == (66000000/60)*0.9 ) toggle = 7;
-		arm9.step();
-		if( i & 1 ) arm7.step();
-	}
 	
+	frame_complete = false;
+	while( !frame_complete )
+	{
+		if( arm9.halted && arm7.halted )
+		{
+			arm9.stamp = sched.next_stamp();
+			sched.run_event();
+		} else {
+			if( !arm9.halted )
+			{
+				arm9.step();
+			} else {
+				arm9.stamp += 1;
+			}
+			if( !arm7.halted && (arm9.stamp&1) )
+			{
+				arm7.step();
+			}
+			while( sched.next_stamp() <= arm9.stamp )
+			{
+				sched.run_event();
+			}
+		}
+	}
+		
 	memcpy(fbuf, vram, 256*192*2);
 }
 
@@ -32,6 +50,13 @@ void nds::reset()
 	arm9.dtcm.base = 0x800000;
 	arm9.dtcm.size = 0x4000;
 	wramcnt = 3;
+	
+	disp.scanline = 0;
+	arm7.stamp = arm9.stamp = 0;
+	arm7.halted = arm9.halted = false;
+	sched.reset();
+	sched.add_event(1536, EVENT_HBLANK_START);
+	sched.add_event(1605, EVENT_NEXT_SCANLINE);
 }
 
 bool nds::loadROM(std::string fname)
@@ -172,9 +197,45 @@ void nds::dsmath_sqrt()
 
 void nds::event(u64 oldstamp, u32 code)
 {
-
-
-
+	if( code == EVENT_HBLANK_START )
+	{
+		disp.stat |= DISPSTAT_HBLANK_FLAG;
+		if( disp.stat & DISPSTAT_HBLANK_IRQ_EN )
+		{
+			arm9_raise_irq(IRQ_HBLANK_BIT);
+			arm7_raise_irq(IRQ_HBLANK_BIT);
+		}
+		sched.add_event(oldstamp + 1605, EVENT_HBLANK_START);
+		return;
+	}
+	if( code == EVENT_NEXT_SCANLINE )
+	{
+		disp.stat &= ~7;
+		//draw_scanline();
+		disp.scanline += 1;
+		if( disp.scanline >= 263 )
+		{
+			disp.scanline = 0;
+			frame_complete = true;
+		}
+		if( disp.scanline == 192 && (disp.stat & DISPSTAT_VBLANK_IRQ_EN) )
+		{
+			arm9_raise_irq(IRQ_VBLANK_BIT);
+			arm7_raise_irq(IRQ_VBLANK_BIT);
+		}
+		if( disp.scanline >= 192 )
+		{
+			disp.stat |= DISPSTAT_VBLANK_FLAG;
+		}
+		u32 vmatch = (disp.stat>>8)|((disp.stat&0x80)<<1);
+		if( (disp.stat & DISPSTAT_VCOUNT_IRQ_EN) && vmatch == disp.scanline )
+		{
+			arm9_raise_irq(IRQ_VCOUNT_BIT);
+			arm7_raise_irq(IRQ_VCOUNT_BIT);		
+		}
+		sched.add_event(oldstamp + 1605, EVENT_NEXT_SCANLINE);
+		return;
+	}
 }
 
 

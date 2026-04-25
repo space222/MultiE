@@ -109,7 +109,7 @@ void nds::arm7_raise_irq(u32 bit)
 {
 	irq7.IF |= bit;
 	arm7.irq_line = irq7.IME && (irq7.IF & irq7.IE);
-	if( arm7.irq_line ) { irq7.halted = 0; }
+	if( arm7.irq_line ) { arm7.halted = 0; }
 }
 
 void nds::arm7_clear_irq(u32 bit)

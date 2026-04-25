@@ -120,10 +120,19 @@ public:
 	u32 rtc_state;
 	u64 rtc_out;
 	
+	const u32 EVENT_SND_OUT=  2;
+	const u32 EVENT_SCANLINE_START =3;
+	const u32 EVENT_HBLANK_START =4;
+	const u32 EVENT_FRAME_COMPLETE =5;
+	const u32 EVENT_TMR0_CHECK =6;
+	const u32 EVENT_TMR1_CHECK =7;
+	const u32 EVENT_TMR2_CHECK =8;
+	const u32 EVENT_TMR3_CHECK =9;
+	
 	void check_irqs();
 };
 
-#define EVENT_SND_OUT  2
+/*#define EVENT_SND_OUT  2
 #define EVENT_SCANLINE_START 3
 #define EVENT_HBLANK_START 4
 #define EVENT_FRAME_COMPLETE 5
@@ -131,6 +140,7 @@ public:
 #define EVENT_TMR1_CHECK 7
 #define EVENT_TMR2_CHECK 8
 #define EVENT_TMR3_CHECK 9
+*/
 
 #define SAVE_TYPE_UNKNOWN 0
 #define SAVE_TYPE_SRAM 1
