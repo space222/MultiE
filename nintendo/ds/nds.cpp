@@ -51,6 +51,9 @@ void nds::reset()
 	arm9.dtcm.size = 0x4000;
 	wramcnt = 3;
 	
+	ipc.ipcsync7 = ipc.ipcsync9 = 0;
+	ipc.fifocnt7.v = ipc.fifocnt9.v = 0x101;
+	ipc.last_q2arm9 = ipc.last_q2arm7 = 0;
 	disp.scanline = 0;
 	arm7.stamp = arm9.stamp = 0;
 	arm7.halted = arm9.halted = false;
@@ -89,7 +92,7 @@ bool nds::loadROM(std::string fname)
 	ROM.resize(fsz);
 	[[maybe_unused]] int unu = fread(ROM.data(), 1, fsz, fp);
 	fclose(fp);
-	
+	///*
 	u32 rom_offset = *(u32*)&ROM[0x20];
 	u32 ram_addr = *(u32*)&ROM[0x28];
 	u32 size = *(u32*)&ROM[0x2C];
@@ -111,7 +114,7 @@ bool nds::loadROM(std::string fname)
 	arm7.reset();
 	arm7.r[15] = *(u32*)&ROM[0x34];
 	arm7.flushp();
-	
+	//*/
 	
 	
 	return true;

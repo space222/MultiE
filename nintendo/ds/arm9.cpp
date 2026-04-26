@@ -3,7 +3,6 @@
 #include "nds.h"
 #include "util.h"
 
-u16 toggle = 0;
 
 u32 nds::arm9_io_read(u32 a, int sz)
 {
@@ -14,6 +13,7 @@ u32 nds::arm9_io_read(u32 a, int sz)
 	{ // IPCSYNC
 		return (ipc.to_arm9&15)|((ipc.to_arm7&15)<<8)|(ipc.ipcsync9);
 	}
+	if( a == 0x04000184 ) return ipc.fifocnt9.v;
 	if( a == 0x04000208 ) return irq9.IME;
 	if( a == 0x04000210 ) return irq9.IE;
 	if( a == 0x04000214 ) return irq9.IF;
@@ -22,31 +22,29 @@ u32 nds::arm9_io_read(u32 a, int sz)
 
 	if( a == 0x04100000 )
 	{ // IPC Receive FIFO
-		if( !(ipc.fifocnt9 & BIT(15)) )
+		auto& othercnt = ipc.fifocnt7;
+		auto& thiscnt = ipc.fifocnt9;
+		auto& Q = ipc.q2arm9;
+		if( thiscnt.b.enable == 0 ) return (Q.empty() ? ipc.last_q2arm9 : Q.front());
+		if( thiscnt.b.recv_empty )
 		{
-			if( ipc.q2arm9.empty() ) 
-			{
-				return ipc.last_q2arm9;
-			}
-			return ipc.q2arm9.front();
-		}
-		if( ipc.q2arm9.empty() )
-		{
-			ipc.fifocnt9 |= BIT(14);
+			thiscnt.b.error = 1;
 			return ipc.last_q2arm9;
 		}
-		u32 val = ipc.q2arm9.front(); ipc.q2arm9.pop_front();
-		if( ipc.q2arm9.empty() )
+		
+		u32 retval = ipc.last_q2arm9 = Q.front(); Q.pop_front();
+		othercnt.b.send_full = thiscnt.b.recv_full = 0;
+		if( Q.empty() )
 		{
-			u32 oldstat = ipc.fifocnt7 & 1; // empty status
-			ipc.fifocnt7 |= 1;
-			if( oldstat==0 && (ipc.fifocnt7&5)==5 )
+			u32 oldirq = othercnt.b.send_empty & othercnt.b.send_empty_irq_en;
+			othercnt.b.send_empty = 1;
+			if( !oldirq && (othercnt.b.send_empty & othercnt.b.send_empty_irq_en) )
 			{
 				arm7_raise_irq(IRQ_IPC_SEND_EMPTY);
 			}
-			ipc.fifocnt9 |= BIT(8);	
-		}
-		return ipc.last_q2arm9 = val;
+			thiscnt.b.recv_empty = 1;
+		}	
+		return retval;
 	}
 	
 	if( a == 0x04000280 ) return dsmath.divcnt;
@@ -69,6 +67,10 @@ u32 nds::arm9_io_read(u32 a, int sz)
 
 void nds::arm9_io_write(u32 a, u32 v, int sz)
 {
+	if( a == 0x04000208 ) { irq9.IME = v&1; return; }
+	if( a == 0x04000210 ) { irq9.IE = v&0xffFFffu; arm9.irq_line = irq9.IME && (irq9.IE & irq9.IF); return; }
+	if( a == 0x04000214 ) { irq9.IF &= ~v; arm9.irq_line = irq9.IME && (irq9.IE & irq9.IF); return; }
+
 	if( a == 0x04000004 )
 	{
 		if( sz != 16 ) { std::println("dispstat wr{} isn't 16", sz); exit(1); }
@@ -76,9 +78,9 @@ void nds::arm9_io_write(u32 a, u32 v, int sz)
 		disp.stat |= (v&~7);
 		return;
 	}
-
 	if( a == 0x04000180 )
 	{ // IPCSYNC
+		//std::println("arm9 ipcsync = ${:X}", v);
 		ipc.to_arm7 = (v>>8)&15;
 		ipc.ipcsync9 = v & BIT(14);
 		if( (v&BIT(13)) && (ipc.ipcsync7 & BIT(14)) )
@@ -87,10 +89,64 @@ void nds::arm9_io_write(u32 a, u32 v, int sz)
 		}
 		return;
 	}
+	
+	if( a == 0x04000184 )
+	{ // IPCFIFOCNT
+		u32 send_empty_old = ipc.fifocnt9.b.send_empty_irq_en & ipc.fifocnt9.b.send_empty;
+		u32 recv_nempty_old = ipc.fifocnt9.b.recv_nempty_irq_en & !ipc.fifocnt9.b.recv_empty;
+		
+		fifocnt_t f;
+		f.v = v;
+		if( f.b.error ) ipc.fifocnt9.b.error = 0;
+		ipc.fifocnt9.b.send_empty_irq_en = f.b.send_empty_irq_en;
+		ipc.fifocnt9.b.recv_nempty_irq_en = f.b.recv_nempty_irq_en;
+		ipc.fifocnt9.b.enable = f.b.enable;
+				
+		if( send_empty_old == 0 && (ipc.fifocnt9.b.send_empty_irq_en & ipc.fifocnt9.b.send_empty) )
+		{
+			arm9_raise_irq(IRQ_IPC_SEND_EMPTY);
+		}
+		if( recv_nempty_old == 0 && (ipc.fifocnt9.b.recv_nempty_irq_en & !ipc.fifocnt9.b.recv_empty) )
+		{
+			arm9_raise_irq(IRQ_IPC_RECV_NEMPTY);
+		}
+		
+		if( f.b.send_clear )
+		{
+			ipc.q2arm7.clear();
+			ipc.last_q2arm7 = 0;
+			ipc.fifocnt9.b.send_empty = ipc.fifocnt7.b.recv_empty = 1;
+			ipc.fifocnt9.b.send_full = ipc.fifocnt7.b.recv_full = 0;
+		}
+		return;
+	}
+	if( a == 0x04000188 )
+	{ // IPCFIFOSEND
+		auto& othercnt = ipc.fifocnt7;
+		auto& thiscnt = ipc.fifocnt9;
+		auto& Q = ipc.q2arm7;
+		if( thiscnt.b.enable == 0 ) return;
+		if( thiscnt.b.send_full )
+		{
+			thiscnt.b.error = 1;
+			return;
+		}
+		if( Q.empty() )
+		{
+			if( othercnt.b.recv_empty && othercnt.b.recv_nempty_irq_en )
+			{
+				arm7_raise_irq(IRQ_IPC_RECV_NEMPTY);
+			}
+			othercnt.b.recv_empty = thiscnt.b.send_empty = 0;
+		}
+		Q.push_back(v);
+		if( Q.size() >= 16 )
+		{
+			thiscnt.b.send_full = othercnt.b.recv_full = 1;
+		}
+		return;
+	}
 
-	if( a == 0x04000208 ) { irq9.IME = v&1; return; }
-	if( a == 0x04000210 ) { irq9.IE = v&0xffFFffu; arm9.irq_line = irq9.IME && (irq9.IE & irq9.IF); return; }
-	if( a == 0x04000214 ) { irq9.IF &= ~v; arm9.irq_line = irq9.IME && (irq9.IE & irq9.IF); return; }
 	
 	if( a >= 0x04000240 && a <= 0x04000249 )
 	{
@@ -154,7 +210,7 @@ void nds::arm9_io_write(u32 a, u32 v, int sz)
 		dsmath_sqrt();
 		return;
 	}
-	std::println("arm9 IO Wr{} ${:X} = ${:X}", sz, a, v);
+std::println("arm9 IO Wr{} ${:X} = ${:X}", sz, a, v);	
 }
 
 extern bool enditall;
@@ -227,7 +283,6 @@ void nds::arm9_write(u32 a, u32 v, int sz, ARM_CYCLE)
 		return sized_write(vram, a-0x06800000u, v, sz);
 	}
 
-	if( a == 0x04000180 ) return;
 	std::println("arm9 wr{} ${:X} = ${:X} '{:c}'", sz, a, v, (char)v);
 }
 

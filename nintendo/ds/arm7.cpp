@@ -5,42 +5,48 @@
 
 u32 nds::arm7_io_read(u32 a, int sz)
 {
+	//std::println("arm7 io rd{} ${:X}", sz, a);
+	if( a == 0x040001A4 )
+	{
+		return BIT(23);
+	}
 	if( a == 0x04000180 )
 	{ // IPCSYNC
 		return (ipc.to_arm7&15)|((ipc.to_arm9&15)<<8)|(ipc.ipcsync7);
 	}
+	if( a == 0x04000184 ) return ipc.fifocnt7.v;
 	if( a == 0x04000208 ) return irq7.IME;
 	if( a == 0x04000210 ) return irq7.IE;
 	if( a == 0x04000214 ) return irq7.IF;
 	if( a == 0x04000241 ) return wramcnt;
 	if( a == 0x04100000 )
 	{ // IPC Receive FIFO
-		if( !(ipc.fifocnt7 & BIT(15)) )
+		auto& othercnt = ipc.fifocnt9;
+		auto& thiscnt = ipc.fifocnt7;
+		auto& Q = ipc.q2arm7;
+		if( thiscnt.b.enable == 0 ) return (Q.empty() ? ipc.last_q2arm7 : Q.front());
+		if( thiscnt.b.recv_empty )
 		{
-			if( ipc.q2arm7.empty() ) 
-			{
-				return ipc.last_q2arm7;
-			}
-			return ipc.q2arm7.front();
-		}
-		if( ipc.q2arm7.empty() )
-		{
-			ipc.fifocnt7 |= BIT(14);
+			thiscnt.b.error = 1;
 			return ipc.last_q2arm7;
 		}
-		u32 val = ipc.q2arm7.front(); ipc.q2arm7.pop_front();
-		if( ipc.q2arm7.empty() )
+		
+		u32 retval = ipc.last_q2arm7 = Q.front(); Q.pop_front();
+		othercnt.b.send_full = thiscnt.b.recv_full = 0;
+		if( Q.empty() )
 		{
-			u32 oldstat = ipc.fifocnt9 & 1; // empty status
-			ipc.fifocnt9 |= 1;
-			if( oldstat==0 && (ipc.fifocnt9&5)==5 )
+			u32 oldirq = othercnt.b.send_empty & othercnt.b.send_empty_irq_en;
+			othercnt.b.send_empty = 1;
+			if( !oldirq && (othercnt.b.send_empty & othercnt.b.send_empty_irq_en) )
 			{
 				arm9_raise_irq(IRQ_IPC_SEND_EMPTY);
 			}
-			ipc.fifocnt7 |= BIT(8);	
+			thiscnt.b.recv_empty = 1;
 		}
-		return ipc.last_q2arm7 = val;
+		return retval;
 	}
+	
+	std::println("arm7 io rd{} ${:X}", sz, a);
 	return 0;
 }
 
@@ -57,10 +63,69 @@ void nds::arm7_io_write(u32 a, u32 v, int sz)
 		return;
 	}
 	
+	if( a == 0x04000184 )
+	{ // IPCFIFOCNT
+		u32 send_empty_old = ipc.fifocnt7.b.send_empty_irq_en & ipc.fifocnt7.b.send_empty;
+		u32 recv_nempty_old = ipc.fifocnt7.b.recv_nempty_irq_en & !ipc.fifocnt7.b.recv_empty;
+		
+		fifocnt_t f;
+		f.v = v;
+		if( f.b.error ) ipc.fifocnt7.b.error = 0;
+		ipc.fifocnt7.b.send_empty_irq_en = f.b.send_empty_irq_en;
+		ipc.fifocnt7.b.recv_nempty_irq_en = f.b.recv_nempty_irq_en;
+		ipc.fifocnt7.b.enable = f.b.enable;
+				
+		if( send_empty_old == 0 && (ipc.fifocnt7.b.send_empty_irq_en & ipc.fifocnt7.b.send_empty) )
+		{
+			arm7_raise_irq(IRQ_IPC_SEND_EMPTY);
+		}
+		if( recv_nempty_old == 0 && (ipc.fifocnt7.b.recv_nempty_irq_en & !ipc.fifocnt7.b.recv_empty) )
+		{
+			arm7_raise_irq(IRQ_IPC_RECV_NEMPTY);
+		}
+		
+		if( f.b.send_clear )
+		{
+			ipc.q2arm9.clear();
+			ipc.last_q2arm9 = 0;
+			ipc.fifocnt7.b.send_empty = ipc.fifocnt9.b.recv_empty = 1;
+			ipc.fifocnt7.b.send_full = ipc.fifocnt9.b.recv_full = 0;
+		}
+		return;
+	}
+	
+	if( a == 0x04000188 )
+	{ // IPCFIFOSEND
+		auto& othercnt = ipc.fifocnt9;
+		auto& thiscnt = ipc.fifocnt7;
+		auto& Q = ipc.q2arm9;
+		if( thiscnt.b.enable == 0 ) return;
+		if( thiscnt.b.send_full )
+		{
+			thiscnt.b.error = 1;
+			return;
+		}
+		if( Q.empty() )
+		{
+			if( othercnt.b.recv_empty && othercnt.b.recv_nempty_irq_en )
+			{
+				arm9_raise_irq(IRQ_IPC_RECV_NEMPTY);
+			}
+			othercnt.b.recv_empty = thiscnt.b.send_empty = 0;
+		}
+		Q.push_back(v);
+		if( Q.size() >= 16 )
+		{
+			thiscnt.b.send_full = othercnt.b.recv_full = 1;
+		}
+		return;
+	}
+	
 	if( a == 0x04000208 ) { irq7.IME = v&1; return; }
 	if( a == 0x04000210 ) { irq7.IE = v&0xffFFffu; arm7.irq_line = irq7.IME && (irq7.IE & irq7.IF); return; }
 	if( a == 0x04000214 ) { irq7.IF &= ~v; arm7.irq_line = irq7.IME && (irq7.IE & irq7.IF); return; }
 
+	std::println("arm7 io wr{} ${:X} = ${:X}", sz, a, v);
 }
 
 u32 nds::arm7_read(u32 a, int sz, ARM_CYCLE)
@@ -109,7 +174,7 @@ void nds::arm7_raise_irq(u32 bit)
 {
 	irq7.IF |= bit;
 	arm7.irq_line = irq7.IME && (irq7.IF & irq7.IE);
-	if( arm7.irq_line ) { arm7.halted = 0; }
+	if( irq7.IF & irq7.IE ) { arm7.halted = 0; }
 }
 
 void nds::arm7_clear_irq(u32 bit)

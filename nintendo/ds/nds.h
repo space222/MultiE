@@ -21,6 +21,14 @@ public:
 	bool loadROM(std::string) override;
 	void event(u64 oldstamp, u32 code) override;
 	
+	void key_down(int k) override
+	{
+		if( k == SDL_SCANCODE_T )
+		{
+			std::println("IF7 = ${:X}, IE7 = ${:X}", irq7.IF, irq7.IE);
+		}
+	}
+	
 	Scheduler sched;
 	const u32 EVENT_HBLANK_START = 1;
 	const u32 EVENT_NEXT_SCANLINE = 2;
@@ -48,7 +56,7 @@ public:
 	void arm7_clear_irq(u32 bit);
 	const u32 IRQ_IPCSYNC_BIT = BIT(16);
 	const u32 IRQ_IPC_SEND_EMPTY = BIT(17);
-	const u32 IRQ_IPC_RECV_EMPTY = BIT(18);
+	const u32 IRQ_IPC_RECV_NEMPTY = BIT(18);
 	const u32 IRQ_VBLANK_BIT = BIT(0);
 	const u32 IRQ_HBLANK_BIT = BIT(1);
 	const u32 IRQ_VCOUNT_BIT = BIT(2);
@@ -60,13 +68,30 @@ public:
 	u32 keys();
 	u32 keystate = 0xffffFFFFu;
 	
+	union fifocnt_t {
+		struct {
+			unsigned int send_empty : 1;
+			unsigned int send_full : 1;
+			unsigned int send_empty_irq_en : 1;
+			unsigned int send_clear : 1;
+			unsigned int pad0 : 4;
+			unsigned int recv_empty : 1;
+			unsigned int recv_full : 1;
+			unsigned int recv_nempty_irq_en : 1;
+			unsigned int pad1 : 3;
+			unsigned int error : 1;
+			unsigned int enable : 1;			
+		} PACKED b;
+		u16 v;		
+	} PACKED;
+	
 	struct {
 		u8 to_arm7, to_arm9;
 		u16 ipcsync7, ipcsync9;
 		std::deque<u32> q2arm7, q2arm9;
 		u32 last_q2arm7, last_q2arm9;
 		
-		u32 fifocnt7, fifocnt9;
+		fifocnt_t fifocnt9, fifocnt7;
 	} ipc;
 	
 	struct {
