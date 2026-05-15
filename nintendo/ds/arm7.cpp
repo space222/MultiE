@@ -1,3 +1,4 @@
+#include <iostream>
 #include <print>
 #include <string>
 #include "util.h"
@@ -6,6 +7,9 @@
 u32 nds::arm7_io_read(u32 a, int sz)
 {
 	//std::println("arm7 io rd{} ${:X}", sz, a);
+	if( a >= 0x040001C0 && a <= 0x040001C8 ) return 0;
+	if( a == 0x04000004 ) { return (disp.stat&7)|(disp.stat7&~7); }
+	if( a == 0x04000136 ) { return 0x7f; }
 	if( a == 0x040001A4 )
 	{
 		return BIT(23);
@@ -14,6 +18,12 @@ u32 nds::arm7_io_read(u32 a, int sz)
 	{ // IPCSYNC
 		return (ipc.to_arm7&15)|((ipc.to_arm9&15)<<8)|(ipc.ipcsync7);
 	}
+	if( a == 0x04000181 )
+	{ // IPCSYNC hibyte
+		return ((ipc.to_arm7&15)|((ipc.to_arm9&15)<<8)|(ipc.ipcsync7))>>8;
+	}
+	if( a == 0x04000300 ) return postflag7;
+	if( a == 0x04000130 ) return keystate;
 	if( a == 0x04000184 ) return ipc.fifocnt7.v;
 	if( a == 0x04000208 ) return irq7.IME;
 	if( a == 0x04000210 ) return irq7.IE;
@@ -52,6 +62,17 @@ u32 nds::arm7_io_read(u32 a, int sz)
 
 void nds::arm7_io_write(u32 a, u32 v, int sz)
 {
+	//std::println("${:X}: arm7 io wr{} ${:X} = ${:X}", arm7.r[15]-(arm7.cpsr.b.T?4:8), sz, a, v);
+	if( a >= 0x040001C0 && a <= 0x040001C8 ) return;
+	if( a == 0x04000301 ) { arm7.halted = v&0x80; return; }
+	if( a == 0x04000004 )
+	{
+		disp.stat7 &= ~7;
+		disp.stat7 |= disp.stat&7;
+		v &= ~7;
+		disp.stat7 |= v;
+		return;
+	}
 	if( a == 0x04000180 )
 	{ // IPCSYNC
 		ipc.to_arm9 = (v>>8)&15;
@@ -60,6 +81,16 @@ void nds::arm7_io_write(u32 a, u32 v, int sz)
 		{
 			arm9_raise_irq(IRQ_IPCSYNC_BIT);
 		}		
+		return;
+	}
+	if( a == 0x04000181 )
+	{ // IPCSYNC hibyte
+		ipc.to_arm9 = v&15;
+		ipc.ipcsync7 = v & BIT(6);
+		if( (v&BIT(5)) && (ipc.ipcsync9 & BIT(14)) )
+		{
+			arm9_raise_irq(IRQ_IPCSYNC_BIT);
+		}
 		return;
 	}
 	
@@ -125,12 +156,15 @@ void nds::arm7_io_write(u32 a, u32 v, int sz)
 	if( a == 0x04000210 ) { irq7.IE = v&0xffFFffu; arm7.irq_line = irq7.IME && (irq7.IE & irq7.IF); return; }
 	if( a == 0x04000214 ) { irq7.IF &= ~v; arm7.irq_line = irq7.IME && (irq7.IE & irq7.IF); return; }
 
-	std::println("arm7 io wr{} ${:X} = ${:X}", sz, a, v);
+	if( a >= 0x04000400 && a < 0x04000500 ) { if(v)std::println("SND Write ${:X} = ${:X}", a, v); /*char c; std::cin>>c;*/  return; }
+
+	std::println("${:X}: arm7 io wr{} ${:X} = ${:X}", arm7.r[15]-(arm7.cpsr.b.T?4:8), sz, a, v);
 }
 
 u32 nds::arm7_read(u32 a, int sz, ARM_CYCLE)
 {
-	if( a < 0x02000000 ) return sized_read(arm7_bios, a&0x3fff, sz);
+	if( a < 0x4000 ) { /*std::println("arm7 bios rd{} ${:X}", sz, a);*/ return sized_read(arm7_bios, a&0x3fff, sz); }
+	if( a < 0x02000000 ) { std::println("invalid read from ${:X}", a); exit(1); }
 	if( a < 0x03000000 ) return sized_read(mainram, a&(4_MB-1), sz);
 	if( a >= 0x03000000u && a < 0x03800000u )
 	{
@@ -145,7 +179,7 @@ u32 nds::arm7_read(u32 a, int sz, ARM_CYCLE)
 	}
 	if( a >= 0x03800000 && a < 0x04000000 ) return sized_read(arm7_wram, a&0xffff, sz);
 	if( a >= 0x04000000 && a < 0x05000000 ) return arm7_io_read(a, sz);
-	std::println("arm7 rd{} ${:X}", sz, a);
+	//std::println("arm7 rd{} ${:X}", sz, a);
 	return 0;
 }
 
@@ -166,20 +200,21 @@ void nds::arm7_write(u32 a, u32 v, int sz, ARM_CYCLE)
 	}
 	if( a >= 0x03800000 && a < 0x04000000 ) return sized_write(arm7_wram, a&0xffff, v, sz);
 	if( a >= 0x04000000 && a < 0x05000000 ) return arm7_io_write(a, v, sz);
-	std::println("${:X}: arm7 wr{} ${:X} = ${:X}", arm7.r[15] - (arm7.cpsr.b.T ? 4:8), sz, a, v);
+//std::println("${:X}: arm7 wr{} ${:X} = ${:X}", arm7.r[15] - (arm7.cpsr.b.T ? 4:8), sz, a, v);
+	
 }
 
 
 void nds::arm7_raise_irq(u32 bit)
 {
 	irq7.IF |= bit;
-	arm7.irq_line = irq7.IME && (irq7.IF & irq7.IE);
+	arm7.irq_line = (irq7.IME && (irq7.IF & irq7.IE));
 	if( irq7.IF & irq7.IE ) { arm7.halted = 0; }
 }
 
 void nds::arm7_clear_irq(u32 bit)
 {
 	irq7.IF &= ~bit;
-	arm7.irq_line = irq7.IME && (irq7.IF & irq7.IE);
+	arm7.irq_line = (irq7.IME && (irq7.IF & irq7.IE));
 }
 

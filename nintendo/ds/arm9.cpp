@@ -1,3 +1,4 @@
+#include <iostream>
 #include <print>
 #include <string>
 #include "nds.h"
@@ -9,16 +10,23 @@ u32 nds::arm9_io_read(u32 a, int sz)
 	if( a == 0x04000004u ) return disp.stat;
 	if( a == 0x04000006u ) return disp.scanline;
 	if( a == 0x04000130u ) return (sz == 8) ? keystate&0xff : keystate;// keys();
-	if( a == 0x04000180 )
-	{ // IPCSYNC
-		return (ipc.to_arm9&15)|((ipc.to_arm7&15)<<8)|(ipc.ipcsync9);
-	}
-	if( a == 0x04000184 ) return ipc.fifocnt9.v;
 	if( a == 0x04000208 ) return irq9.IME;
 	if( a == 0x04000210 ) return irq9.IE;
 	if( a == 0x04000214 ) return irq9.IF;
 	if( a == 0x04000247 ) return wramcnt;
 	if( a >= 0x04000240 && a <= 0x04000249 ) { return sized_read(vmap_bytes, a-0x04000240, sz); }
+
+
+	//std::println("arm9 IO Rd{} ${:X}", sz, a);
+	if( a == 0x04000180 )
+	{ // IPCSYNC
+		return (ipc.to_arm9&15)|((ipc.to_arm7&15)<<8)|(ipc.ipcsync9);
+	}
+	if( a == 0x04000181 )
+	{ // IPCSYNC hibyte
+		return ((ipc.to_arm9&15)|((ipc.to_arm7&15)<<8)|(ipc.ipcsync9))>>8;
+	}
+	if( a == 0x04000184 ) return ipc.fifocnt9.v;
 
 	if( a == 0x04100000 )
 	{ // IPC Receive FIFO
@@ -61,7 +69,7 @@ u32 nds::arm9_io_read(u32 a, int sz)
 	if( a == 0x040002B4 ) return dsmath.sqrt_res;
 	if( a == 0x040002B8 ) return dsmath.sqrt_param;
 	if( a == 0x040002BC ) return dsmath.sqrt_param>>32;
-	std::println("arm9 IO Rd{} ${:X}", sz, a);
+//	std::println("arm9 IO Rd{} ${:X}", sz, a);
 	return 0;
 }
 
@@ -71,6 +79,7 @@ void nds::arm9_io_write(u32 a, u32 v, int sz)
 	if( a == 0x04000210 ) { irq9.IE = v&0xffFFffu; arm9.irq_line = irq9.IME && (irq9.IE & irq9.IF); return; }
 	if( a == 0x04000214 ) { irq9.IF &= ~v; arm9.irq_line = irq9.IME && (irq9.IE & irq9.IF); return; }
 
+//std::println("arm9 IO Wr{} ${:X} = ${:X}", sz, a, v);
 	if( a == 0x04000004 )
 	{
 		if( sz != 16 ) { std::println("dispstat wr{} isn't 16", sz); exit(1); }
@@ -84,6 +93,17 @@ void nds::arm9_io_write(u32 a, u32 v, int sz)
 		ipc.to_arm7 = (v>>8)&15;
 		ipc.ipcsync9 = v & BIT(14);
 		if( (v&BIT(13)) && (ipc.ipcsync7 & BIT(14)) )
+		{
+			arm7_raise_irq(IRQ_IPCSYNC_BIT);
+		}
+		return;
+	}
+	if( a == 0x04000181 )
+	{ // IPCSYNC hibyte
+		//std::println("arm9 ipcsync = ${:X}", v);
+		ipc.to_arm7 = v&15;
+		ipc.ipcsync9 = v & BIT(6);
+		if( (v&BIT(5)) && (ipc.ipcsync7 & BIT(14)) )
 		{
 			arm7_raise_irq(IRQ_IPCSYNC_BIT);
 		}
@@ -120,6 +140,7 @@ void nds::arm9_io_write(u32 a, u32 v, int sz)
 		}
 		return;
 	}
+	
 	if( a == 0x04000188 )
 	{ // IPCFIFOSEND
 		auto& othercnt = ipc.fifocnt7;
@@ -150,6 +171,7 @@ void nds::arm9_io_write(u32 a, u32 v, int sz)
 	
 	if( a >= 0x04000240 && a <= 0x04000249 )
 	{
+		vmap_bytes[7] = wramcnt;
 		sized_write(vmap_bytes, a-0x04000240, v, sz);
 		wramcnt = vmap_bytes[7]&3;
 		remap_vram();
@@ -210,7 +232,7 @@ void nds::arm9_io_write(u32 a, u32 v, int sz)
 		dsmath_sqrt();
 		return;
 	}
-std::println("arm9 IO Wr{} ${:X} = ${:X}", sz, a, v);	
+//std::println("arm9 IO Wr{} ${:X} = ${:X}", sz, a, v);
 }
 
 extern bool enditall;
@@ -218,7 +240,12 @@ extern bool enditall;
 u32 nds::arm9_read(u32 a, int sz, ARM_CYCLE)
 {
 	//todo: actual dtcm
-	if( a >= arm9.dtcm.base && a < arm9.dtcm.base+arm9.dtcm.size ) return sized_read(dtcm, a&0x3fff, sz);
+	if( a >= arm9.dtcm.base && a < arm9.dtcm.base+arm9.dtcm.size )
+	{
+		u32 r = sized_read(dtcm, a&0x3fff, sz);
+		//std::println("dtcm read ${:X} got ${:X}", a, r);
+		return r;
+	}
 	if( a >= 0x01000000u && a < 0x02000000u )
 	{ //todo: real'er itcm
 		return sized_read(itcm, a&(32_KB-1), sz);
@@ -253,7 +280,17 @@ u32 nds::arm9_read(u32 a, int sz, ARM_CYCLE)
 
 void nds::arm9_write(u32 a, u32 v, int sz, ARM_CYCLE)
 {
-	if( a >= arm9.dtcm.base && a < arm9.dtcm.base+arm9.dtcm.size ) return sized_write(dtcm, a&0x3fff, v, sz);
+	//std::println("arm9 wr{} ${:X} = ${:X}", sz, a, v);
+	if( a >= arm9.dtcm.base && a < arm9.dtcm.base+arm9.dtcm.size )
+	{
+		if( (a&0x3ffc) == 0x3ffc ) 
+		{
+			std::println("DTCM vector write{} ${:X} = ${:X}", sz, a, v);
+			//char c;
+			//std::cin >> c;
+		}
+		return sized_write(dtcm, a&0x3fff, v, sz);
+	}
 	if( a >= 0x01000000u && a < 0x02000000u )
 	{ //todo: real'er itcm
 		return sized_write(itcm, a&(32_KB-1), v, sz);
@@ -267,7 +304,7 @@ void nds::arm9_write(u32 a, u32 v, int sz, ARM_CYCLE)
 		switch( wramcnt&3 )
 		{
 		case 0: a &= 0x7fff; break; 		
-		case 1: a = 0x4000 + (a&0x3fff); break;		
+		case 1: a = 0x4000 + (a&0x3fff); break;
 		case 2: a &= 0x3fff; break;		
 		case 3: return;	
 		}
@@ -283,11 +320,15 @@ void nds::arm9_write(u32 a, u32 v, int sz, ARM_CYCLE)
 		return sized_write(vram, a-0x06800000u, v, sz);
 	}
 
-	std::println("arm9 wr{} ${:X} = ${:X} '{:c}'", sz, a, v, (char)v);
+	//std::println("arm9 wr{} ${:X} = ${:X} '{:c}'", sz, a, v, (char)v);
 }
+
+std::deque<u32> L10;
 
 u32 nds::arm9_fetch(u32 a, int sz, ARM_CYCLE)
 {
+	L10.push_back(a);
+	if( L10.size() > 10 ) L10.pop_front();
 	if( a >= 0x01000000u && a < 0x02000000u )
 	{
 		return sized_read(itcm, a&(32_KB-1), sz);
@@ -298,11 +339,17 @@ u32 nds::arm9_fetch(u32 a, int sz, ARM_CYCLE)
 	}
 	if( a >= 0xFFFF0000u ) return sized_read(arm9_bios, a&0x3fff, sz);
 	std::println("arm9 fetch{} ${:X}", sz, a);
+	for(u32 i : L10)
+	{
+		std::println("L10 ${:X}", i);
+	}
+	exit(1);
 	return 0;
 }
 
 void nds::arm9_raise_irq(u32 bit)
 {
+	//std::println("ARM9 Raise IRQ ${:X}", bit);
 	irq9.IF |= bit;
 	arm9.irq_line = irq9.IME && (irq9.IF & irq9.IE);
 	if( arm9.irq_line ) { arm9.halted = 0; }

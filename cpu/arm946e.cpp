@@ -1,3 +1,4 @@
+#include <iostream>
 #include <print>
 #include "arm946e.h"
 
@@ -39,12 +40,14 @@ void arm7_mul_long(arm&, u32);
 
 void arm9_stcldc(arm& cpu, u32 opc)
 {
-	
+	std::println("STC LDC !");
+	exit(1);
 }
 
 void arm9_cdp(arm& cpu, u32 opc)
 {
-	
+	std::println("CDP!");
+	exit(1);
 }
 
 void arm9_mcr(arm& cpu_, u32 opc)
@@ -65,6 +68,7 @@ void arm9_mcr(arm& cpu_, u32 opc)
 			cpu.r[Rd] = 0x0F0D2112;
 		} else if( cp_op == 0 && Cn == 9 && Cm == 1 && CP == 0 ) {
 			cpu.r[Rd] = cpu.dtcm.p15_910;
+			std::println("cop910 dtcm base read ${:X}", cpu.r[Rd]);
 		} else {
 			std::println("copread P{}, cp_op{}, Cn{}, Cm{}, CP{}, Rd(${:X})", Pn, cp_op, Cn, Cm, CP, cpu.r[Rd]);
 		}
@@ -78,10 +82,13 @@ void arm9_mcr(arm& cpu_, u32 opc)
 			cpu.dtcm.size = 512 << ((v>>1)&0x1F);
 			cpu.dtcm.p15_910 = v;
 			std::println("DTCM base=${:X}, size={}KB", cpu.dtcm.base, cpu.dtcm.size);
+			//char c;
+			//std::cin>>c;
 			return;
 		}
 		if( cp_op == 0 && Cn == 7 && Cm == 0 && CP == 4 )
 		{
+			//std::println("ARM9 Halted");
 			cpu.halted = true;
 			return;
 		}
@@ -239,7 +246,7 @@ void arm9_xfer_double(arm& cpu, u32 opc)
 {
 	u32 offs = (opc&BIT(22)) ? (((opc>>4)&0xf0)|(opc&15)) : cpu.r[opc&15];
 	u32 n = (opc>>16)&15;
-	u32 d = (opc>>12)&15;
+	u32 d = (opc>>12)&14;
 	u32 base = cpu.r[n];
 	const bool up = opc & BIT(23);
 	const bool pre = opc & BIT(24);
@@ -250,23 +257,21 @@ void arm9_xfer_double(arm& cpu, u32 opc)
 		base += up ? offs : -offs;
 	}
 	
-	if( opc & BIT(20) )
+	if( !(opc & BIT(5)) )
 	{
 		cpu.r[d++] = cpu.read(base&~3, 32, ARM_CYCLE::N);
-		base += up ? offs : -offs;
-		cpu.r[d&0xF] = cpu.read(base&~3, 32, ARM_CYCLE::N);
+		cpu.r[d&0xF] = cpu.read((base&~3)+4, 32, ARM_CYCLE::N); //(up ? 4 : -4)
 		if( d == 15 )
 		{
-			if( cpu.armV >= 5 && (cpu.r[15]&1) )
+			if( cpu.r[15]&1 )
 			{ //todo: most v5 loads can change modes but confirm this one can
-				cpu.cpsr.b.T = 1;
+				//cpu.cpsr.b.T = 1;  // apparently not?
 			}		
 			cpu.flushp();
 		}
 	} else {
-		cpu.write(base&~3, cpu.r[d], 32, ARM_CYCLE::N);
-		base += up ? offs : -offs;
-		cpu.write(base&~3, cpu.r[d], 32, ARM_CYCLE::N);		
+		cpu.write(base&~3, cpu.r[d++], 32, ARM_CYCLE::N);
+		cpu.write((base&~3)+4, cpu.r[d&0xf] + (d==15 ? 4:0), 32, ARM_CYCLE::N);		
 	}
 	
 	if( !pre )
@@ -274,7 +279,7 @@ void arm9_xfer_double(arm& cpu, u32 opc)
 		base += up ? offs : -offs;
 	}
 	
-	if( wback && (n != d || !(opc&BIT(20))) ) cpu.r[n] = base;	
+	if( wback && ((n != (d&~1)) || !(opc&BIT(5))) ) cpu.r[n] = base;	
 }
 
 arm7_instr arm946e::decode_arm(u32 opcode)
@@ -417,7 +422,7 @@ void arm946e::step()
 	fetch = inst_fetch(r[15]&(cpsr.b.T?~1:~3), (cpsr.b.T ? 16 : 32), ARM_CYCLE::X);
 	u32 opc = execute;
 	
-	//std::println("${:X}:{:X}: opc = ${:X}", r[15] - (cpsr.b.T?4:8), u32(cpsr.b.T), opc);
+	//std::println("${:X}:{:X}: arm9opc = ${:X}", r[15] - (cpsr.b.T?4:8), u32(cpsr.b.T), opc);
 	
 	if( cpsr.b.T )
 	{
@@ -425,7 +430,6 @@ void arm946e::step()
 	} else {
 		if( (opc>>28) == 0xF )
 		{
-			//std::println("condF! opc = ${:X}", opc);
 			if( ((opc>>25)&7) == 5 )
 			{
 				u32 retval = r[15] - 4;
@@ -436,6 +440,9 @@ void arm946e::step()
 				cpsr.b.T = 1;
 				flushp();
 		 		r[14] = retval;
+	 		} else {
+	 			std::println("condF! opc = ${:X}", opc);
+				exit(1);
 	 		}
 		} else if( isCond(opc>>28) ) {
  			decode_arm(opc)(*this, opc);
@@ -447,7 +454,6 @@ void arm946e::step()
 void arm946e::reset()
 {
 	//todo: copied from my old emu, need to double check
-	//std::println("arm7di::reset()");
 	cpsr.b.M = ARM_MODE_USER;
 	r[13] = 0x03007F00;
 	r13_svc = 0x03007FE0; 

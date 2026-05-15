@@ -612,7 +612,7 @@ void thumb17_swi(arm& cpu, u32)
 	cpu.r[14] = cpu.r[15]-2;
 	cpu.r[15] = ((cpu.armV>4) ? 0xffff0008u : 8);
 	cpu.flushp();
-	//std::println("Thumb SWI");
+	//std::println("Thumb SWI ${:X}", opc&0xff);
 }
 
 void thumb18_b(arm& cpu, u32 opc)

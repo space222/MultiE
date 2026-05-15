@@ -47,10 +47,14 @@ void nds::reset()
 {
 	//arm7.reset();
 	//arm9.reset();
-	arm9.dtcm.base = 0x800000;
+	arm9.dtcm.base = 0x02FF0000;
 	arm9.dtcm.size = 0x4000;
+	arm9.dtcm.p15_910 = 0x02FF000A;
 	wramcnt = 3;
 	
+	postflag7 = postflag9 = 1;
+	
+	irq7.IF = irq7.IE = irq9.IF = irq9.IE = irq9.IME = irq7.IME = 0;	
 	ipc.ipcsync7 = ipc.ipcsync9 = 0;
 	ipc.fifocnt7.v = ipc.fifocnt9.v = 0x101;
 	ipc.last_q2arm9 = ipc.last_q2arm7 = 0;
@@ -85,6 +89,8 @@ bool nds::loadROM(std::string fname)
 		return false;
 	}
 	
+	wramcnt = 3;
+	
 	FILE* fp = fopen(fname.c_str(), "rb");
 	fseek(fp, 0, SEEK_END);
 	auto fsz = ftell(fp);
@@ -101,21 +107,36 @@ bool nds::loadROM(std::string fname)
 		arm9_write(ram_addr, ROM[rom_offset], 8, ARM_CYCLE::X);
 	}
 	arm9.reset();
-	arm9.r[15] = *(u32*)&ROM[0x24];
+	arm9.switch_to_mode(ARM_MODE_USER);
+	for(u32 i = 0; i < 15; ++i) arm9.r[i] = 0;
+	arm9.r[12] = arm9.r[14] = arm9.r[15] = *(u32*)&ROM[0x24];
+	arm9.r[13] = 0x3002F7C;
+	arm9.r13_irq = 0x3003F80;
+	arm9.r13_svc = 0x3003FC0;
+	arm9.cpsr.b.I = arm9.cpsr.b.F = 1;
+	arm9.switch_to_mode(ARM_MODE_SUPER);
+	arm9.cpsr.b.I = arm9.cpsr.b.F = 1;
 	arm9.flushp();
 	
 	rom_offset = *(u32*)&ROM[0x30];
 	ram_addr = *(u32*)&ROM[0x38];
 	size = *(u32*)&ROM[0x3C];
+	std::println("arm7 start = ${:X}, size = ${:X}, entry = ${:X}", ram_addr, size, *(u32*)&ROM[0x34]);
 	for(u32 i = 0; i < size; ++i, ++ram_addr, ++rom_offset)
 	{
 		arm7_write(ram_addr, ROM[rom_offset], 8, ARM_CYCLE::X);
 	}
 	arm7.reset();
-	arm7.r[15] = *(u32*)&ROM[0x34];
+	for(u32 i = 0; i < 15; ++i) arm7.r[i] = 0;
+	arm7.r[12] = arm7.r[14] = arm7.r[15] = *(u32*)&ROM[0x34];
+	arm7.r[13] = 0x380FFC0;
+	arm7.r13_svc = 0x380FD80;
+	arm7.r13_irq = 0x380FF80;
 	arm7.flushp();
+	arm7.cpsr.b.I = arm7.cpsr.b.F = 1;
 	//*/
 	
+	memcpy(mainram + 0x3FFE00, ROM.data(), 0x170);
 	
 	return true;
 }
@@ -206,6 +227,9 @@ void nds::event(u64 oldstamp, u32 code)
 		if( disp.stat & DISPSTAT_HBLANK_IRQ_EN )
 		{
 			arm9_raise_irq(IRQ_HBLANK_BIT);
+		}
+		if( disp.stat7 & DISPSTAT_HBLANK_IRQ_EN )
+		{
 			arm7_raise_irq(IRQ_HBLANK_BIT);
 		}
 		sched.add_event(oldstamp + 1605, EVENT_HBLANK_START);
@@ -224,6 +248,9 @@ void nds::event(u64 oldstamp, u32 code)
 		if( disp.scanline == 192 && (disp.stat & DISPSTAT_VBLANK_IRQ_EN) )
 		{
 			arm9_raise_irq(IRQ_VBLANK_BIT);
+		}
+		if( disp.scanline == 192 && (disp.stat7 & DISPSTAT_VBLANK_IRQ_EN) )
+		{
 			arm7_raise_irq(IRQ_VBLANK_BIT);
 		}
 		if( disp.scanline >= 192 )
@@ -231,9 +258,13 @@ void nds::event(u64 oldstamp, u32 code)
 			disp.stat |= DISPSTAT_VBLANK_FLAG;
 		}
 		u32 vmatch = (disp.stat>>8)|((disp.stat&0x80)<<1);
+		u32 vmatch7= (disp.stat7>>8)|((disp.stat7&0x80)<<1);
 		if( (disp.stat & DISPSTAT_VCOUNT_IRQ_EN) && vmatch == disp.scanline )
 		{
 			arm9_raise_irq(IRQ_VCOUNT_BIT);
+		}
+		if( (disp.stat7 & DISPSTAT_VCOUNT_IRQ_EN) && vmatch7 == disp.scanline )
+		{
 			arm7_raise_irq(IRQ_VCOUNT_BIT);		
 		}
 		sched.add_event(oldstamp + 1605, EVENT_NEXT_SCANLINE);

@@ -450,9 +450,9 @@ vr4300_instr decode_regular(VR4300& proc, u32 opcode)
 					en.V1 = cpu.ENTRY_LO1 & 2; 
 				};			
 			}
-			printf("VR4300: Unimpl COP0 opcode = $%X\n", opcode);
-			//return [](VR4300&, u32) {};
-			exit(1);
+			//printf("VR4300: Unimpl COP0 opcode = $%X\n", opcode);
+			return [](VR4300&, u32) {};
+			//exit(1);
 		}
 	case 0x11: return cop1(proc, opcode); // COP1 / FPU todo
 	case 0x12: return [](VR4300& cpu, u32) { if( cpu.COPUnusable(2) ) return; }; // COP2??		
@@ -734,7 +734,9 @@ vr4300_instr decode_regular(VR4300& proc, u32 opcode)
 		};
 	
 	case 0x3F: return INSTR { ITYPE; cpu.write(cpu.r[s] + s16(imm16), cpu.r[t], 64); }; // SD
-	default: printf("VR4300: unimpl regular opc $%X\n", opcode>>26); exit(1);
+	default: 
+		return INSTR { cpu.exception(10); };
+		//printf("VR4300: unimpl regular opc $%X\n", opcode>>26); exit(1);
 	}
 	return nullptr;
 }

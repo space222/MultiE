@@ -104,10 +104,11 @@ public:
 	void dsmath_sqrt();
 	
 	u8 wramcnt;
+	u8 postflag7, postflag9;
 	
 	struct {
 		u32 scanline;
-		u32 stat;
+		u32 stat, stat7;
 	} disp;
 	const u32 DISPSTAT_VBLANK_FLAG = BIT(0);
 	const u32 DISPSTAT_HBLANK_FLAG = BIT(1);
