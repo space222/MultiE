@@ -22,6 +22,7 @@ void GameCube::run_frame()
 	
 		for(u32 i = 0; i < 31000; ++i)
 		{
+			//if( cpu.pc >= 0x80003c8c && cpu.pc < 0x80004000 ) std::println("pc = ${:X}", cpu.pc);
 			cpu.step();
 		}
 		vi.dpv += 1;
@@ -67,8 +68,9 @@ void GameCube::reset()
 	cpu.reset();
 	debug_type = 0;
 	vi.di[0].v = vi.di[1].v = vi.di[2].v = vi.di[3].v = 0;
-	cpu.msr.b.ee = 0;
-	
+	cpu.msr.v = 0;
+	cpu.msr.b.ri = 1;
+	cpu.SPRs[1009] = 0x80000000u;
 	/* //seeing what kind of stuff Dolphin writes to RAM in order to HLE the bootrom
 	// Booted from bootrom. 0xE5207C22 = booted from jtag
   PowerPC::MMU::HostWrite_U32(guard, 0x0D15EA5E, 0x80000020);
@@ -99,12 +101,14 @@ void GameCube::reset()
 	
 }
 
+static u64 tbase = 0;
+	
 bool GameCube::loadROM(std::string fname)
 {
 	//cpu.fetcher = [&](u32 a)->u32 { return fetch(a); };
 	cpu.read = [&](u32 a, int s)->u32 { return read(a, s); };
 	cpu.write = [&](u32 a, u64 v, int s) { write(a,v,s); };
-	
+	cpu.get_tbr = [&](u32 tbr)->u32 { tbase+=1; if( tbr == 268 ) return tbase; return tbase>>32; };
 	//cpu.readf = [&](u32 a)->float { float v = 0; u32 b = read(a,32); memcpy(&v,&b,4); return v; };
 	//cpu.readd = [&](u32 a)->double { return read_double(a); };
 	//cpu.writef = [&](u32 a, float f) { u32 b = 0; memcpy(&b,&f,4); write(a,b,32); };
@@ -203,7 +207,7 @@ u32 GameCube::fetch(u32 addr)
 	return 0;
 }
 
-u32 GameCube::read(u32 addr, int size)
+u64 GameCube::read(u32 addr, int size)
 {
 	if( ((addr >> 24)&0xf) == 0x0c )
 	{
@@ -215,10 +219,25 @@ u32 GameCube::read(u32 addr, int size)
 		if( addr == 0xcc006404 )
 		{
 			auto keys = SDL_GetKeyboardState(nullptr);
-			return (keys[SDL_SCANCODE_S] ? -1 : 0);
+			u32 val = 0x00008080u;
+			if( keys[SDL_SCANCODE_S] ) val ^= BIT(28);
+			if( keys[SDL_SCANCODE_UP] ) { val &= ~0xff; val |= 200;  }
+			if( keys[SDL_SCANCODE_DOWN] ) { val &= ~0xff; val |= 40;  }
+			if( keys[SDL_SCANCODE_RIGHT] ) { val &= 0xff; val |= 200<<8;  }
+			if( keys[SDL_SCANCODE_LEFT] ) { val &=0xff; val |= 40<<8;  }
+			if( keys[SDL_SCANCODE_Z] ) val ^= BIT(24);
+			return val;
 		}
-		if( addr == 0xcc006408 ) return 0;//0x3fffFFFFu; // cont.1 btns
-		
+		if( addr == 0xcc006408 )
+		{
+			auto keys = SDL_GetKeyboardState(nullptr);
+			u32 val = 0;
+			if( keys[SDL_SCANCODE_UP] ) { val |= 40;  }
+			if( keys[SDL_SCANCODE_DOWN] ) { val |= 200;  }
+			if( keys[SDL_SCANCODE_RIGHT] ) { val |= 40<<8;  }
+			if( keys[SDL_SCANCODE_LEFT] ) { val |= 200<<8;  }
+			return val;
+		}
 		if( addr >= 0xcc006800u && addr < 0xcc006900u )
 		{
 			//u32 t = exiregs[(addr>>2)&0x3F];
@@ -233,25 +252,51 @@ u32 GameCube::read(u32 addr, int size)
 			return dsp_io_read(addr, size);
 		}
 		
-		std::println("${:X}: read{} ${:X}", cpu.pc-4, size, addr);
 				
-		if( addr == 0xcc002030 ) return vi.di[0].v;
-		if( addr == 0xcc002034 ) return vi.di[1].v;
-		if( addr == 0xcc002038 ) return vi.di[2].v;
-		if( addr == 0xcc00203c ) return vi.di[3].v;
+		if( addr == 0xcc002030 )
+		{
+			return vi.di[0].v>>16;
+		}
+		if( addr == 0xcc002032 )
+		{
+			std::println("read{} ${:X}", size, addr);
+			exit(1);
+		}
+		if( addr == 0xcc002034 ) 
+		{
+			return vi.di[1].v>>16;
+		}
+		if( addr == 0xcc002036 )
+		{
+			std::println("read{} ${:X}", size, addr);
+			exit(1);
+		}
+		if( addr == 0xcc002038 ) 
+		{
+			return vi.di[2].v>>16;
+		}
+		if( addr == 0xcc00203A )
+		{
+			std::println("read{} ${:X}", size, addr);
+			exit(1);
+		}
+		if( addr == 0xcc00203c ) 
+		{
+			return vi.di[3].v>>16;
+		}
 		
 		static u32 line = 0;
 		if( addr == 0xcc00202c ) { line++; if(line==263){ line = 0; } return line; }
-		std::println("${:X}: read{} ${:X}", cpu.pc-4, size, addr);
-	
+		
 		if( addr == 0xcc003000 )
 		{
-			std::println("PI INTSR reads ${:X}", pi.INTSR);
+			//std::println("PI INTSR reads ${:X}", pi.INTSR);
 			return pi.INTSR;
 		}
 		
 		if( addr == 0xcc003004 ) return pi.INTMR;
 		
+		std::println("${:X}: read{} ${:X}", cpu.pc-4, size, addr);
 		
 		
 		return 0;
@@ -268,13 +313,14 @@ u32 GameCube::read(u32 addr, int size)
 		//if( addr >= 0x20 && addr <= 0x30 ) { std::println("read ${:X}", addr); exit(1); }
 		if( size == 8 ) return mem1[addr];
 		if( size == 16) return __builtin_bswap16(*(u16*)&mem1[addr]);
-		return __builtin_bswap32(*(u32*)&mem1[addr]);
+		if( size == 32) return __builtin_bswap32(*(u32*)&mem1[addr]);
+		return __builtin_bswap64(*(u64*)&mem1[addr]);
 	}
 	std::println("${:X}: read{} ${:X}", cpu.pc-4, size, addr);
 	return 0;
 }
 
-void GameCube::write(u32 addr, u32 v, int size)
+void GameCube::write(u32 addr, u64 v, int size)
 {
 	if( ((addr >> 24)&0xf) == 0x0c )
 	{
@@ -286,12 +332,17 @@ void GameCube::write(u32 addr, u32 v, int size)
 		if( addr == 0xcc003004 ) { pi.INTMR = v; return; }
 		if( addr >= 0xcc002030 && addr <= 0xcc00203c ) 
 		{
-			if( size == 16 && (addr&3)==0 ) v<<=16;
 			u32 direg = (addr>>2)&3;
-			vi.di[direg].v &= BIT(31);
-			vi.di[direg].v |= v&~BIT(31);
-			if( v & BIT(31) ) vi.di[direg].v &= ~BIT(31);
-			std::println("{}: di{} = 0x{:X}, e = {}", size, direg, v, (int)vi.di[direg].b.e);
+			if( size == 16 && !(addr&2))
+			{
+				 v = (v<<16)|(vi.di[direg].v&0xffff);
+			} else if( size==16 && (addr&2) ) {
+				v &= 0xffff;
+				v |= vi.di[direg].v&0xffff0000u;
+			}
+			vi.di[direg].v = v;
+			if( !(v & BIT(31)) ) { clearINTSR(0x100); }
+			//std::println("{}: di{} = 0x{:X}, e = {}", size, direg, v, (int)vi.di[direg].b.e);
 			return;
 		}
 		if( addr == 0xcc00201c ) { vi.fbaddr = v&0x1fffFFFFu; return; }
@@ -345,7 +396,8 @@ void GameCube::write(u32 addr, u32 v, int size)
 		addr &= 0x1fffFFFFu;
 		if( size == 8 ) mem1[addr] = v;
 		else if( size == 16 ) *(u16*)&mem1[addr] = __builtin_bswap16(u16(v));
-		else *(u32*)&mem1[addr] = __builtin_bswap32(v);
+		else if( size == 32 ) *(u32*)&mem1[addr] = __builtin_bswap32((u32)v);
+		else *(u64*)&mem1[addr] = __builtin_bswap64(v);
 		return;
 	}
 	std::println("${:X}: write{} ${:X} = ${:X}", cpu.pc-4, size, addr, v);

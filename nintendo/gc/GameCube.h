@@ -22,13 +22,13 @@ public:
 		//fwrite(mem1+0x1300000, 2*1024*1024, 1, fp);
 		//fclose(fp);
 		std::println("pc = ${:X}", cpu.pc);
-		pi.INTSR = 8;
-		cpu.irq_line = true;
+		//pi.INTSR = 8;
+		//cpu.irq_line = true;
 	}
 
 	u32 fetch(u32);
-	u32 read(u32, int);
-	void write(u32, u32, int);
+	u64 read(u32, int);
+	void write(u32, u64, int);
 	
 	double read_double(u32);
 	void write_double(u32, double);

@@ -210,7 +210,7 @@ static gekko::instr_type decode_opcode(u32 opcode)
 	case 14: instr { rD = zrA + SIMM16; }; // addi
 	case 15: instr { rD = zrA + (IMM16<<16); }; // addis
 	case 16: instr { // BCx
-			if( !(BO&BIT(2)) ) { cpu.CTR -= 1; }
+			if( !(BO&BIT(2)) ) cpu.CTR -= 1;
 			bool ctr_ok = (BO&BIT(2)) || ((cpu.CTR!=0)^((BO&BIT(1))>>1));
 			bool cond_ok = (BO&BIT(4)) || (cpu.cond.bit(BI)==((BO&BIT(3))?1:0));
 			if( ctr_ok && cond_ok )
@@ -225,32 +225,30 @@ static gekko::instr_type decode_opcode(u32 opcode)
 	case 18: instr { u32 exts = (s32(opc<<6)>>6)&~3; if(!(opc&BIT(1))) { exts+=cpu.pc-4; } if(opc&1) { cpu.LR=cpu.pc; } cpu.pc = exts;}; // Bx
 	case 19: return decode_19(opcode);
 	case 20: instr { // rlwimi
-			u32 me = 31-ME;
-			u32 mb = 31-MB;
 			u32 r = std::rotl(rS, SH);
-			u32 mask = (mb>=me) ? (((1u<<(mb+1))-1) & ~((1u<<(me))-1)) : (~((1u<<(me))-1) | ((1u<<(mb+1))-1));
-			//std::println("mask = ${:X}", mask);
+			u32 mask_begin = 0xffffFFFFu >> MB;
+			u32 mask_end = ((ME == 31) ? 0u : (0xffffFFFFu >> (ME + 1)));
+			u32 mask = mask_begin ^ mask_end;
+			if( MB > ME ) { mask = ~mask; }
 			rA = (r & mask) | (rA & ~mask);
 			if(Rc) { cpu.setCR0(rA); }
 		};
 	case 21: instr { // rlwinm
-			u32 me = 31-ME;
-			u32 mb = 31-MB;
-			std::println("${:X}: rS = ${:X}", cpu.pc-4, rS);
 			u32 r = std::rotl(rS, SH);
-			u32 mask = (mb>=me) ? (((1u<<(mb+1))-1) & ~((1u<<(me))-1)) : (~((1u<<(me))-1) | ((1u<<(mb+1))-1));
-			//std::println("mask = ${:X}", mask);
+			u32 mask_begin = 0xffffFFFFu >> MB;
+			u32 mask_end = ((ME == 31) ? 0u : (0xffffFFFFu >> (ME + 1)));
+			u32 mask = mask_begin ^ mask_end;
+			if( MB > ME ) { mask = ~mask; }
 			rA = r & mask;
-			std::println("mask = ${:X}, SH={}, result=${:X}", mask, SH, rA);
 			if(Rc) { cpu.setCR0(rA); }
 		};
 
 	case 23: instr { // rlwnm
-			u32 me = 31-ME;
-			u32 mb = 31-MB;
 			u32 r = std::rotl(rS, rB&0x1F);
-			u32 mask = (mb>=me) ? (((1u<<(mb+1))-1) & ~((1u<<(me))-1)) : (~((1u<<(me))-1) | ((1u<<(mb+1))-1));
-			//std::println("mask = ${:X}", mask);
+			u32 mask_begin = 0xffffFFFFu >> MB;
+			u32 mask_end = ((ME == 31) ? 0u : (0xffffFFFFu >> (ME + 1)));
+			u32 mask = mask_begin ^ mask_end;
+			if( MB > ME ) { mask = ~mask; }
 			rA = r & mask;
 			if(Rc) { cpu.setCR0(rA); }
 		};
@@ -304,12 +302,6 @@ static gekko::instr_type decode_opcode(u32 opcode)
 	case 53: instr { cpu.write(rA+SIMM16, std::bit_cast<u32>((float)frD), 32); rA+=SIMM16; }; // stfsu
 	case 54: instr { cpu.write(zrA+SIMM16, std::bit_cast<u64>(frD), 64); }; // stfd
 	case 55: instr { cpu.write(rA+SIMM16, std::bit_cast<u64>(frD), 64); rA+=SIMM16; }; // stfdu
-	
-	case 4:
-	case 56:
-	case 57:
-	case 60:
-	case 61: instr_nop; //todo: ps ld/st
 
 	case 59: return decode_59(opcode);
 	case 63: return decode_63(opcode);
@@ -323,12 +315,22 @@ void gekko::step()
 {
 	if( msr.b.ee && irq_line )
 	{
+		msr.b.ip = 0;
 		SRR0 = pc;
+		//printf("Interrupt taken! SRR0 (return PC) was: 0x%08X\n", SRR0);
 		SRR1 = msr.v & MSR_TO_SRR_MASK;
-		msr.b.ee = msr.b.ri = 0;
+		msr.b.ee = 0; 
+		msr.b.ri = 0; 
+		msr.b.pr = 0; 
+		msr.b.fp = 0; 
+		msr.b.fe0 = 0;
+		msr.b.fe1 = 0;
+		msr.b.se = 0; 
+		msr.b.be = 0; 
+		msr.b.ir = 0; 
+		msr.b.dr = 0; 
+
 		pc = 0x500;
-		//std::println("ExtIRQ not yet implemented");
-		//exit(1);
 	} else {
 		u32 opc = read(pc, 32);
 		pc += 4;
@@ -799,7 +801,7 @@ u32 gekko::get_spr(u32 spr)
 	case 920: return hid2.v;
 	default: break;
 	}
-	std::println("gekko: unimpl spr = {}", spr);
+	//std::println("gekko: unimpl spr = {}", spr);
 	return SPRs[spr];
 }
 
@@ -812,10 +814,17 @@ void gekko::set_spr(u32 spr, u32 v)
 	case 9: CTR = v; return;
 	
 	case 920: hid2.v = v; return;
+	
+	case 1008: // hid0
+		SPRs[spr] = v & ~((1 << (31 - 10)) | (1 << (31 - 11)));
+		return;
+	case 1009: // hid1
+		SPRs[spr] = (SPRs[spr] & 0xF8000000u) | (v & ~0xF8000000u);
+		return;
 	default: break;
 	}
 	SPRs[spr] = v;
-	std::println("gekko: unimpl spr = {}", spr);
+	//std::println("gekko: unimpl spr = {}", spr);
 }
 
 

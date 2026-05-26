@@ -72,7 +72,8 @@ void GameCube::dsp_io_write(u32 addr, u32 v, int size)
 	
 	case 0xCC005036: return; //todo
 	default:
-		exit(1);
+		std::println("DSP Io wr unimpl");
+		//exit(1);
 	}
 
 
