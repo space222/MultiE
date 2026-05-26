@@ -1,6 +1,5 @@
 #include <iostream>
 #include <string>
-#include <SDL.h>
 #include "itypes.h"
 #include "a26.h"
 

@@ -1,3 +1,4 @@
+#include <print>
 #include <climits>
 #include <cfloat>
 #include <cstring>
@@ -24,6 +25,8 @@
 		[[maybe_unused]] u32 ft = (opc>>16)&0x1f; \
 		if( !(cpu.STATUS & BIT(26)) ) fs &= ~1; \
 		cpu.FCSR &= ~0x3f000
+#define instr return [](VR4300& cpu, u32 opc)
+#define instr_nop return [](VR4300&, u32) {}
 
 typedef void(*vr4300_instr) (VR4300&, u32);
 vr4300_instr cop1_word(VR4300&, u32);
@@ -49,6 +52,116 @@ bool VR4300::isQNaN_d(double a)
 	u64 v;
 	memcpy(&v, &a, 8);
 	return /*(fpclassify(a)==FP_NAN) &&*/ ((v & mask)==mask); //BITL(51));
+}
+
+#define COP1CHECK if( cpu.COPUnusable(1) ) return
+#define SA ((opc>>6)&0x1f)
+#define D ((opc>>11)&0x1F)
+#define T ((opc>>16)&0x1F)
+#define S ((opc>>21)&0x1F)
+#define FD *(float*)&cpu.f[SA*8]
+#define FS *(float*)&cpu.f[(cpu.STATUS&BIT(26))?D*8:((D&~1)*8)] 
+#define FT *(float*)&cpu.f[T*8]
+#define DD *(double*)&cpu.f[SA*8]
+#define DS *(double*)&cpu.f[(cpu.STATUS&BIT(26))?D*8:((D&~1)*8)]
+#define DT *(double*)&cpu.f[T*8]
+
+static vr4300_instr decode_fpu_float(VR4300&,u32 opcode)
+{
+	switch( opcode&0x3F )
+	{
+	case 0: instr { COP1CHECK; FD = FS + FT; };
+	case 1: instr { COP1CHECK; FD = FS - FT; };
+	case 2: instr { COP1CHECK; FD = FS * FT; };
+	case 3: instr { COP1CHECK; FD = FS / FT; };
+	case 4: instr { COP1CHECK; FD = sqrt(FS); };
+	case 5: instr { COP1CHECK; FD = fabs(FS); };
+	case 6: instr { COP1CHECK; FD = FS; };
+	case 7: instr { COP1CHECK; FD = -FS; };
+	case 8: instr { COP1CHECK; DD = std::bit_cast<double>((s64)round(FS)); };
+	case 9: instr { COP1CHECK; DD = std::bit_cast<double>((s64)trunc(FS)); };
+	case 0xA: instr { COP1CHECK; DD = std::bit_cast<double>((s64)ceil(FS)); };
+	case 0xB: instr { COP1CHECK; DD = std::bit_cast<double>((s64)floor(FS)); };
+
+	case 0xC: instr { COP1CHECK; FD = std::bit_cast<float>((s32)round(FS)); };
+	case 0xD: instr { COP1CHECK; FD = std::bit_cast<float>((s32)trunc(FS)); };
+	case 0xE: instr { COP1CHECK; FD = std::bit_cast<float>((s32)ceil(FS)); };
+	case 0xF: instr { COP1CHECK; FD = std::bit_cast<float>((s32)floor(FS)); };
+
+	case 0x21: instr { COP1CHECK; DD = FS; }; // convert to double
+	case 0x24: instr { COP1CHECK; FD = std::bit_cast<float>((s32)FS); }; // convert to word
+	case 0x25: instr { COP1CHECK; DD = std::bit_cast<double>((s64)FS); }; // convert to long
+	case 0x30: case 0x31: case 0x32: case 0x33: case 0x34: case 0x35: case 0x36: case 0x37: 
+	case 0x38: case 0x39: case 0x3A: case 0x3B: case 0x3C: case 0x3D: case 0x3E: case 0x3F: 
+	instr {
+		COP1CHECK;
+		bool eq = (opc&BIT(1)) && (FS==FT);
+		bool lt = (opc&BIT(2)) && (FS <FT);
+		cpu.fpu_cond = (eq || lt);
+		cpu.FCSR &= ~BIT(23);
+		if( cpu.fpu_cond ) cpu.FCSR |= BIT(23);
+	};
+	default: std::println("Unimpl fpu opc = ${:X}", opcode&0x3F); instr_nop;
+	}
+}
+
+static vr4300_instr decode_fpu_double(VR4300&,u32 opcode)
+{
+	switch( opcode&0x3F )
+	{
+	case 0: instr { COP1CHECK; DD = DS + DT; };
+	case 1: instr { COP1CHECK; DD = DS - DT; };
+	case 2: instr { COP1CHECK; DD = DS * DT; };
+	case 3: instr { COP1CHECK; DD = DS / DT; };
+	case 4: instr { COP1CHECK; DD = sqrt(DS); };
+	case 5: instr { COP1CHECK; DD = fabs(DS); };
+	case 6: instr { COP1CHECK; DD = DS; };
+	case 7: instr { COP1CHECK; DD = -DS; };
+
+	case 8: instr { COP1CHECK; DD = std::bit_cast<double>((s64)round(DS)); };
+	case 9: instr { COP1CHECK; DD = std::bit_cast<double>((s64)trunc(DS)); };
+	case 0xA: instr { COP1CHECK; DD = std::bit_cast<double>((s64)ceil(DS)); };
+	case 0xB: instr { COP1CHECK; DD = std::bit_cast<double>((s64)floor(DS)); };
+
+	case 0xC: instr { COP1CHECK; FD = std::bit_cast<float>((s32)round(DS)); };
+	case 0xD: instr { COP1CHECK; FD = std::bit_cast<float>((s32)trunc(DS)); };
+	case 0xE: instr { COP1CHECK; FD = std::bit_cast<float>((s32)ceil(DS)); };
+	case 0xF: instr { COP1CHECK; FD = std::bit_cast<float>((s32)floor(DS)); };
+	case 0x20: instr { COP1CHECK; FD = DS; }; // convert to float
+	case 0x24: instr { COP1CHECK; FD = std::bit_cast<float>((s32)DS); }; // convert to word
+	case 0x25: instr { COP1CHECK; DD = std::bit_cast<double>((s64)DS); }; // convert to long
+	case 0x30: case 0x31: case 0x32: case 0x33: case 0x34: case 0x35: case 0x36: case 0x37: 
+	case 0x38: case 0x39: case 0x3A: case 0x3B: case 0x3C: case 0x3D: case 0x3E: case 0x3F: 
+	instr {
+		COP1CHECK;
+		bool eq = (opc&BIT(1)) && (DS==DT);
+		bool lt = (opc&BIT(2)) && (DS <DT);
+		cpu.fpu_cond = (eq || lt);
+		cpu.FCSR &= ~BIT(23);
+		if( cpu.fpu_cond ) cpu.FCSR |= BIT(23);
+	};
+	default: std::println("Unimpl fpu double opc = ${:X}", opcode&0x3F); instr_nop;
+	}
+}
+
+static vr4300_instr decode_fpu_word(VR4300&,u32 opcode)
+{
+	switch( opcode&0x3F )
+	{
+	case 0x20: instr { COP1CHECK; FD = std::bit_cast<s32>(FS); }; // convert to float
+	case 0x21: instr { COP1CHECK; DD = std::bit_cast<s32>(FS); }; // convert to double
+	}
+	instr_nop;
+}
+
+static vr4300_instr decode_fpu_long(VR4300&,u32 opcode)
+{
+	switch( opcode&0x3F )
+	{
+	case 0x20: instr { COP1CHECK; FD = std::bit_cast<s64>(DS); }; // convert to float
+	case 0x21: instr { COP1CHECK; DD = std::bit_cast<s64>(DS);  }; // convert to double	
+	}
+	instr_nop;
 }
 
 vr4300_instr cop1_d(VR4300&, u32 opcode)
@@ -1117,16 +1230,18 @@ vr4300_instr cop1(VR4300& proc, u32 opcode)
 			}
 		};
 		
-	case 0x10: return cop1_s(proc, opcode);
-	case 0x11: return cop1_d(proc, opcode);
-	case 0x14: return cop1_word(proc, opcode);
-	case 0x15: return cop1_long(proc, opcode);
+	case 0x10: return decode_fpu_float(proc, opcode); //return cop1_s(proc, opcode);
+	case 0x11: return decode_fpu_double(proc, opcode);//return cop1_d(proc, opcode);
+	case 0x14: return decode_fpu_word(proc, opcode);//return cop1_word(proc, opcode);
+	case 0x15: return decode_fpu_long(proc, opcode);//return cop1_long(proc, opcode);
 	default:
 		//printf("VR4300: Unimpl or undef cop1 opcode = $%X\n", opcode);
 		return [](VR4300& cpu, u32) { if( cpu.COPUnusable(1) ) return; cpu.FCSR &= ~0x3f000; cpu.signal_fpu(cpu.FPU_UNIMPL); };
 	}
 	return nullptr;
 }
+
+
 
 vr4300_instr cop1_word(VR4300&, u32 opcode)
 {

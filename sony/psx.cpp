@@ -9,7 +9,6 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <print>
-#include <SDL.h>
 #include "Settings.h"
 #include "psx.h"
 extern console* sys;

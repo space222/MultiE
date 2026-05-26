@@ -922,6 +922,7 @@ BusResult VR4300::read(u64 addr, int size)
 		{
 			addr = p;
 		} else {
+		
 			BADVADDR = addr;
 			CONTEXT &= ~0x7fFFf0;
 			CONTEXT |= (u32(addr)>>9);

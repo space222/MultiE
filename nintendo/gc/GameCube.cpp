@@ -67,7 +67,7 @@ void GameCube::reset()
 	cpu.reset();
 	debug_type = 0;
 	vi.di[0].v = vi.di[1].v = vi.di[2].v = vi.di[3].v = 0;
-	cpu.msr.b.EE = 0;
+	cpu.msr.b.ee = 0;
 	
 	/* //seeing what kind of stuff Dolphin writes to RAM in order to HLE the bootrom
 	// Booted from bootrom. 0xE5207C22 = booted from jtag
@@ -101,14 +101,14 @@ void GameCube::reset()
 
 bool GameCube::loadROM(std::string fname)
 {
-	cpu.fetcher = [&](u32 a)->u32 { return fetch(a); };
-	cpu.reader = [&](u32 a, int s)->u32 { return read(a, s); };
-	cpu.writer = [&](u32 a, u32 v, int s) { write(a,v,s); };
+	//cpu.fetcher = [&](u32 a)->u32 { return fetch(a); };
+	cpu.read = [&](u32 a, int s)->u32 { return read(a, s); };
+	cpu.write = [&](u32 a, u64 v, int s) { write(a,v,s); };
 	
-	cpu.readf = [&](u32 a)->float { float v = 0; u32 b = read(a,32); memcpy(&v,&b,4); return v; };
-	cpu.readd = [&](u32 a)->double { return read_double(a); };
-	cpu.writef = [&](u32 a, float f) { u32 b = 0; memcpy(&b,&f,4); write(a,b,32); };
-	cpu.writed = [&](u32 a, double d) { write_double(a, d); };
+	//cpu.readf = [&](u32 a)->float { float v = 0; u32 b = read(a,32); memcpy(&v,&b,4); return v; };
+	//cpu.readd = [&](u32 a)->double { return read_double(a); };
+	//cpu.writef = [&](u32 a, float f) { u32 b = 0; memcpy(&b,&f,4); write(a,b,32); };
+	//cpu.writed = [&](u32 a, double d) { write_double(a, d); };
 
 	if( fname.ends_with("dol") || fname.ends_with("DOL") )
 	{
@@ -208,9 +208,10 @@ u32 GameCube::read(u32 addr, int size)
 	if( ((addr >> 24)&0xf) == 0x0c )
 	{
 		addr |= 0xc0000000u;
+	
 		if( addr == 0xcc002002 || (addr == 0xcc002000 && size == 32) ) return vi.dcr;
 		if( addr == 0xCC00302c ) return 0x246500B1; // hw revision reg
-		if( addr == 0xcc00202c ) return vi.dpv;
+		//if( addr == 0xcc00202c ) return vi.dpv;
 		if( addr == 0xcc006404 )
 		{
 			auto keys = SDL_GetKeyboardState(nullptr);
@@ -239,7 +240,10 @@ u32 GameCube::read(u32 addr, int size)
 		if( addr == 0xcc002038 ) return vi.di[2].v;
 		if( addr == 0xcc00203c ) return vi.di[3].v;
 		
-		
+		static u32 line = 0;
+		if( addr == 0xcc00202c ) { line++; if(line==263){ line = 0; } return line; }
+		std::println("${:X}: read{} ${:X}", cpu.pc-4, size, addr);
+	
 		if( addr == 0xcc003000 )
 		{
 			std::println("PI INTSR reads ${:X}", pi.INTSR);
@@ -275,6 +279,8 @@ void GameCube::write(u32 addr, u32 v, int size)
 	if( ((addr >> 24)&0xf) == 0x0c )
 	{
 		addr |= 0xc0000000u;
+		std::println("${:X}: write{} ${:X} = ${:X}", cpu.pc-4, size, addr, v);
+		
 		if( addr == 0xcc002000 && size == 32 ) { vi.dcr = v&~2; return; }
 		if( addr == 0xcc002002 ) { vi.dcr = v&~2; return; }
 		if( addr == 0xcc003004 ) { pi.INTMR = v; return; }
@@ -296,7 +302,7 @@ void GameCube::write(u32 addr, u32 v, int size)
 			{
 				if( v & 0x80000000u )
 				{
-					std::putchar(v&0xff);
+					std::fputc(v&0xff, stderr);
 					return;
 				}
 				debug_type = v >> 24;
@@ -304,13 +310,13 @@ void GameCube::write(u32 addr, u32 v, int size)
 			}
 			if( debug_type == 1 )
 			{
-				std::printf("%i", (int)v);
+				std::fprintf(stderr, "%i", (int)v);
 			} else if( debug_type == 2 ) {
-				std::printf("%u", (unsigned int)v);
+				std::fprintf(stderr, "%u", (unsigned int)v);
 			} else if( debug_type == 3 ) {
 				float a = 0;
 				memcpy(&a, &v, 4);
-				std::printf("%f", a);
+				std::fprintf(stderr, "%f", a);
 			}
 			debug_type = 0;
 			return;
@@ -325,7 +331,7 @@ void GameCube::write(u32 addr, u32 v, int size)
 			exi_write(addr, v, size);			
 			return;
 		}
-		std::println("${:X}: write{} ${:X} = ${:X}", cpu.pc-4, size, addr, v);
+		//std::println("${:X}: write{} ${:X} = ${:X}", cpu.pc-4, size, addr, v);
 		return;
 	}
 	if( (addr >> 24) == 0xe0 )

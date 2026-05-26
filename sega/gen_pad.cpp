@@ -1,4 +1,3 @@
-#include <SDL.h>
 #include "genesis.h"
 extern std::vector<SDL_GameController*> conts;
 

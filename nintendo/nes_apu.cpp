@@ -2,7 +2,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <vector>
-#include <SDL.h>
 #include "nes.h"
 #include "Settings.h"
 

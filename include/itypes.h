@@ -15,6 +15,8 @@ typedef int64_t s64;
 typedef __uint128_t u128;
 typedef __int128_t s128;
 
+typedef unsigned int bitfield;
+
 #define BIT(b) (1u<<(b))
 #define BITL(b) (1ull<<(b))
 

@@ -692,7 +692,7 @@ n64_rdp::dc n64_rdp::tex_sample(u32 tile, s64 s, s64 t)
 	
 	//if( !(T.bpp == 4 && T.format == 4) )
 	{
-		std::println(stderr, "tex_sample, tile bpp{}, format{} unsupported.", T.bpp, T.format);
+		//std::println(stderr, "tex_sample, tile bpp{}, format{} unsupported.", T.bpp, T.format);
 	}
 	return dc::from32(0);
 }

@@ -9,7 +9,7 @@
 #include <atomic>
 #include <array>
 #include <thread>
-#include <SDL.h>
+#include <SDL2/SDL.h>
 #ifdef _WIN32
 // it seems enet pulls in Windows.h, and explicitly doing it results in errors
 //#include <Windows.h>

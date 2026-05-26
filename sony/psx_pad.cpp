@@ -1,6 +1,5 @@
 #include <cstdio>
 #include <cstdlib>
-#include <SDL.h>
 #include "psx.h"
 
 u8 cont1LO();

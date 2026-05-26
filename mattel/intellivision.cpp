@@ -1,6 +1,5 @@
 #include <vector>
 #include <string>
-#include <SDL.h>
 #include "intellivision.h"
 
 extern console* sys;

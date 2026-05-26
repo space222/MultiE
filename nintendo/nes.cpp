@@ -1,7 +1,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string>
-#include <SDL.h>
 #include <iostream>
 #include <chrono>
 #include "Settings.h"

@@ -1,797 +1,830 @@
-#include <cstdlib>
-#include <cstdio>
-#include <cstring>
-#include <bit>
 #include <print>
+#include <cmath>
+#include <string>
 #include "gekko.h"
+#define instr return [](gekko& cpu, u32 opc)
+#define instr_nop return [](gekko&,u32){}
+#define BO ((opc>>21)&0x1F)
+#define BI ((opc>>16)&0x1F)
+#define crbD BO
+#define crbA BI
+#define crbB ((opc>>11)&0x1F)
+#define rD cpu.r[(opc>>21)&0x1F]
+#define rS rD
+#define rA cpu.r[(opc>>16)&0x1F]
+#define rB cpu.r[(opc>>11)&0x1F]
+#define zrA (((opc>>16)&0x1F) ? rA : 0)
+#define IMM16 (opc&0xffff)
+#define SIMM16 s16(opc&0xffff)
+#define crfD ((opc>>23)&7)
+#define crfS ((opc>>18)&7)
+#define Rc (opc&1)
+#define MB ((opc>>6)&0x1F)
+#define ME ((opc>>1)&0x1F)
+#define SH ((opc>>11)&0x1F)
+#define frD (*(double*)&cpu.f[((opc>>21)&0x1F)<<3])
+#define frD_PS1 cpu.ps1[((opc>>21)&0x1F)]
+#define frA (*(double*)&cpu.f[((opc>>16)&0x1F)<<3])
+#define frA_PS1 cpu.ps1[((opc>>16)&0x1F)]
+#define frB (*(double*)&cpu.f[((opc>>11)&0x1F)<<3])
+#define frB_PS1 cpu.ps1[((opc>>11)&0x1F)]
+#define frC (*(double*)&cpu.f[((opc>>6)&0x1F)<<3])
+#define frC_PS1 cpu.ps1[((opc>>6)&0x1F)]
+#define frS frD
+#define MSR_TO_SRR_MASK 0x87c0ffff
 
-typedef void (*gekko_instr)(gekko&, u32);
-#define nopped [](gekko&, u32){}
-
-#define instr [](gekko& cpu, u32 opc) 
-
-#define rD cpu.r[(opc>>21)&0x1f]
-#define fD cpu.f[(opc>>21)&0x1f]
-#define rA cpu.r[(opc>>16)&0x1f]
-#define rB cpu.r[(opc>>11)&0x1f]
-#define fB cpu.f[(opc>>11)&0x1f]
-#define A0 ( ((opc>>16)&0x1f) ? cpu.r[(opc>>16)&0x1f] : 0 )
-#define simm16 ( (s16)(opc&0xffff) )
-#define carry cpu.xer.b.CA
-#define OE (opc&BIT(10))  
-
-static u32 crmasks[] = { 0xf0000000u, 0x0f000000u, 0x00f00000u, 0xf0000u, 0xf000u, 0xf00u, 0xf0u, 0xfu };
-
-gekko_instr decode_31(u32 opcode)
+static gekko::instr_type decode_59(u32 opcode)
 {
-	const u32 btm10 = (opcode>>1)&0x3ff;
-	
-	switch( btm10 )
+	switch( (opcode>>1)&0x1F )
 	{
-	case 0: return instr {
-			u32 c = cpu.xer.b.SO;
-			if( s32(rA) < s32(rB) )
-			{
-				c |= 8;
-			} else if( s32(rA) > s32(rB) ) {
-				c |= 4;
-			} else {
-				c |= 2;
-			}
-			u32 crfD = (opc>>(31-8))&7;
-			cpu.cr.v &= ~crmasks[crfD];
-			cpu.cr.v |= (c << ((crfD^7)*4));
-		}; // cmp
-	case 32: return instr {
-			u32 c = cpu.xer.b.SO;
-			if( rA < rB )
-			{
-				c |= 8;
-			} else if( rA > rB ) {
-				c |= 4;
-			} else {
-				c |= 2;
-			}
-			u32 crfD = (opc>>(31-8))&7;
-			cpu.cr.v &= ~crmasks[crfD];
-			cpu.cr.v |= (c << ((crfD^7)*4));
-		}; // cmpl
-	case 19: return instr { rD = cpu.cr.v; }; // mfcr
+	case 18: instr { frD = (float)(frA / frB); if( cpu.hid2.b.pse ) { frD_PS1 = frD; } if(Rc){ /*cpu.updateCR1();*/ } }; // fdivs
+	case 20: instr { frD = (float)(frA - frB); if( cpu.hid2.b.pse ) { frD_PS1 = frD; } if(Rc){ /*cpu.updateCR1();*/ } }; // fsubs
+	case 21: instr { frD = (float)(frA + frB); if( cpu.hid2.b.pse ) { frD_PS1 = frD; } if(Rc){ /*cpu.updateCR1();*/ } }; // fadds
+	case 24: instr { frD = (float)(1.0 / frB); if( cpu.hid2.b.pse ) { frD_PS1 = frD; } if(Rc){ /*cpu.updateCR1();*/ } }; // fres	
+	case 25: instr { frD = (float)(frA * frC); if( cpu.hid2.b.pse ) { frD_PS1 = frD; } if(Rc){ /*cpu.updateCR1();*/ } }; // fmuls
+	case 28: instr { frD = (float)(frA * frC - frB); if( cpu.hid2.b.pse ) { frD_PS1 = frD; } if(Rc){ /*cpu.updateCR1();*/ } }; // fmsubs
+	case 29: instr { frD = (float)(frA * frC + frB); if( cpu.hid2.b.pse ) { frD_PS1 = frD; } if(Rc){ /*cpu.updateCR1();*/ } }; // fmadds
+	case 30: instr { frD = (float)-(frA * frC - frB); if( cpu.hid2.b.pse ) { frD_PS1 = frD; } if(Rc){ /*cpu.updateCR1();*/ } }; // fnmsubs
+	case 31: instr { frD = (float)-(frA * frC + frB); if( cpu.hid2.b.pse ) { frD_PS1 = frD; } if(Rc){ /*cpu.updateCR1();*/ } }; // fnmadds
+	default:
+		std::println("Unimpl opc59, bot5 = {:05b}", (opcode>>1)&0x1f);
+		break;
+	}
+	return nullptr;
+}
+
+static gekko::instr_type decode_63(u32 opcode)
+{
+	if( opcode & BIT(5) ) switch( (opcode>>1) & 0x1F )
+	{
+	case 18: instr { frD = frA / frB; }; // fdiv
+	case 20: instr { frD = frA - frB; }; // fsub
+	case 21: instr { frD = frA + frB; }; // fadd
+	case 23: instr { frD = ((frA >= 0.0f) ? frC : frB); }; // fsel
+	case 25: instr { frD = frA * frC; }; // fmul
+	case 26: instr { frD = 1.0/std::sqrt(frB); }; // frsqrte
+	case 28: instr { frD = frA * frC - frB; }; // fmsub
+	case 29: instr { frD = frA * frC + frB; }; // fmadd
+	case 30: instr { frD = -(frA * frC - frB); }; // fNmsub
+	case 31: instr { frD = -(frA * frC + frB); }; // fNmadd
+	default:
+		std::println("Unimpl opc63, bot5 = {:05b}", (opcode>>1)&0xf);
+		return nullptr;
+	}
 	
-	case 11: return instr { // mulhwu/.
-			u64 a = rA;
-			a *= rB;
-			rD = a>>32;
-			if( opc & 1 ) { cpu.crlog(rD); }
+	switch( (opcode>>1) & 0x3FF )
+	{
+	case 32: // fcmpo
+	case 0: instr { // fcmpu
+			u32 c = 0;
+			if( std::isnan(frA) || std::isnan(frB) ) // frA or frB are NaN
+			{
+				c = 0b0001;
+			} else if( frA < frB ) {
+				c = 0b1000;
+			} else if( frA > frB ) {
+				c = 0b0100;
+			} else {
+				c = 0b0010;
+			}
+			cpu.fpscr.b.fprf = c;
+			cpu.cond.b[crfD] = c;
 		};
-	
-	case 23: return instr { u32 EA = A0+rB; rD = cpu.read(EA,32); }; // lwzx
-	
-	case 24: return instr {
-			const u32 sh = rB&0x3F;
-			if( sh > 31 )
-			{
-				rA = 0;
-			} else {
-				rA = rD << sh;
-			}
-			if( opc&1 ) { cpu.crlog(rA); }	
-		}; // slw/.
-	
-	case 28: return instr { rA = rD & rB; if( opc & 1 ) { cpu.crlog(rA); } }; // and/.
-	case 60: return instr { rA = rD & ~rB; if( opc & 1 ) { cpu.crlog(rA); } }; // andc/.
-	
-	case 75: return instr { rD = (s64(s32(rA)) * s64(s32(rB)))>>32; if(opc&1){cpu.crlog(rD);} }; // mulhw/.
-	
-	case 83: return instr { rD = cpu.msr.v; }; // mfmsr
-	
-	case 87: return instr { u32 EA = A0 + rB; rD = cpu.read(EA, 8); }; // lbzx
-	
-	case 104|BIT(9):
-	case 104: return instr { // neg/o.
-			if( rA == 0x80000000u )
-			{
-				rD = rA;
-				if( OE ) { cpu.xer.b.SO = cpu.xer.b.OV = 1; }
-			} else {
-				rD = 1 + ~rA;			
-				if( OE ) { cpu.xer.b.OV = 0; }
-			}
-			if( opc & 1 ) { cpu.crlog(rD); }
+		
+	case 64: instr { // mcrfs
+			u32 fex = cpu.fpscr.b.fex;
+			u32 vx = cpu.fpscr.b.vx;
+			u32 f = (cpu.fpscr.v >> (31-(crfS*4)))&0xf;
+			cpu.fpscr.v &= ~(0xf << (31-(crfS*4)));
+			cpu.fpscr.b.fex = fex;
+			cpu.fpscr.b.vx = vx;
+			cpu.cond.b[crfD] = f;
 		};
+
+	case 70: instr { u32 bit = ((opc>>21)&0x1F); if(bit!=1&&bit!=2) cpu.fpscr.v &= ~(1u<<(31-bit)); }; // mtfsb0.
+	case 38: instr { u32 bit = ((opc>>21)&0x1F); if(bit!=1&&bit!=2) cpu.fpscr.v |= 1u<<(31-bit); }; // mtfsb1.
+	case 12: instr { frD = (float)frB; }; // frsp
+	case 14: instr { frD = std::bit_cast<double>((u64)(u32)(s32)std::clamp<double>(frB, -0x80000000ll, 0x7fffffffll)); }; // fctiw
+	case 15: instr { frD = std::bit_cast<double>((u64)(u32)(s32)std::clamp<double>(frB, -0x80000000ll, 0x7fffffffll)); }; // fctiwz
+	case 40: instr { frD = std::bit_cast<double>(std::bit_cast<u64>(frB)^BITL(63)); }; // fneg
 	
-	case 119: return instr { u32 EA = rA + rB; rD = cpu.read(EA, 8); rA = EA; }; // lbzux
+	case 72: instr { frD = frB; }; // fmr
 	
-	case 136: return instr { // subfe/o.
-			u64 t = (rA ^ 0xffffFFFFu);
-			t += rB;
-			t += carry;
-			if( OE )
-			{
-				cpu.xer.b.OV = (((t^rB) & (t^rA) & BIT(31))?1:0);
-				cpu.xer.b.SO |= cpu.xer.b.OV;
-			}
-			rD = t;
-			if( opc&1 ) { cpu.crlog(rD); }
+	case 134: instr { // mtfsfi
+			u32 imm = (opc>>12)&0xf;
+			u32 fex = cpu.fpscr.b.fex;
+			u32 vx = cpu.fpscr.b.vx;
+			cpu.fpscr.v &= ~(0xf<< (31-(crfD*4)) );
+			cpu.fpscr.v |= (imm << (31-(crfD*4)) );	
+			cpu.fpscr.b.fex = fex;
+			cpu.fpscr.b.vx = vx;
 		};
+
+	case 136: instr { frD = std::bit_cast<double>(std::bit_cast<u64>(frB)|BITL(63)); }; // fnabs
+	case 264: instr { frD = std::bit_cast<double>(std::bit_cast<u64>(frB)&~BITL(63)); }; // fabs
 	
-	case 144: return instr { // mtcrf
-			const u32 crm = (opc>>12)&0xff;
+	case 583: instr { frD = std::bit_cast<double>((u64)cpu.fpscr.v); }; // mffs
+	
+	case 711: instr { // mtfsf
+			u32 FM = (opc>>17)&0xff;
 			u32 mask = 0;
-			for(u32 i = 0; i < 8; ++i)
-			{
-				if( crm & (1u<<i) )
-				{
-					mask |= 0xf<<(i*4);
-				}
-			}
-			cpu.cr.v = (rD & mask) | (cpu.cr.v & ~mask);
+			for(u32 i = 0; i < 8; ++i) { if(FM&BIT(i)) mask |= 0xf << ((i)*4); }
+			u32 fex = cpu.fpscr.b.fex;
+			u32 vx = cpu.fpscr.b.vx;
+			//u32 fx = cpu.fpscr.b.fx;
+			cpu.fpscr.v = (cpu.fpscr.v&~mask) | (mask&((u32)std::bit_cast<u64>(frB)));
+			cpu.fpscr.b.fex = fex;
+			cpu.fpscr.b.vx = vx;
+			//cpu.fpscr.b.fx = fx | (FM>>7);
 		};
-	
-	case 151: return instr { cpu.write(A0+rB, rD, 32); }; // stwx
+	default:
+		std::println("Unimpl opc63, bot10 = {}dec", (opcode>>1)&0x3ff);
+		break;
+	}	
+	return nullptr;
+}
 
-	case 124: return instr { rA = ~(rD | rB);  if( opc & 1 ) { cpu.crlog(rA); } }; // nor/.
-	case 444: return instr { rA =  (rD | rB);  if( opc & 1 ) { cpu.crlog(rA); } }; // or/.
-	case 412: return instr { rA =  (rD | ~rB); if( opc & 1 ) { cpu.crlog(rA); } }; // orc/.
-	
-	case 316: return instr { rA = rD ^ rB; if( opc & 1) { cpu.crlog(rA); } }; // xor/.
-	
-	case 146: return instr { cpu.msr.v = rD; cpu.msr.b.pad0 = cpu.msr.b.pad1 = cpu.msr.b.pad2 = 0; }; // mtmsr
-	
-	case 210: return nopped; // todo: mtsr
-	
-	case 26: return instr { // cntlzw/.
-			rA = std::countl_zero(rD);
-			if( opc & 1 ) { cpu.crlog(rA); }
+static gekko::instr_type decode_31(u32);
+
+static gekko::instr_type decode_19(u32 opcode)
+{
+	switch( (opcode>>1)&0x3ff )
+	{
+	case 0: instr { cpu.cond.cr[crfD] = cpu.cond.cr[crfS]; }; // mcrf
+	case 16: instr { // BCLRx
+			if( !(BO&BIT(2)) ) cpu.CTR -= 1;
+			bool ctr_ok = (BO&BIT(2)) || ((cpu.CTR!=0)^((BO&BIT(1))>>1));
+			bool cond_ok = (BO&BIT(4)) || (cpu.cond.bit(BI)==((BO&BIT(3))?1:0));
+			if( ctr_ok && cond_ok )
+			{
+				u32 temp = cpu.LR;
+				if(opc&1) { cpu.LR=cpu.pc; }
+				cpu.pc = temp;
+			}
+		};
+	case 50: instr { cpu.pc = cpu.SRR0 & ~3; cpu.msr.v &= ~MSR_TO_SRR_MASK; cpu.msr.v |= cpu.SRR1 & MSR_TO_SRR_MASK; cpu.msr.b.pow=0; }; // rfi
+	case 33: instr { cpu.cond.set_bit(crbD, 1^(cpu.cond.bit(crbA) | cpu.cond.bit(crbB))); }; // crnor
+	case 129: instr { cpu.cond.set_bit(crbD, cpu.cond.bit(crbA) & (1^cpu.cond.bit(crbB))); }; // crandc
+	case 150: instr_nop; // isync
+	case 193: instr { cpu.cond.set_bit(crbD, cpu.cond.bit(crbA) ^ cpu.cond.bit(crbB)); }; // crxor
+	case 225: instr { cpu.cond.set_bit(crbD, 1^(cpu.cond.bit(crbA) & cpu.cond.bit(crbB))); }; // crnand
+	case 257: instr { cpu.cond.set_bit(crbD, cpu.cond.bit(crbA) & cpu.cond.bit(crbB)); }; // crand
+	case 289: instr { cpu.cond.set_bit(crbD, cpu.cond.bit(crbA) ^ (1^cpu.cond.bit(crbB))); }; // creqv
+	case 417: instr { cpu.cond.set_bit(crbD, cpu.cond.bit(crbA) | (1^cpu.cond.bit(crbB))); }; // crorc
+	case 449: instr { cpu.cond.set_bit(crbD, cpu.cond.bit(crbA) | cpu.cond.bit(crbB)); }; // cror
+	case 528: instr { // bcctr
+			bool cond_ok = (BO&BIT(4)) || (cpu.cond.bit(BI)==((BO>>3)&1)); 
+			if( cond_ok ) 
+			{
+				if( opc&1 ) { cpu.LR = cpu.pc; }
+				cpu.pc = cpu.CTR & ~3;
+			}
+		};
+	default:
+		std::println("Unimpl opc 19, bot10 = {}dec", (opcode>>1)&0x3ff);
+		return nullptr;
+	}
+}
+
+static gekko::instr_type decode_opcode(u32 opcode)
+{
+	switch( opcode>>26 )
+	{
+	case 7: instr { rD = s32(rA) * SIMM16; }; // mulli
+	case 8: instr { u32 t=~rA; u64 a = t; a += (u32)SIMM16; a += 1; rD=a; cpu.xer.b.ca = a>>32; }; // subfic
+
+	case 10: instr { //cmpli
+			cpu.cond.cr[crfD].lt = u32(rA)<IMM16;
+			cpu.cond.cr[crfD].gt = u32(rA)>IMM16;
+			cpu.cond.cr[crfD].eq = u32(rA)==IMM16;
+			cpu.cond.cr[crfD].so = cpu.xer.b.so;
+		};
+	case 11: instr { //cmpi
+			cpu.cond.cr[crfD].lt = s32(rA)<SIMM16;
+			cpu.cond.cr[crfD].gt = s32(rA)>SIMM16;
+			cpu.cond.cr[crfD].eq = s32(rA)==SIMM16;
+			cpu.cond.cr[crfD].so = cpu.xer.b.so;
+		};
+	case 12: instr { u64 a = rA; a += SIMM16; cpu.xer.b.ca = a>>32; rD=a; }; // addic
+	case 13: instr { u64 a = rA; a += SIMM16; cpu.xer.b.ca = a>>32; rD=a; cpu.setCR0(rD); }; // addic
+	case 14: instr { rD = zrA + SIMM16; }; // addi
+	case 15: instr { rD = zrA + (IMM16<<16); }; // addis
+	case 16: instr { // BCx
+			if( !(BO&BIT(2)) ) { cpu.CTR -= 1; }
+			bool ctr_ok = (BO&BIT(2)) || ((cpu.CTR!=0)^((BO&BIT(1))>>1));
+			bool cond_ok = (BO&BIT(4)) || (cpu.cond.bit(BI)==((BO&BIT(3))?1:0));
+			if( ctr_ok && cond_ok )
+			{
+				u32 exts = s16(opc&~3); 
+				if(!(opc&BIT(1))) { exts+=cpu.pc-4; } 
+				if(opc&1) { cpu.LR=cpu.pc; }
+				cpu.pc = exts;
+			}
+		};
+	case 17: instr { cpu.SRR0 = cpu.pc; cpu.SRR1 = cpu.msr.v & MSR_TO_SRR_MASK; cpu.msr.b.ee = cpu.msr.b.ri = 0; cpu.pc = 0xc00; }; // sc (syscall)	
+	case 18: instr { u32 exts = (s32(opc<<6)>>6)&~3; if(!(opc&BIT(1))) { exts+=cpu.pc-4; } if(opc&1) { cpu.LR=cpu.pc; } cpu.pc = exts;}; // Bx
+	case 19: return decode_19(opcode);
+	case 20: instr { // rlwimi
+			u32 me = 31-ME;
+			u32 mb = 31-MB;
+			u32 r = std::rotl(rS, SH);
+			u32 mask = (mb>=me) ? (((1u<<(mb+1))-1) & ~((1u<<(me))-1)) : (~((1u<<(me))-1) | ((1u<<(mb+1))-1));
+			//std::println("mask = ${:X}", mask);
+			rA = (r & mask) | (rA & ~mask);
+			if(Rc) { cpu.setCR0(rA); }
+		};
+	case 21: instr { // rlwinm
+			u32 me = 31-ME;
+			u32 mb = 31-MB;
+			std::println("${:X}: rS = ${:X}", cpu.pc-4, rS);
+			u32 r = std::rotl(rS, SH);
+			u32 mask = (mb>=me) ? (((1u<<(mb+1))-1) & ~((1u<<(me))-1)) : (~((1u<<(me))-1) | ((1u<<(mb+1))-1));
+			//std::println("mask = ${:X}", mask);
+			rA = r & mask;
+			std::println("mask = ${:X}, SH={}, result=${:X}", mask, SH, rA);
+			if(Rc) { cpu.setCR0(rA); }
 		};
 
-	case 40|BIT(9): // fallthru
-	case 40: return instr { // subf/o.
-			u64 t = rA ^ 0xffffFFFFu;
-			t += rB;
-			t += 1;
-	//std::println("${:X}: r{}({}) = r{}({}) - r{}({})", cpu.pc-4, (opc>>21)&0x1f, u32(t), (opc>>16)&0x1f, rA, (opc>>11)&0x1f, rB);
-			if( OE )
-			{
-				cpu.xer.b.OV = (( (t^rB) & (t^rA) & BIT(31) ) ? 1 : 0);
-				cpu.xer.b.SO |= cpu.xer.b.OV;
-			}
-			rD = t;
-			if( opc & 1 ) { cpu.crlog(rD); }	
+	case 23: instr { // rlwnm
+			u32 me = 31-ME;
+			u32 mb = 31-MB;
+			u32 r = std::rotl(rS, rB&0x1F);
+			u32 mask = (mb>=me) ? (((1u<<(mb+1))-1) & ~((1u<<(me))-1)) : (~((1u<<(me))-1) | ((1u<<(mb+1))-1));
+			//std::println("mask = ${:X}", mask);
+			rA = r & mask;
+			if(Rc) { cpu.setCR0(rA); }
 		};
-		
-	case 202|BIT(9): // fallthru
-	case 202: return instr { // addze/o.
-			u64 t = rA;
-			t += carry;
-			if( opc & BIT(9) )
-			{
-				cpu.xer.b.OV = (( (t^0) & (t^rA) & BIT(31) ) ? 1 : 0);
-				cpu.xer.b.SO |= cpu.xer.b.OV;
-			}
-			carry = t>>32;
-			rD = t;
-			if( opc & 1 ) { cpu.crlog(rD); }	
-		}; 
+	case 24: instr { rA = rS | IMM16; }; // ori
+	case 25: instr { rA = rS | (IMM16<<16); }; // oris
+	case 26: instr { rA = rS ^ IMM16; }; // xori
+	case 27: instr { rA = rS ^ (IMM16<<16); }; // xoris
+	case 28: instr { rA = rS & IMM16; cpu.setCR0(rA); }; // andi.
+	case 29: instr { rA = rS & (IMM16<<16); cpu.setCR0(rA); }; // andis.
 
-	case 266|BIT(9): // fallthru
-	case 266: return instr { // add/o.
-			u64 t = rA;
-			t += rB;
-			if( OE )
+	case 31: return decode_31(opcode);
+	case 32: instr { rD = cpu.read(zrA+SIMM16, 32); }; // lwz
+	case 33: instr { u32 EA=rA+SIMM16; rA=EA; rD = cpu.read(EA, 32); }; // lwzu
+	case 34: instr { rD = (u8)cpu.read(zrA+SIMM16, 8); }; // lbz
+	case 35: instr { u32 EA=rA+SIMM16; rA=EA; rD = (u8)cpu.read(EA, 8); }; // lbzu
+	case 36: instr { cpu.write(zrA + SIMM16, rS, 32); }; // stw
+	case 37: instr { cpu.write(rA + SIMM16, rS, 32); rA += SIMM16; }; // stwu	
+	case 38: instr { cpu.write(zrA + SIMM16, rS, 8); }; // stb
+	case 39: instr { cpu.write(rA + SIMM16, rS, 8); rA += SIMM16; }; // stbu
+	case 40: instr { rD = (u16)cpu.read(zrA+SIMM16, 16); }; // lhz
+	case 41: instr { u32 EA=rA+SIMM16; rA=EA; rD = (u16)cpu.read(EA, 16); }; // lhzu
+	case 42: instr { rD = (s16)cpu.read(zrA+SIMM16, 16); }; // lha
+	case 43: instr { u32 EA=rA+SIMM16; rA=EA; rD = (s16)cpu.read(EA, 16); }; // lhau
+	case 44: instr { cpu.write(zrA + SIMM16, rS, 16); }; // sth
+	case 45: instr { cpu.write(rA + SIMM16, rS, 16); rA += SIMM16; }; // sthu
+	case 46: instr { //lmw
+			u32 d = (opc>>21)&0x1F;
+			u32 EA = zrA + SIMM16;
+			while( d <= 31 )
 			{
-				cpu.xer.b.OV = (( (t^rB) & (t^rA) & BIT(31) ) ? 1 : 0);
-				cpu.xer.b.SO |= cpu.xer.b.OV;
-			}
-			rD = t;
-			if( opc & 1 ) { cpu.crlog(rD); }	
-		}; 
-	case 10|BIT(9): // fallthru
-	case 10: return instr { // addc/o.
-			u64 t = rA;
-			t += rB;
-			if( OE )
-			{
-				cpu.xer.b.OV = (( (t^rB) & (t^rA) & BIT(31) ) ? 1 : 0);
-				cpu.xer.b.SO |= cpu.xer.b.OV;
-			}
-			cpu.xer.b.CA = t>>32;
-			rD = t;
-			if( opc & 1 ) { cpu.crlog(rD); }	
-		};
-	case 138|BIT(9): // fallthru
-	case 138: return instr { // adde/o.
-			u64 t = rA;
-			t += rB;
-			t += cpu.xer.b.CA;
-			if( OE )
-			{
-				cpu.xer.b.OV = (( (t^rB) & (t^rA) & BIT(31) ) ? 1 : 0);
-				cpu.xer.b.SO |= cpu.xer.b.OV;
-			}
-			cpu.xer.b.CA = t>>32;
-			rD = t;
-			if( opc & 1 ) { cpu.crlog(rD); }	
-		};
-		
-	case 8|BIT(9):
-	case 8: return instr { // subfc/o.
-			u64 t = rA^0xffffFFFFu;
-			t += rB;
-			t += 1;
-			if( OE )
-			{
-				cpu.xer.b.OV = (( (t^rB) & (t^rA) & BIT(31) ) ? 1 : 0);
-				cpu.xer.b.SO |= cpu.xer.b.OV;
-			}
-			carry = t>>32;
-			rD = t;
-			if( opc&1 ) { cpu.crlog(rD); }
-		};
-
-	case 215: return instr { u32 EA=A0+rB; cpu.write(EA, rD&0xff, 8); }; // stbx
-
-	case 339: return instr { u32 spr = (opc>>11)&0x3ff; spr = ((spr<<5)&0x3ff)|(spr>>5); rD = cpu.read_spr(spr); }; // mfspr
-	case 467: return instr { u32 spr = (opc>>11)&0x3ff; spr = ((spr<<5)&0x3ff)|(spr>>5); cpu.write_spr(spr, rD); }; // mtspr
-
-	case 371: return instr { // mftb
-			u32 spr = (opc>>11)&0x3ff; spr = ((spr<<5)&0x3ff)|(spr>>5);
-			if( spr == 268 )
-			{
-				rD = cpu.time_base;
-			} else if( spr == 269 ) {
-				rD = cpu.time_base>>32;
+				cpu.r[d] = cpu.read(EA, 32);
+				d += 1;
+				EA += 4;
 			}	
 		};
-
-	case 407: return instr { // sthx
-			u32 EA = A0+rB; cpu.write(EA, rD&0xffff, 16);	
+	case 47: instr { //stmw
+			u32 s = (opc>>21)&0x1F;
+			u32 EA = zrA + SIMM16;
+			while( s <= 31 )
+			{
+				cpu.write(EA, cpu.r[s], 32);
+				s += 1;
+				EA += 4;
+			}	
 		};
+	case 48: instr { frD = std::bit_cast<float>((u32)cpu.read(rA+SIMM16, 32)); }; // lfs	
+	case 49: instr { frD = std::bit_cast<float>((u32)cpu.read(rA+SIMM16, 32)); rA+=SIMM16; }; // lfsu
+	case 50: instr { frD = std::bit_cast<double>(cpu.read(rA+SIMM16, 64)); }; // lfd	
+	case 51: instr { frD = std::bit_cast<double>(cpu.read(rA+SIMM16, 64)); rA+=SIMM16; }; // lfdu
+	case 52: instr { cpu.write(zrA+SIMM16, std::bit_cast<u32>((float)frD), 32); }; // stfs
+	case 53: instr { cpu.write(rA+SIMM16, std::bit_cast<u32>((float)frD), 32); rA+=SIMM16; }; // stfsu
+	case 54: instr { cpu.write(zrA+SIMM16, std::bit_cast<u64>(frD), 64); }; // stfd
+	case 55: instr { cpu.write(rA+SIMM16, std::bit_cast<u64>(frD), 64); rA+=SIMM16; }; // stfdu
+	
+	case 4:
+	case 56:
+	case 57:
+	case 60:
+	case 61: instr_nop; //todo: ps ld/st
 
-	case 459|BIT(9):
-	case 459: return instr {
-			if( OE )
-			{
-				cpu.xer.b.OV = ((rB==0)?1:0);
-				cpu.xer.b.SO |= cpu.xer.b.OV;
-			}
-			if( rB == 0 ) { if( opc & 1 ) { cpu.cr.b.SO = cpu.xer.b.SO; } return; }
-			rD = rA / rB;
-			if( opc & 1 ) { cpu.crlog(rD); }
-		}; // divwu/o.
-		
-		
-	case 491|BIT(9):
-	case 491: return instr {
-			cpu.xer.b.OV = 0;
-			s32 dividend = rA;
-			s32 divisor = rB;
-			if( divisor == 0 || (divisor == -1 && rA == 0x80000000u) )
-			{
-				cpu.xer.b.SO = cpu.xer.b.OV = 1;
-				if( opc & 1 ) { cpu.cr.b.SO = 1; }
-				return;
-			}
-			rD = dividend / divisor;
-			if( opc & 1 ) { cpu.crlog(rD); }	
-		}; // divw/o.
-		
-	case 235|BIT(9):
-	case 235: return instr {
-			s64 res = s32(rA);
-			res *= s32(rB);
-			rD = res;
-			if( OE )
-			{
-				u32 top = res>>32;
-				cpu.xer.b.OV = (top==0 && !(rD&BIT(31)))||(top==0xffffFFFFu && (rD&BIT(31)));
-				cpu.xer.b.SO |= cpu.xer.b.OV;
-			}
-			if( opc&1 ) { cpu.crlog(rD); }
-		}; // mullw/o.
-	
-	case 279: return instr { // lhzx
-			u32 EA = A0 + rB;
-			rD = cpu.read(EA, 16);	
-		};
-
-	case 536: return instr {
-			rA = rD >> (rB & 0x1f);
-			if( opc & 1 ) { cpu.crlog(rA); }
-		}; // srw/.
-	
-	case 824: return instr {
-			const u32 SH = (opc>>11)&0x1f;
-			if( SH == 0 )
-			{
-				carry = 0;
-				rA = rD;
-				return;
-			}
-			const u32 bitsout = rD & ((1ull<<(SH+1))-1);
-			bool neg = rD & 1;
-			rA = s32(rD) >> SH;
-			carry = (bitsout && neg);
-			cpu.crlog(rA);
-		}; // srawi
-	
-	case 86: return nopped; // dcbf
-	case 470: return nopped; // dcbi
-	case 598: return nopped; // sync
-	
-	case 792: return instr {
-			const u32 SH = rB & 0x3F;
-			if( SH == 0 )
-			{
-				carry = 0;
-				rA = rD;
-				if( opc&1 ) { cpu.crlog(rA); }
-				return;
-			} else if( SH > 31 ) {
-				carry = rD>>31;
-				rA = ((rD&BIT(31)) ? 0xffffFFFFu : 0);
-				if( opc&1 ) { cpu.crlog(rA); }
-				return;
-			}
-			const u32 bitsout = rD & ((1ull<<(SH+1))-1);
-			bool neg = rD & 1;
-			rA = s32(rD) >> SH;
-			carry = (bitsout && neg);
-			cpu.crlog(rA);
-		}; // sraw/.
-		
-	case 922: return instr { // extsh.
-			rA = s16(rD);
-			if(opc&1) { cpu.crlog(rA); }
-		};
-	case 954: return instr { // extsb.
-			rA = s8(rD);
-			if(opc&1) { cpu.crlog(rA); }
-		};
-
-	case 982: return nopped; // icbi
-	default: std::println("In decode_31: btm10 = {}", btm10); break;
-	}
-	return nopped;
-}
-
-gekko_instr decode_19(u32 opcode)
-{
-	const u32 btm10 = (opcode >> 1) & 0x3ff;
-	
-	switch( btm10 )
-	{
-	case 0: return instr {   // mcrf
-			const u32 crfD = 4 * (((opc>>(31-8))&7)^7);
-			const u32 crfS = 4 * (((opc>>(31-13))&7)^7);
-			
-			u32 val = ((cpu.cr.v >> crfS) & 15)<<crfD;
-			cpu.cr.v &= ~crmasks[crfD>>2];
-			cpu.cr.v |= val;	
-		};
-		
-	case 16: return instr {
-			const u32 BO = (opc>>21)&0x1f;
-			const u32 BI = 31 - ((opc>>16)&0x1f);
-			if( !(BO & 4) ) cpu.ctr -= 1;
-			//std::println("ctr = ${:X}", cpu.ctr);
-			bool ctr_ok = (BO&4) || ((cpu.ctr!=0) ^ ((BO&2)?1:0));
-			bool cond_ok = (BO&0x10) || (((cpu.cr.v>>BI)&1) ^ (((BO>>3)&1)^1));
-			if( ctr_ok && cond_ok )
-			{
-				u32 temp = cpu.lr & ~3;
-				if( opc & 1 ) { cpu.lr = cpu.pc; }
-				cpu.pc = temp & ~3;			
-			}
-			//std::println("blr to ${:X}", cpu.pc);
-		}; // blr
-	
-	case 50: return instr {
-			(void)opc;
-			//std::println("${:X} rfi to ${:X}", cpu.pc-4, cpu.srr0);
-			cpu.pc = cpu.srr0;
-			cpu.msr.v = cpu.srr1;
-		};
-	
-	case 150: return nopped; // isync
-	
-	case 193: return instr {
-			const u32 crbD = 31 - ((opc>>21)&0x1f);
-			const u32 crbA = 31 - ((opc>>16)&0x1f);
-			const u32 crbB = 31 - ((opc>>11)&0x1f);
-			cpu.cr.v &= ~(1u<<crbD);
-			cpu.cr.v |= (((cpu.cr.v>>crbA)&1)^((cpu.cr.v>>crbB)&1))<<crbD;
-		}; // crxor
-		
-	case 449: return instr {
-			const u32 crbD = 31 - ((opc>>21)&0x1f);
-			const u32 crbA = 31 - ((opc>>16)&0x1f);
-			const u32 crbB = 31 - ((opc>>11)&0x1f);
-			cpu.cr.v &= ~(1u<<crbD);
-			cpu.cr.v |= (((cpu.cr.v>>crbA)&1)|((cpu.cr.v>>crbB)&1))<<crbD;
-		}; // cror
-		
-	case 289: return instr {
-			const u32 crbD = 31 - ((opc>>21)&0x1f);
-			const u32 crbA = 31 - ((opc>>16)&0x1f);
-			const u32 crbB = 31 - ((opc>>11)&0x1f);
-			cpu.cr.v &= ~(1u<<crbD);
-			cpu.cr.v |= (1^(((cpu.cr.v>>crbA)&1)^((cpu.cr.v>>crbB)&1)))<<crbD;
-		}; // creqv
-		
-		
-	case 528: return instr {
-			const u32 BO = (opc>>21)&0x1f;
-			const u32 BI = 31 - ((opc>>16)&0x1f);
-			const bool cond_ok = (BO&0x10)||(1^(((cpu.cr.v>>BI)&1) ^ ((BO>>3)&1)));
-			if( cond_ok )
-			{
-				if( opc&1 ) cpu.lr = cpu.pc;
-				cpu.pc = cpu.ctr&~3;
-			}
-		}; // bcctr
-	default: std::println("In decode_19: btm10 = {}", btm10); break;
-	}
-	return nullptr;
-}
-
-gekko_instr decode_63(u32 opcode)
-{
-	u32 btm10 = (opcode >> 1) & 0x3ff;
-	
-	switch( btm10 )
-	{
-	case 0: return nopped; // todo: fcmpu
-	
-	case 12: return instr {
-			fD = (double)(float)fB;
-		}; // frsp todo: actual rounding modes and flags
-	
-	case 38: return nopped; //todo: mtfsb1
-	case 70: return nopped; //todo: mtfsb0
-	
-	case 72: return instr { fD = fB; }; // fmr todo: flags
-	
-	case 40: return instr {
-			u64 a = 0;
-			memcpy(&a, &fB, 8);
-			a ^= (1ull<<63);
-			memcpy(&fD, &a, 8);
-		}; // fneg
-	
-	case 711: return nopped; // todo mtfsf
-	default: std::println("In decode_63: btm10 = {}", btm10); return nopped;
-	}
-	return nullptr;
-}
-
-gekko_instr decode(u32 opcode)
-{
-	const u32 top6 = opcode >> 26;
-	
-	switch( top6 )
-	{
-	case 4: return nopped; // todo: bunch of paired single math
-	
-	
-	case 7: return instr { rD = rA * simm16; }; // mulli
-	case 8: return instr{u64 t=(rA^0xffffFFFFu);t+=(u32)(s32)simm16;t+=1;carry=t>>32;rD=t; };//subfic
-	case 10: return instr {
-			u32 c = cpu.xer.b.SO;
-			if( rA < (opc&0xffff) )
-			{
-				c |= 8;
-			} else if( rA > (opc&0xffff) ) {
-				c |= 4;
-			} else {
-				c |= 2;
-			}
-			u32 crfD = (opc>>(31-8))&7;
-			cpu.cr.v &= ~crmasks[crfD];
-			cpu.cr.v |= (c << ((crfD^7)*4));
-		}; // cmpli
-	case 11: return instr {
-			u32 c = cpu.xer.b.SO;
-			if( s32(rA) < simm16 )
-			{
-				c |= 8;
-			} else if( s32(rA) > simm16 ) {
-				c |= 4;
-			} else {
-				c |= 2;
-			}
-			u32 crfD = (opc>>(31-8))&7;
-			cpu.cr.v &= ~crmasks[crfD];
-			cpu.cr.v |= (c << ((crfD^7)*4));
-		}; // cmpi
-	case 12: return instr { u64 t = rA; t += (u32)(s32)simm16; carry = t>>32; rD = t; }; // addic
-	case 13: return instr { u64 t = rA; t += (u32)(s32)simm16; carry = t>>32; rD = t; cpu.crlog(rD); }; // addic.
-	case 14: return instr { rD = A0 + simm16; };    // addi
-	case 15: return instr { rD = A0 + (opc<<16); }; // addis
-	case 16: return instr {
-			const u32 BO = (opc>>21)&0x1f;
-			const u32 BI = 31 - ((opc>>16)&0x1f);
-			if( !(BO & 4) ) cpu.ctr -= 1;
-			//std::println("ctr = ${:X}", cpu.ctr);
-			bool ctr_ok = (BO&4) || ((cpu.ctr!=0) ^ ((BO&2)?1:0));
-			bool cond_ok = (BO&0x10) || (((cpu.cr.v>>BI)&1) ^ (((BO>>3)&1)^1));
-			if( ctr_ok && cond_ok )
-			{
-				if( opc & 1 ) { cpu.lr = cpu.pc; }
-				cpu.pc = ((opc&2) ? 0 : (cpu.pc-4)) + s16(opc&0xfffc);			
-			}
-			//std::println("bcc to ${:X}", cpu.pc);
-		}; // bc
-	case 17: return nopped; // sc todo: actually do system call?
-	case 18: return instr {
-			//std::println("b opcode = ${:X}", opc);
-			if( opc & 1 ) { cpu.lr = cpu.pc; }
-			s32 soff = (opc&~3)<<6;
-			soff >>= 6;
-			cpu.pc = ( (opc&2) ? 0 : (cpu.pc-4) ) + soff;
-			//std::println("branch to ${:X}", cpu.pc);
-		}; // b
-	case 19: return decode_19(opcode);
-	case 20: return instr {
-			u32 SH = (opc>>11)&0x1f;
-			//std::println("SH = {}", SH);
-			u32 r = std::rotl(rD, SH);
-			u32 ME = (opc>>1)&0x1f;
-			u32 MB = (opc>>6)&0x1f;
-			//std::println("ME = {} | MB = {}", ME, MB);
-			u32 m = 0;
-			while( MB != ME )
-			{
-				m |= 1<<(31-MB);
-				MB = (MB+1)&31;
-			}
-			m |= 1<<(31-MB);
-			r = (r & m) | (rA & ~m);
-			//std::println("rD = ${:X}, r = ${:X}, m = ${:X}", rD, r, m);
-			rA = r;
-			if( opc & 1 ) { cpu.crlog(rA); }
-		}; // rlwimi	
-	case 21: return instr {
-			u32 SH = (opc>>11)&0x1f;
-			//std::println("SH = {}", SH);
-			u32 r = std::rotl(rD, SH);
-			u32 ME = (opc>>1)&0x1f;
-			u32 MB = (opc>>6)&0x1f;
-			//std::println("ME = {} | MB = {}", ME, MB);
-			u32 m = 0;
-			while( MB != ME )
-			{
-				m |= 1<<(31-MB);
-				MB = (MB+1)&31;
-			}
-			m |= 1<<(31-MB);
-			r &= m;
-			//std::println("rD = ${:X}, r = ${:X}, m = ${:X}", rD, r, m);
-			rA = r;
-			if( opc & 1 ) { cpu.crlog(rA); }
-			//exit(1);
-		}; // rlwinm
-	case 23: return instr {
-			u32 SH = rB & 0x1f;
-			//std::println("SH = {}", SH);
-			u32 r = std::rotl(rD, SH);
-			u32 ME = (opc>>1)&0x1f;
-			u32 MB = (opc>>6)&0x1f;
-			//std::println("ME = {} | MB = {}", ME, MB);
-			u32 m = 0;
-			while( MB != ME )
-			{
-				m |= 1<<(31-MB);
-				MB = (MB+1)&31;
-			}
-			m |= 1<<(31-MB);
-			r &= m;
-			//std::println("rD = ${:X}, r = ${:X}, m = ${:X}", rD, r, m);
-			rA = r;
-			if( opc & 1 ) { cpu.crlog(rA); }
-			//exit(1);
-		}; // rlwnm	
-	case 24: return instr { rA = rD | (opc&0xffff); }; // ori
-	case 25: return instr { rA = rD | (opc<<16); };    // oris
-	case 26: return instr { rA = rD ^ (opc&0xffff); }; // xori
-	case 27: return instr { rA = rD ^ (opc<<16); };    // xoris
-	case 28: return instr { rA = rD & (opc&0xffff); cpu.crlog(rA); }; // andi.
-	case 29: return instr { rA = rD & (opc<<16); cpu.crlog(rA); }; // andis.
-	
-	case 31: return decode_31(opcode);
-	case 32: return instr { u32 EA = A0 + simm16; rD = cpu.read(EA, 32); }; //lwz
-	case 33: return instr { u32 EA = rA + simm16; rD = cpu.read(EA, 32); rA = EA; }; // lwzu
-	case 34: return instr { u32 EA = A0 + simm16; rD = cpu.read(EA, 8); }; // lbz
-	case 35: return instr { u32 EA = rA + simm16; rD = cpu.read(EA, 8); rA = EA; }; // lbzu
-	case 36: return instr { u32 EA = A0 + simm16; cpu.write(EA, rD, 32); }; // stw
-	case 37: return instr { u32 EA = rA + simm16; cpu.write(EA, rD, 32); rA = EA; }; // stwu
-	case 38: return instr { u32 EA = A0 + simm16; cpu.write(EA, rD&0xff, 8); }; // stb
-	case 39: return instr { u32 EA = rA + simm16; cpu.write(EA, rD&0xff, 8); rA = EA; }; // stbu
-	case 40: return instr { u32 EA = A0 + simm16; rD = cpu.read(EA, 16); }; // lhz
-	case 41: return instr { u32 EA = rA + simm16; rD = cpu.read(EA, 16); rA = EA; }; // lhzu
-	case 42: return instr { u32 EA = A0 + simm16; rD = (s16)cpu.read(EA, 16); }; // lha
-	case 43: return instr { u32 EA = rA + simm16; rD = (s16)cpu.read(EA, 16); rA = EA; }; // lha
-	case 44: return instr { u32 EA = A0 + simm16; cpu.write(EA, rD&0xffff, 16); }; // sth
-	case 45: return instr { u32 EA = rA + simm16; cpu.write(EA, rD&0xffff, 16); rA = EA; }; // sthu
-	case 46: return instr{ u32 EA =A0+simm16; u32 rg= (opc>>21)&0x1f; while( rg<32 ){cpu.r[rg] =cpu.read(EA,32); rg++; EA+=4;}};//lmw 
-	case 47: return instr{ u32 EA =A0+simm16; u32 rg= (opc>>21)&0x1f; while( rg<32 ){cpu.write(EA,cpu.r[rg],32); rg++; EA+=4;}};//lmw 
-	case 48: return instr{ u32 EA=A0+simm16; fD = cpu.readf(EA); };
-
-	case 50: return instr { 
-			u32 EA = A0+simm16; u64 t = cpu.read(EA,32); t<<=32; t|=cpu.read(EA+4,32); memcpy(&cpu.f[(opc>>21)&0x1f], &t, 8);
-			//std::println("loaded f{} = {}", (opc>>21)&0x1f, cpu.f[(opc>>21)&0x1f]);
-		}; // lfd
-	
-	case 52: return instr {
-			u32 EA = A0+simm16; u32 v = 0; float vf = fD; memcpy(&v,&vf,4); cpu.write(EA, v, 4);	
-		}; // stfs
-	case 53: return instr {
-			u32 EA = rA+simm16; u32 v = 0; float vf = fD; memcpy(&v,&vf,4); cpu.write(EA, v, 4);	
-			rA = EA;
-		}; // stfsu				
-	case 54: return instr {
-			u32 EA = A0+simm16; cpu.writed(EA, fD);	
-		}; // stfd
-			
-	case 56: return nopped; // todo psq_l
-	case 59: return nopped; // todo psq_l
-	case 60: return nopped; // todo psq stuff
-	
+	case 59: return decode_59(opcode);
 	case 63: return decode_63(opcode);
-	default: std::println("In decode: undef opcode top6 = {}", top6); break;
+	default:
+		std::println("Gecko: Undef toplevel opc = ${:X}", opcode>>26);
+		return nullptr;
 	}
-	return nullptr;
 }
 
 void gekko::step()
 {
-	time_base += 1;
-	
-	dec_div+=1;
-	if( dec_div == 12 )
+	if( msr.b.ee && irq_line )
 	{
-		dec_div = 0;
-		dec -= 1;
-		if( dec == 0xffffFFFFu )
-		{
-			dec_happened = true;
-		}
-	}
-	
-	if( irq_line && msr.b.EE )
-	{
-		srr1 = msr.v;
-		msr.b.EE = 0;
-		srr0 = pc;
-		pc = 0x500u;
-		std::println("IRQ taken");
-	} else if( 0 ) {//dec_happened && msr.b.EE ) {
-		dec_happened = false;
-		srr1 = msr.v;
-		msr.b.EE = 0;
-		srr0 = pc;
-		pc = 0x900u;
-	}
-
-	//lastpc = pc;
-	u32 opcode = fetcher(pc);
-	
-	//if( pc >= 0x80000000u && pc <= 0x90000000u ) { std::println("PC reached ${:X}", pc); exit(1); }
-	//std::println("${:X} = ${:X}", pc, opcode);
-	pc += 4;
-	
-	auto i = decode(opcode);
-	if( i )
-	{
-		i(*this, opcode);
+		SRR0 = pc;
+		SRR1 = msr.v & MSR_TO_SRR_MASK;
+		msr.b.ee = msr.b.ri = 0;
+		pc = 0x500;
+		//std::println("ExtIRQ not yet implemented");
+		//exit(1);
 	} else {
-		std::println("${:X}: Undef opcode. halting", pc-4, opcode);
-		exit(1);
+		u32 opc = read(pc, 32);
+		pc += 4;
+		
+		auto I = decode_opcode(opc);
+		if( !I )
+		{
+			std::println("Ended at ${:X}", pc-4);
+			exit(1);
+		}
+		
+		I(*this, opc);
 	}
-	
-	//if( pc == 0x8001ef44u ) { std::println("lastpc = ${:X}", lastpc); exit(1); }
-}
-
-u32 gekko::read_spr(u32 spr)
-{
-	//std::println("Read spr {}", spr);
-	switch( spr )
-	{
-	case 1: return xer.v;
-	case 8: return lr;
-	case 9: return ctr;
-	
-	case 19: return 0; // DAR unimpl.
-	
-	case 22: return dec;
-	
-	case 26: return srr0;
-	case 27: return srr1;
-	
-	case 272: return sprg0;
-	case 273: return sprg1;
-	case 274: return sprg2;
-	case 275: return sprg3;
-	
-	case 912:
-	case 913:
-	case 914:
-	case 915:
-	case 916:
-	case 917:
-	case 918: // gqr
-	case 919: return 0;
-	case 920: return hid2.v;
-	case 1008: return hid0.v;
-	case 1009: return hid1.v;
-	case 1017: { u32 t = l2cr; l2cr &= ~1; std::println("${:X}: rd spr 1017", pc-4); return t; }
-	default:
-		std::println("read spr {} unimpl.", spr);
-		//exit(1);
-	}
-	return 0;
-}
-
-void gekko::write_spr(u32 spr, u32 val)
-{
-	switch( spr )
-	{
-	case 1: xer.v = val; return;
-	case 8: lr = val; return;
-	case 9: ctr = val; /*std::println("set ctr = ${:X}", val);*/ return;
-	
-	case 22: dec = val; return;
-	
-	case 26: srr0 = val; return;
-	case 27: srr1 = val; return;
-	
-	case 272: sprg0 = val; return;
-	case 273: sprg1 = val; return;
-	case 274: sprg2 = val; return;
-	case 275: sprg3 = val; return;
-	
-	case 912:
-	case 913:
-	case 914:
-	case 915:
-	case 916:
-	case 917:
-	case 918: // gqr
-	case 919: return;
-	case 920: hid2.v = val; return;
-	case 1008: hid0.v = val; return;
-	case 1009: hid1.v = val; return;
-	case 1017: l2cr = val&~1; if( l2cr & 0x200000 ) { l2cr |= 1; } return;
-	default:
-		std::println("${:X}: write spr {} = ${:X} unimpl.", pc-4, spr, val);
-		//exit(1);
-	}
-	return;
-}
-
-u32 gekko::fetch(u32 /*addr*/)
-{ // unused
-	return 0;
-}
-
-u32 gekko::read(u32 addr, int size)
-{
-	return reader(addr,size);
-}
-
-void gekko::write(u32 addr, u32 v, int size)
-{
-	writer(addr,v,size);
 }
 
 void gekko::reset()
 {
-	l2cr = 0;
-	msr.b.EE = 0;
-	dec_div = 0;
-	r[1] = 0x817ffffcu;
-	irq_line = false;
+
 }
+
+#define OE (opc&BIT(10))
+#define bOE BIT(9)
+
+static gekko::instr_type decode_31(u32 opcode)
+{
+	switch( (opcode>>1)&0x3ff )
+	{
+	// starting with the instructions where the bit that would be OE is required to be 1(one)
+	case 512: instr {  // mcrxr
+			cpu.cond.cr[crfD].lt = cpu.xer.b.so;
+			cpu.cond.cr[crfD].gt = cpu.xer.b.ov;
+			cpu.cond.cr[crfD].eq = cpu.xer.b.ca;
+			cpu.cond.cr[crfD].so = 0; //todo: or can that bit in xer have value?
+			cpu.xer.v &= 0x0fffFFFFu; 
+		};
+		
+	case 533: instr { // lswx
+			u32 EA = zrA+rB;
+			u32 i = 0;
+			u32 r = (((opc>>21)&0x1F)-1)&0x1F;
+			u32 n = cpu.xer.b.bc;
+			while( n > 0 )
+			{
+				if( i == 0 )
+				{
+					r = (r + 1) & 0x1F;
+					cpu.r[r] = 0;
+				}
+				cpu.r[r] |= ((u8)cpu.read(EA,8))<<(24-i);
+				i += 8;
+				if( i==32 ) { i=0; }
+				EA += 1;
+				n -= 1;
+			}
+		};
+		
+	case 534: instr { rD = __builtin_bswap32((u32)cpu.read(zrA+rB, 32)); }; // lwbrx
+	
+	case 535: instr { frD = std::bit_cast<float>((u32)cpu.read(zrA+rB,32)); if(cpu.hid2.b.pse) { frD_PS1 = frD; } }; // lfsx
+	case 536: instr { rA = ((rB&BIT(5)) ? 0 : (rS>>(rB&0x1F))); if(Rc){cpu.setCR0(rA);} }; // srw
+
+	case 567: instr { frD = std::bit_cast<float>((u32)cpu.read(rA+rB,32)); rA+=rB; if(cpu.hid2.b.pse) { frD_PS1 = frD; } }; // lfsx
+
+	case 597: instr { // lswi
+			u32 EA = zrA;
+			u32 i = 0;
+			u32 r = (((opc>>21)&0x1F)-1)&0x1F;
+			u32 n = ((opc>>11)&0x1F);
+			if( n == 0 ) { n = 32; }
+			while( n > 0 )
+			{
+				if( i == 0 )
+				{
+					r = (r + 1) & 0x1F;
+					cpu.r[r] = 0;
+				}
+				cpu.r[r] |= ((u8)cpu.read(EA,8))<<(24-i);
+				i += 8;
+				if( i==32 ) { i=0; }
+				EA += 1;
+				n -= 1;
+			}
+		};
+
+	case 599: instr { frD = std::bit_cast<double>(cpu.read(zrA+rB, 64)); }; // lfdx
+	case 631: instr { frD = std::bit_cast<double>(cpu.read(rA+rB, 64)); rA+=rB; }; // lfdux
+
+	case 661: instr { // stswx
+			u32 EA = zrA+rB;
+			u32 i = 0;
+			u32 r = (((opc>>21)&0x1F)-1)&0x1F;
+			u32 n = cpu.xer.b.bc;
+			while( n > 0 )
+			{
+				if( i == 0 ) { r = (r + 1) & 0x1F; }
+				cpu.write(EA, cpu.r[r]>>(24-i), 8);
+				i += 8;
+				if( i==32 ) { i=0; }
+				EA += 1;
+				n -= 1;
+			}
+		};
+	case 662: instr { cpu.write(zrA+rB, __builtin_bswap32(rS), 32); }; // stwbrx
+	case 663: instr { cpu.write(zrA+rB, std::bit_cast<u32>((float)frS), 32); }; // stfsx
+
+	case 695: instr { cpu.write(rA+rB, std::bit_cast<u32>((float)frS), 32); rA+=rB; }; // stfsux
+
+	case 725: instr { // stswi
+			u32 EA = zrA;
+			u32 i = 0;
+			u32 r = (((opc>>21)&0x1F)-1)&0x1F;
+			u32 n = ((opc>>11)&0x1F);
+			if( n == 0 ) { n = 32; }
+			while( n > 0 )
+			{
+				if( i == 0 ) { r = (r + 1) & 0x1F; }
+				cpu.write(EA, cpu.r[r]>>(24-i), 8);
+				i += 8;
+				if( i==32 ) { i=0; }
+				EA += 1;
+				n -= 1;
+			}
+		};
+
+	case 727: instr { cpu.write(zrA+rB, std::bit_cast<u64>(frS), 64); }; // stfdx
+
+	case 759: instr { cpu.write(rA+rB, std::bit_cast<u64>(frS), 64); rA+=rB; }; // stfdux
+
+	case 790: instr { rD = __builtin_bswap16((u16)cpu.read(zrA+rB, 16)); }; // lhbrx
+
+	case 792: instr { // sraw
+			if( rB & BIT(5) )
+			{
+				cpu.xer.b.ca = (rS>>31)&1;
+				rA = s32(rS)>>31;
+			} else if( (rB&0x1F) == 0 ) {
+				cpu.xer.b.ca = 0;
+				rA = rS;
+			} else {
+				cpu.xer.b.ca = (rS&BIT(31)) && (rS&(BIT((rB&0x1F))-1));
+				rA = s32(rS) >> (rB&0x1F);
+			}
+			if(Rc) { cpu.setCR0(rA); }
+		};
+	case 824: instr { // srawi
+			if( SH == 0 )
+			{
+				cpu.xer.b.ca = 0;
+				rA = rS;
+			} else {
+				cpu.xer.b.ca = (rS&BIT(31)) && (rS&(BIT(SH)-1));
+				rA = s32(rS) >> SH;
+			}
+			if(Rc) { cpu.setCR0(rA); }
+		};
+
+	case 918: instr { cpu.write(zrA+rB, __builtin_bswap16((u16)rS), 16); }; // sthbrx
+
+	case 922: instr { rA = (s16)rS; if(Rc) { cpu.setCR0(rA); } }; // extsh
+	
+	case 954: instr { rA = (s8)rS; if(Rc) { cpu.setCR0(rA); } }; // extsb
+	
+	case 983: instr { cpu.write(zrA+rB, (u32)std::bit_cast<u64>(frS), 32); }; // stfiwx
+	
+	case 566: instr_nop; // tlbsync
+	case 598: instr_nop; // sync
+	case 854: instr_nop; // eieio
+	case 982: instr_nop; // icbi
+	case 1014: instr_nop; // dcbz
+	
+	// all the instructions where bit10 is either OE or must be zero
+	case 0: instr { //cmp
+			cpu.cond.cr[crfD].lt = s32(rA)<s32(rB);
+			cpu.cond.cr[crfD].gt = s32(rA)>s32(rB);
+			cpu.cond.cr[crfD].eq = rA==rB;
+			cpu.cond.cr[crfD].so = cpu.xer.b.so;
+		};
+	case bOE|8:
+	case 8: instr { // subfc
+			u32 t = ~rA;
+			u64 res = t;
+			res += rB;
+			res += 1;
+			if(OE) 
+			{
+				cpu.xer.b.ov = ((res^t)&(res^rB)&BIT(31))>>31;
+				cpu.xer.b.so |= cpu.xer.b.ov;
+			}
+			rD = res;
+			cpu.xer.b.ca = (res>>32)&1;
+			if(Rc) { cpu.setCR0(rD); }
+		};
+	case bOE|10:
+	case 10: instr { // addc
+			u64 res = rA;
+			res += rB;
+			if(OE) 
+			{
+				cpu.xer.b.ov = (((res^rA)&(res^rB)&BIT(31))?1:0);
+				cpu.xer.b.so |= cpu.xer.b.ov;
+			}
+			rD = res;
+			cpu.xer.b.ca = ((res>>32)&1);
+			if(Rc) { cpu.setCR0(rD); }		
+		};	
+	case 11: instr { u64 a = rA; a *= rB; rD=a>>32; if(Rc) { cpu.setCR0(rD); } }; // mulhwu
+
+	case 19: instr { rD = cpu.cond.get(); }; // mfcr
+	case 20: instr { rD = cpu.read(zrA+rB, 32); cpu.reserve = 1; }; // lwarx
+	case 150: instr { // stwcx.
+			cpu.cond.cr[0].lt = cpu.cond.cr[0].gt = 0;
+			cpu.cond.cr[0].so = cpu.xer.b.so;
+			if( cpu.reserve )
+			{
+				cpu.reserve = 0;
+				cpu.write(zrA+rB, rS, 32);
+				cpu.cond.cr[0].eq = 1;
+			} else {
+				cpu.cond.cr[0].eq = 0;
+			}
+		};
+
+	case 23: instr { rD = cpu.read(zrA+rB, 32); }; // lwzx
+	case 24: instr { rA = ((rB&BIT(5)) ? 0 : (rS<<(rB&0x1F))); if(Rc) { cpu.setCR0(rA); } }; //slw
+	case 26: instr { rA = std::countl_zero(rS); if(Rc){cpu.setCR0(rA); }}; //cntlzw
+	case 28: instr { rA = rS & rB; if(Rc) { cpu.setCR0(rA); } }; // and
+	case 32: instr { //cmpl
+			cpu.cond.cr[crfD].lt = u32(rA)<u32(rB);
+			cpu.cond.cr[crfD].gt = u32(rA)>u32(rB);
+			cpu.cond.cr[crfD].eq = rA==rB;
+			cpu.cond.cr[crfD].so = cpu.xer.b.so;
+		};
+	case bOE|40:
+	case 40: instr { // subf
+			u32 t = ~rA;
+			u64 res = t;
+			res += rB;
+			res += 1;
+			if(OE) 
+			{
+				cpu.xer.b.ov = ((res^t)&(res^rB)&BIT(31))>>31;
+				cpu.xer.b.so |= cpu.xer.b.ov;
+			}
+			rD = res;
+			if(Rc) { cpu.setCR0(rD); }
+		};
+
+	case 55: instr { u32 EA=rA+rB; rA=EA; rD = cpu.read(EA, 32); }; // lwzux
+
+	case 60: instr { rA = rS & ~rB; if(Rc) { cpu.setCR0(rA); }}; // andc
+
+	case 75: instr { s64 a = s32(rA); a *= s32(rB); rD=a>>32; if(Rc) { cpu.setCR0(rD); } }; // mulhw
+
+	case 83: instr { rD = cpu.msr.v; }; // mFmsr
+
+	case 87: instr { rD = (u8)cpu.read(zrA+rB, 8); }; // lbzx
+	case bOE|104:
+	case 104: instr { // neg
+			if( rA == BIT(31) ) 
+			{ 
+				rD = rA; if(OE) { cpu.xer.b.so=cpu.xer.b.ov=1; } 
+			} else { 
+				rD = ~rA + 1; if(OE) { cpu.xer.b.ov=0; }
+			}
+			if(Rc) { cpu.setCR0(rD); }
+		};
+
+	case 119: instr { u32 EA=rA+rB; rA=EA; rD = (u8)cpu.read(EA, 8); }; // lbzux
+
+	case 124: instr { rA = ~(rS | rB); if(Rc) { cpu.setCR0(rA); } }; // nor
+	case bOE|136:
+	case 136: instr { // subfe
+			u32 t = ~rA;
+			u64 res = t;
+			res += rB;
+			res += cpu.xer.b.ca;
+			if(OE)
+			{
+				cpu.xer.b.so |= (cpu.xer.b.ov = (((res^rB)&(res^t)&BIT(31))>>31));
+			}
+			rD = res;
+			cpu.xer.b.ca = (res>>32)&1;
+			if(Rc) { cpu.setCR0(rD); }
+		};
+	case bOE|138:
+	case 138: instr { // adde
+			u64 res = rA;
+			res += rB;
+			res += cpu.xer.b.ca;
+			if(OE) 
+			{
+				cpu.xer.b.ov = (((res^rA)&(res^rB)&BIT(31))?1:0);
+				cpu.xer.b.so |= cpu.xer.b.ov;
+			}
+			rD = res;
+			cpu.xer.b.ca = ((res>>32)&1);
+			if(Rc) { cpu.setCR0(rD); }		
+		};
+		
+	case 144: instr { // mtcrf
+			u32 crm = (opc>>12)&0xff;
+			u32 v = cpu.cond.get();
+			u32 mask = 0;
+			for(u32 i = 0; i < 8; ++i) { mask |= ((crm&BIT(i)) ? (0xf<<((i)*4)) : 0); }
+			v = (v&~mask) | (rS&mask);
+			cpu.cond.set(v);	
+		};
+		
+	case 146: instr { cpu.msr.v = rS; }; // mTmsr
+
+	case 151: instr { cpu.write(zrA+rB, rS, 32); }; // stwux
+
+	case 183: instr { cpu.write(rA+rB, rS, 32); rA+=rB; }; // stwux
+	case bOE|200:
+	case 200: instr { // subfze
+			u32 t = ~rA;
+			u64 res = t;
+			res += cpu.xer.b.ca;
+			if(OE) 
+			{
+				cpu.xer.b.ov = ((res^t)&(res^0)&BIT(31))>>31;
+				cpu.xer.b.so |= cpu.xer.b.ov;
+			}
+			rD = res;
+			cpu.xer.b.ca = ((res>>32)&1);
+			if(Rc) { cpu.setCR0(rD); }
+		};
+	case bOE|202:
+	case 202: instr { // addze
+			u64 res = rA;
+			res += cpu.xer.b.ca;
+			if(OE) 
+			{
+				cpu.xer.b.ov = (((res^rA)&(res^0)&BIT(31))?1:0);
+				cpu.xer.b.so |= cpu.xer.b.ov;
+			}
+			rD = res;
+			cpu.xer.b.ca = ((res>>32)&1);
+			if(Rc) { cpu.setCR0(rD); }		
+		};
+	case 215: instr { cpu.write(zrA+rB, rS, 8); }; // stbx
+	case bOE|232:
+	case 232: instr { // subfme
+			u32 t = ~rA;
+			u64 res = t;
+			res += cpu.xer.b.ca;
+			res += 0xffffFFFFu;
+			if(OE)
+			{
+				cpu.xer.b.so |= (cpu.xer.b.ov = (((res^BIT(31))&(res^t)&BIT(31))>>31));
+			}
+			rD = res;
+			cpu.xer.b.ca = (res>>32)&1;
+			if(Rc) { cpu.setCR0(rD); }
+		};
+	case bOE|234:
+	case 234: instr { // addme
+			u64 res = rA;
+			res += 0xffffFFFFu;
+			res += cpu.xer.b.ca;
+			if(OE) 
+			{
+				cpu.xer.b.ov = (((res^rA)&(res^BIT(31))&BIT(31))?1:0);
+				cpu.xer.b.so |= cpu.xer.b.ov;
+			}
+			rD = res;
+			cpu.xer.b.ca = ((res>>32)&1);
+			if(Rc) { cpu.setCR0(rD); }		
+		};
+	case bOE|235:
+	case 235: instr { // mullw
+			s64 a = s32(rA); a*=s32(rB); rD=a; 
+			if( OE )
+			{
+				cpu.xer.b.ov = ((a != s32(rD)) ? 1:0);
+				cpu.xer.b.so |= cpu.xer.b.ov;
+			}
+			if(Rc) { cpu.setCR0(rD); }
+		};
+
+	case 247: instr { cpu.write(rA+rB, rS, 8); rA+=rB; }; // stbux
+
+	case bOE|266:
+	case 266: instr { // add
+			u64 res = rA;
+			res += rB;
+			if(OE) 
+			{
+				cpu.xer.b.ov = (((res^rA)&(res^rB)&BIT(31))?1:0);
+				cpu.xer.b.so |= cpu.xer.b.ov;
+			}
+			rD = res;
+			if(Rc) { cpu.setCR0(rD); }		
+		};
+	case 279: instr { rD = (u16)cpu.read(zrA+rB, 16); }; // lhzx
+		
+	case 284: instr { rA = ~(rS^rB); if(Rc) { cpu.setCR0(rA); } }; // eqv
+	case 311: instr { u32 EA=rA+rB; rA=EA; rD = (u16)cpu.read(EA, 16); }; // lhzux
+
+	case 316: instr { rA = rS ^ rB; if(Rc) { cpu.setCR0(rA); } }; // xor
+
+	case 339: instr { u32 spr = (opc>>11)&0x3ff; rD = cpu.get_spr( ((spr&0x1F)<<5) | ((spr>>5)&0x1F) ); }; // mfspr
+
+	case 343: instr { rD = (s16)cpu.read(zrA+rB, 16); }; // lhax
+
+	case 371: instr { u32 tbr = (opc>>11)&0x3ff; rD = cpu.get_tbr( ((tbr&0x1F)<<5) | ((tbr>>5)&0x1F) ); }; // mftb
+
+	case 375: instr { u32 EA=rA+rB; rA=EA; rD = (s16)cpu.read(EA, 16); }; // lhaux
+
+	case 407: instr { cpu.write(zrA+rB, rS, 16); }; // sthx
+	case 412: instr { rA = rS | ~rB; if(Rc) { cpu.setCR0(rA); } }; // orc
+
+	case 439: instr { cpu.write(rA+rB, rS, 16); rA+=rB; }; // sthux
+	case 444: instr { rA = rS | rB; if(Rc) { cpu.setCR0(rA); } }; // or
+
+	case bOE|459:
+	case 459: instr { // divwu
+			if( rB==0 )
+			{
+				// rD is probably deterministic, just dunno it
+				if( OE ) { cpu.xer.b.so = cpu.xer.b.ov = 1; }
+			} else {
+				rD = u32(rA)/u32(rB);
+				if( OE ) { cpu.xer.b.ov = 0; }
+			}			
+			if(Rc) { cpu.setCR0(rD); }
+		};
+
+	case 467: instr { u32 spr = (opc>>11)&0x3ff; cpu.set_spr( ((spr&0x1F)<<5) | ((spr>>5)&0x1F) , rS ); }; // mTspr
+
+	case 476: instr { rA = ~(rS & rB); if(Rc) { cpu.setCR0(rA); } }; // nand
+	
+	case bOE|491:
+	case 491: instr { // divw
+			if( rB==0 || (rA==0x80000000u&&rB==0xffffFFFFu) )
+			{
+				// rD is probably deterministic, just don't know what
+				if( OE ) { cpu.xer.b.so = cpu.xer.b.ov = 1; }
+			} else {
+				rD = s32(rA)/s32(rB);
+				if( OE ) { cpu.xer.b.ov = 0; }
+			}			
+			if(Rc) { cpu.setCR0(rD); }
+		};
+	
+	case 54: instr_nop; // dcbst
+	case 86: instr_nop; // dcbf
+	case 246: instr_nop; // dcbtst
+	case 278: instr_nop; // dcbt
+	case 470: instr_nop; // dcbi
+	//anything >=512 belongs in the first switch
+	default:
+		std::println("Unimpl opc31 bot10 = {}dec", (opcode>>1)&0x3ff);
+		break;
+	}	
+	//return nullptr;
+	instr_nop;
+}
+
+u32 gekko::get_spr(u32 spr)
+{
+	switch( spr )
+	{
+	case 1: return xer.v;
+	case 8: return LR;
+	case 9: return CTR;
+	
+	case 920: return hid2.v;
+	default: break;
+	}
+	std::println("gekko: unimpl spr = {}", spr);
+	return SPRs[spr];
+}
+
+void gekko::set_spr(u32 spr, u32 v)
+{
+	switch( spr )
+	{
+	case 1: xer.v = v; return;
+	case 8: LR = v; return;
+	case 9: CTR = v; return;
+	
+	case 920: hid2.v = v; return;
+	default: break;
+	}
+	SPRs[spr] = v;
+	std::println("gekko: unimpl spr = {}", spr);
+}
+
+
+
+
+
+
+
+
 
 
 

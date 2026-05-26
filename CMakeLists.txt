@@ -2,12 +2,12 @@ cmake_minimum_required(VERSION 3.10)
 
 project(test)
 
-find_package(SDL2)
+find_package(SDL2 REQUIRED)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 #set(CMAKE_CXX_FLAGS "-g -fabi-version=16 -fsanitize=address -ftree-vectorize -march=native -Wall -Wpedantic -Wextra -Wshadow -Wimplicit-fallthrough")
 set(CMAKE_CXX_FLAGS "-O3 -ftree-vectorize -march=native -Wall -Wpedantic -Wextra -Wshadow -Wimplicit-fallthrough")
-set(CMAKE_CXX_COMPILER g++)
+set(CMAKE_CXX_COMPILER clang++)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
 
 add_executable(test main.cpp imgui/backends/imgui_impl_sdl2.cpp progopt.cpp commodore/c64.cpp commodore/TAPFile.cpp 

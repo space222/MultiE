@@ -1,4 +1,3 @@
-#include <SDL.h>
 #include <thread>
 #include "sms.h"
 #include "Settings.h"

@@ -133,7 +133,7 @@ u64 n64::read(u32 addr, int size)
 		if( size != 32 ) { printf("ISViewer not word!\n"); exit(1); }
 		return __builtin_bswap32(*(u32*)&viewbuf[addr-0x13ff0000]);
 	}
-	
+	//if( addr >= 0x70000000 && addr < 0x80000000 ) { return sized_read(ROM.data(), (addr-0x70000000u)%ROM.size(), size); }
 	//if( addr >= 0x0800000 && addr <= 0xF000000 ) return __builtin_bswap32(*(u32*)&sram[addr&0x7fff]);
 	
 	printf("N64:$%X: r%i <$%X\n", u32(cpu.pc), size, addr);

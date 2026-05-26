@@ -1,6 +1,5 @@
 #include <print>
 #include <string>
-#include <SDL.h>
 #include "dreamcast.h"
 
 void dreamcast::maple_port1(u32 dest, u32* msg, u32 len)

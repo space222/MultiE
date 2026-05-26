@@ -1,5 +1,4 @@
 #include <print>
-#include <SDL.h>
 #include "util.h"
 #include "snes.h"
 

@@ -1,5 +1,6 @@
 #include <cstdio>
 #include <cstdlib>
+#include <algorithm>
 #include "n64_rsp.h"
 
 extern u16 rcp_table[]; // at bottom
@@ -37,12 +38,14 @@ u32 broadcast[] = {
 };
 #define BC(b) broadcast[((e<<3)+(b))]
 
-s16 clamp_signed(s32 accum)
+#define clamp_signed(a) std::clamp<s32>(a, -32768, 32767)
+/*s16 clamp_signed(s32 accum)
 {
 	if( accum < -32768 ) return -32768;
 	if( accum > 32767 ) return 32767;
 	return accum;
 }
+*/
 
 u16 clamp_unsigned(s32 accum)
 {

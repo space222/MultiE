@@ -22,8 +22,8 @@ public:
 		//fwrite(mem1+0x1300000, 2*1024*1024, 1, fp);
 		//fclose(fp);
 		std::println("pc = ${:X}", cpu.pc);
-		//pi.INTSR = 0x100;
-		//cpu.irq_line = true;
+		pi.INTSR = 8;
+		cpu.irq_line = true;
 	}
 
 	u32 fetch(u32);

@@ -1,7 +1,6 @@
 #include <iostream>
 #include <string>
 #include <unordered_map>
-#include <SDL.h>
 #include "console.h"
 #include "Settings.h"
 #include "6502.h"

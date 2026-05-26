@@ -1,6 +1,5 @@
 #include <iostream>
 #include <string>
-#include <SDL.h>
 #include "a52.h"
 
 #define DMACTL 0

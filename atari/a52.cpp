@@ -1,6 +1,6 @@
 #include <cstdlib>
 #include <cstdio>
-#include <SDL.h>
+#include <SDL2/SDL.h>
 #include "Settings.h"
 #include "a52.h"
 

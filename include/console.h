@@ -2,7 +2,7 @@
 #include <string>
 #include <vector>
 #include <array>
-#include <SDL.h>
+#include <SDL2/SDL.h>
 #include "itypes.h"
 
 class console
