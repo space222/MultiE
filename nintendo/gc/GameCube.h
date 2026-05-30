@@ -1,6 +1,7 @@
 #pragma once
 #include <print>
 #include <vector>
+#include <deque>
 #include "console.h"
 #include "gekko.h"
 #include "gc_dsp_cpu.h"
@@ -18,12 +19,7 @@ public:
 	
 	void key_down(int) override
 	{
-		//FILE* fp = fopen("bs2.bin", "wb");
-		//fwrite(mem1+0x1300000, 2*1024*1024, 1, fp);
-		//fclose(fp);
-		std::println("pc = ${:X}", cpu.pc);
-		//pi.INTSR = 8;
-		//cpu.irq_line = true;
+		//std::println("pc = ${:X}", cpu.pc);
 	}
 
 	u32 fetch(u32);
@@ -68,6 +64,14 @@ public:
 		u32 INTSR;
 		u32 INTMR;
 	} pi;
+	
+	struct {
+		u32 bp[0x100];
+		u32 cp[0x100];
+		u32 xf[0x4000];
+	} gx;
+	void gx_exec();
+	std::deque<u8> gx_fifo;
 	
 	GCDsp dsp;	
 	void dsp_io_write(u32, u32, int);

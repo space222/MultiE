@@ -33,6 +33,8 @@
 #define frS frD
 #define MSR_TO_SRR_MASK 0x87c0ffff
 
+static gekko::instr_type decode_ps(u32);
+
 static gekko::instr_type decode_59(u32 opcode)
 {
 	switch( (opcode>>1)&0x1F )
@@ -190,6 +192,7 @@ static gekko::instr_type decode_opcode(u32 opcode)
 {
 	switch( opcode>>26 )
 	{
+	case 4: return decode_ps(opcode);
 	case 7: instr { rD = s32(rA) * SIMM16; }; // mulli
 	case 8: instr { u32 t=~rA; u64 a = t; a += (u32)SIMM16; a += 1; rD=a; cpu.xer.b.ca = a>>32; }; // subfic
 
@@ -294,15 +297,101 @@ static gekko::instr_type decode_opcode(u32 opcode)
 				EA += 4;
 			}	
 		};
-	case 48: instr { frD = std::bit_cast<float>((u32)cpu.read(rA+SIMM16, 32)); }; // lfs	
-	case 49: instr { frD = std::bit_cast<float>((u32)cpu.read(rA+SIMM16, 32)); rA+=SIMM16; }; // lfsu
-	case 50: instr { frD = std::bit_cast<double>(cpu.read(rA+SIMM16, 64)); }; // lfd	
-	case 51: instr { frD = std::bit_cast<double>(cpu.read(rA+SIMM16, 64)); rA+=SIMM16; }; // lfdu
+	case 48: instr { frD = std::bit_cast<float>((u32)cpu.read(zrA+SIMM16, 32)); if( cpu.hid2.b.pse==1 ) { frD_PS1=frD; } }; // lfs	
+	case 49: instr { frD = std::bit_cast<float>((u32)cpu.read(rA+SIMM16, 32)); if( cpu.hid2.b.pse==1 ) { frD_PS1=frD; } rA+=SIMM16; }; // lfsu
+	case 50: instr { frD = std::bit_cast<double>(cpu.read(zrA+SIMM16, 64)); if( cpu.hid2.b.pse==1 ) { frD_PS1=frD; } }; // lfd	
+	case 51: instr { frD = std::bit_cast<double>(cpu.read(rA+SIMM16, 64)); if( cpu.hid2.b.pse==1 ) { frD_PS1=frD; } rA+=SIMM16; }; // lfdu
 	case 52: instr { cpu.write(zrA+SIMM16, std::bit_cast<u32>((float)frD), 32); }; // stfs
 	case 53: instr { cpu.write(rA+SIMM16, std::bit_cast<u32>((float)frD), 32); rA+=SIMM16; }; // stfsu
 	case 54: instr { cpu.write(zrA+SIMM16, std::bit_cast<u64>(frD), 64); }; // stfd
 	case 55: instr { cpu.write(rA+SIMM16, std::bit_cast<u64>(frD), 64); rA+=SIMM16; }; // stfdu
-
+	case 56: instr { // psq_l
+			if( cpu.hid2.b.pse==0 || cpu.hid2.b.lsqe==0 ) { /*todo: illegal instruction*/ }
+			const bool W = opc & BIT(15);
+			const u32 I = (opc>>12)&7;
+			const u32 EA = zrA + (s16(opc<<4)>>4);
+			const u32 type = cpu.gqr[I].b.l_type;
+			const u32 scale = cpu.gqr[I].b.l_scale;
+			if( type < 4 )
+			{ // either undefined or float
+				frD = std::bit_cast<float>((u32)cpu.read(EA, 32));
+				frD_PS1 = ( W ? 1.0 : std::bit_cast<float>((u32)cpu.read(EA+4, 32)) );
+				std::println("${:X}: PSQ_L got {}f, and {}f", cpu.pc-4, frD, frD_PS1);
+			} else {
+				frD = cpu.dequant(cpu.read(EA, (type&1)?16:8), type, scale);
+				frD_PS1 = ( W ? 1.0 : cpu.dequant(cpu.read(EA+((type&1)?2:1), (type&1)?16:8), type, scale) );
+			}
+		};
+	case 57: instr { // psq_lu
+			if( cpu.hid2.b.pse==0 || cpu.hid2.b.lsqe==0 ) { /*todo: illegal instruction*/ }
+			const bool W = opc & BIT(15);
+			const u32 I = (opc>>12)&7;
+			const u32 EA = zrA + (s16(opc<<4)>>4);
+			const u32 type = cpu.gqr[I].b.l_type;
+			const u32 scale = cpu.gqr[I].b.l_scale;
+			if( type < 4 )
+			{ // either undefined or float
+				frD = std::bit_cast<float>((u32)cpu.read(EA, 32));
+				frD_PS1 = ( W ? 1.0 : std::bit_cast<float>((u32)cpu.read(EA+4, 32)) );
+			} else {
+				frD = cpu.dequant(cpu.read(EA, (type&1)?16:8), type, scale);
+				frD_PS1 = ( W ? 1.0 : cpu.dequant(cpu.read(EA+((type&1)?2:1), (type&1)?16:8), type, scale) );
+			}
+			rA = EA;
+		};
+		
+	case 60: instr { // psq_st
+			if( cpu.hid2.b.pse==0 || cpu.hid2.b.lsqe==0 ) { /*todo: illegal instruction*/ }
+			const bool W = opc & BIT(15);
+			const u32 I = (opc>>12)&7;
+			const u32 EA = zrA + (s16(opc<<4)>>4);
+			const u32 type = cpu.gqr[I].b.s_type;
+			const u32 scale = cpu.gqr[I].b.s_scale;
+			if( type < 4 )
+			{ // either undefined or float
+				if( !W )
+				{
+					cpu.write(EA, std::bit_cast<u32>((float)frD), 32);
+					cpu.write(EA+4, std::bit_cast<u32>((float)frD_PS1), 32);
+					std::println("${:X}: PSQ_ST got {}f, and {}f", cpu.pc-4, frD, frD_PS1);
+				} else {
+					cpu.write(EA, std::bit_cast<u32>((float)frD), 32);
+				}
+			} else {
+				cpu.write(EA, cpu.quantize(frD, type, scale), (type&1)?16:8);
+				if( !W )
+				{
+					cpu.write(EA+((type&1)?2:1), cpu.quantize(frD_PS1, type, scale), (type&1)?16:8);				
+				}
+			}
+		};
+	case 61: instr { // psq_stu
+			if( cpu.hid2.b.pse==0 || cpu.hid2.b.lsqe==0 ) { /*todo: illegal instruction*/ }
+			const bool W = opc & BIT(15);
+			const u32 I = (opc>>12)&7;
+			const u32 EA = zrA + (s16(opc<<4)>>4);
+			const u32 type = cpu.gqr[I].b.s_type;
+			const u32 scale = cpu.gqr[I].b.s_scale;
+			if( type < 4 )
+			{ // either undefined or float
+				if( !W )
+				{
+					cpu.write(EA, std::bit_cast<u32>((float)frD), 32);
+					cpu.write(EA+4, std::bit_cast<u32>((float)frD_PS1), 32);
+				} else {
+					cpu.write(EA, std::bit_cast<u32>((float)frD), 32);
+				}
+			} else {
+				cpu.write(EA, cpu.quantize(frD, type, scale), (type&1)?16:8);
+				if( !W )
+				{
+					cpu.write(EA+((type&1)?2:1), cpu.quantize(frD_PS1, type, scale), (type&1)?16:8);				
+				}
+			}
+			rA = EA;
+		};
+		
+		
 	case 59: return decode_59(opcode);
 	case 63: return decode_63(opcode);
 	default:
@@ -392,7 +481,7 @@ static gekko::instr_type decode_31(u32 opcode)
 	case 535: instr { frD = std::bit_cast<float>((u32)cpu.read(zrA+rB,32)); if(cpu.hid2.b.pse) { frD_PS1 = frD; } }; // lfsx
 	case 536: instr { rA = ((rB&BIT(5)) ? 0 : (rS>>(rB&0x1F))); if(Rc){cpu.setCR0(rA);} }; // srw
 
-	case 567: instr { frD = std::bit_cast<float>((u32)cpu.read(rA+rB,32)); rA+=rB; if(cpu.hid2.b.pse) { frD_PS1 = frD; } }; // lfsx
+	case 567: instr { frD = std::bit_cast<float>((u32)cpu.read(rA+rB,32)); rA+=rB; if(cpu.hid2.b.pse) { frD_PS1 = frD; } }; // lfsux
 
 	case 597: instr { // lswi
 			u32 EA = zrA;
@@ -415,8 +504,8 @@ static gekko::instr_type decode_31(u32 opcode)
 			}
 		};
 
-	case 599: instr { frD = std::bit_cast<double>(cpu.read(zrA+rB, 64)); }; // lfdx
-	case 631: instr { frD = std::bit_cast<double>(cpu.read(rA+rB, 64)); rA+=rB; }; // lfdux
+	case 599: instr { frD = std::bit_cast<double>(cpu.read(zrA+rB, 64)); /*if( cpu.hid2.b.pse==1 ) { frD_PS1=frD; }*/ }; // lfdx
+	case 631: instr { frD = std::bit_cast<double>(cpu.read(rA+rB, 64)); /*if( cpu.hid2.b.pse==1 ) { frD_PS1=frD; }*/ rA+=rB; }; // lfdux
 
 	case 661: instr { // stswx
 			u32 EA = zrA+rB;
@@ -797,6 +886,15 @@ u32 gekko::get_spr(u32 spr)
 	case 1: return xer.v;
 	case 8: return LR;
 	case 9: return CTR;
+
+	case 912:
+	case 913:
+	case 914:
+	case 915:
+	case 916:
+	case 917:
+	case 918:
+	case 919: return gqr[spr-912].v;
 	
 	case 920: return hid2.v;
 	default: break;
@@ -813,6 +911,15 @@ void gekko::set_spr(u32 spr, u32 v)
 	case 8: LR = v; return;
 	case 9: CTR = v; return;
 	
+	case 912:
+	case 913:
+	case 914:
+	case 915:
+	case 916:
+	case 917:
+	case 918:
+	case 919: gqr[spr-912].v = v; return;
+	
 	case 920: hid2.v = v; return;
 	
 	case 1008: // hid0
@@ -827,8 +934,206 @@ void gekko::set_spr(u32 spr, u32 v)
 	//std::println("gekko: unimpl spr = {}", spr);
 }
 
+float gekko::dequant(u32 val, u32 type, u32 scale)
+{
+	s8 sc = s8(scale<<3)>>3;
+	double v = ((type&1) ? ((type&2) ? (s16)val : (u16)val) : ((type&2) ? (s8)val : (u8)val));
+	v /= std::exp2(sc);
+	return v;
+}
 
+u64 gekko::quantize(double v, u32 type, u32 scale)
+{
+	float min = ( (type&1) ? ((type&2) ? 0x8000 : 0) : ((type&2) ? 0x80 : 0) );
+	float max = ( (type&1) ? ((type&2) ? 0x7fff : 0xffff) : ((type&2) ? 0x7f : 0xff) );
+	if( std::isinf(v) && v < 0 ) return min;
+	
+	s8 sc = s8(scale<<3)>>3;
+	v *= std::exp2(sc);
+	
+	if( v < min ) return (s64)min;
+	if( v > max ) return (s64)max;
+	return (s64)v;
+}
 
+gekko::instr_type decode_ps(u32 opcode)
+{
+	switch( (opcode>>1)&0x3f )
+	{
+	case 6: instr { // psq_lx
+			if( cpu.hid2.b.pse==0 || cpu.hid2.b.lsqe==0 ) { /*todo: illegal instruction*/ }
+			const bool W = opc & BIT(10);
+			const u32 I = (opc>>7)&7;
+			const u32 EA = zrA + rB;
+			const u32 type = cpu.gqr[I].b.l_type;
+			const u32 scale = cpu.gqr[I].b.l_scale;
+			if( type < 4 )
+			{ // either undefined or float
+				frD = std::bit_cast<float>((u32)cpu.read(EA, 32));
+				frD_PS1 = ( W ? 1.0 : std::bit_cast<float>((u32)cpu.read(EA+4, 32)) );
+			} else {
+				frD = cpu.dequant(cpu.read(EA, (type&1)?16:8), type, scale);
+				frD_PS1 = ( W ? 1.0 : cpu.dequant(cpu.read(EA+((type&1)?2:1), (type&1)?16:8), type, scale) );
+			}
+		};	
+	case 7: instr { // psq_st
+			if( cpu.hid2.b.pse==0 || cpu.hid2.b.lsqe==0 ) { /*todo: illegal instruction*/ }
+			const bool W = opc & BIT(10);
+			const u32 I = (opc>>7)&7;
+			const u32 EA = zrA + rB;
+			const u32 type = cpu.gqr[I].b.s_type;
+			const u32 scale = cpu.gqr[I].b.s_scale;
+			if( type < 4 )
+			{ // either undefined or float
+				if( !W )
+				{
+					cpu.write(EA, std::bit_cast<u32>((float)frD), 32);
+					cpu.write(EA+4, std::bit_cast<u32>((float)frD_PS1), 32);
+				} else {
+					cpu.write(EA, std::bit_cast<u32>((float)frD), 32);
+				}
+			} else {
+				cpu.write(EA, cpu.quantize(frD, type, scale), (type&1)?16:8);
+				if( !W )
+				{
+					cpu.write(EA+((type&1)?2:1), cpu.quantize(frD_PS1, type, scale), (type&1)?16:8);				
+				}
+			}
+		};
+	case 38: instr { // psq_lux
+			if( cpu.hid2.b.pse==0 || cpu.hid2.b.lsqe==0 ) { /*todo: illegal instruction*/ }
+			const bool W = opc & BIT(10);
+			const u32 I = (opc>>7)&7;
+			const u32 EA = zrA + rB;
+			const u32 type = cpu.gqr[I].b.l_type;
+			const u32 scale = cpu.gqr[I].b.l_scale;
+			if( type < 4 )
+			{ // either undefined or float
+				frD = std::bit_cast<float>((u32)cpu.read(EA, 32));
+				frD_PS1 = ( W ? 1.0 : std::bit_cast<float>((u32)cpu.read(EA+4, 32)) );
+			} else {
+				frD = cpu.dequant(cpu.read(EA, (type&1)?16:8), type, scale);
+				frD_PS1 = ( W ? 1.0 : cpu.dequant(cpu.read(EA+((type&1)?2:1), (type&1)?16:8), type, scale) );
+			}
+			rA = EA;
+		};	
+	case 39: instr { // psq_stux
+			if( cpu.hid2.b.pse==0 || cpu.hid2.b.lsqe==0 ) { /*todo: illegal instruction*/ }
+			const bool W = opc & BIT(10);
+			const u32 I = (opc>>7)&7;
+			const u32 EA = zrA + rB;
+			const u32 type = cpu.gqr[I].b.s_type;
+			const u32 scale = cpu.gqr[I].b.s_scale;
+			if( type < 4 )
+			{ // either undefined or float
+				if( !W )
+				{
+					cpu.write(EA, std::bit_cast<u32>((float)frD), 32);
+					cpu.write(EA+4, std::bit_cast<u32>((float)frD_PS1), 32);
+				} else {
+					cpu.write(EA, std::bit_cast<u32>((float)frD), 32);
+				}
+			} else {
+				cpu.write(EA, cpu.quantize(frD, type, scale), (type&1)?16:8);
+				if( !W )
+				{
+					cpu.write(EA+((type&1)?2:1), cpu.quantize(frD_PS1, type, scale), (type&1)?16:8);				
+				}
+			}
+			rA = EA;
+		};
+	default: break;	
+	}
+
+	switch( (opcode>>1)&0x1f )
+	{
+	case 10: instr { // ps_sum0
+			//if( cpu.hid2.b.pse == 0 ) { cpu.illegal_instruction(); return; }
+			frD =   (frA + frB_PS1);
+			frD_PS1 =   (frC_PS1);
+		};
+	case 11: instr { // ps_sum1
+			//if( cpu.hid2.b.pse == 0 ) { cpu.illegal_instruction(); return; }
+			frD =  (frC);
+			frD_PS1 =  (frA + frB_PS1);
+		};
+	case 12: instr { // ps_muls0
+			//if( cpu.hid2.b.pse == 0 ) { cpu.illegal_instruction(); return; }
+			frD = (frA * frC);
+			frD_PS1 = (frA_PS1 * frC);
+		};
+	case 13: instr { // ps_muls1
+			//if( cpu.hid2.b.pse == 0 ) { cpu.illegal_instruction(); return; }
+			frD = (frA * frC_PS1);
+			frD_PS1 = (frA_PS1 * frC_PS1);
+		};
+	case 14: instr { // ps_madds0
+			//if( cpu.hid2.b.pse == 0 ) { cpu.illegal_instruction(); return; }
+			frD =     (frA    * frC + frB);
+			frD_PS1 =   (frA_PS1 * frC + frB_PS1);
+		};
+	case 15: instr { // ps_madds1
+			//if( cpu.hid2.b.pse == 0 ) { cpu.illegal_instruction(); return; }
+			frD =    (frA    * frC_PS1 + frB);
+			frD_PS1 = (frA_PS1 * frC_PS1 + frB_PS1);
+		};
+	case 25: instr { // ps_mul
+			//if( cpu.hid2.b.pse == 0 ) { cpu.illegal_instruction(); return; }
+			frD = ( frA * frC );
+			frD_PS1 = ( frA_PS1 * frC_PS1 );
+		};
+	case 28: instr { // ps_msub
+			//if( cpu.hid2.b.pse == 0 ) { cpu.illegal_instruction(); return; }
+			frD = (frA * frC - frB);
+			frD_PS1 =   ( frA_PS1 * frC_PS1 - frB_PS1);
+		};
+
+	case 29: instr { // ps_madd
+			//if( cpu.hid2.b.pse == 0 ) { cpu.illegal_instruction(); return; }
+			frD =  (frA * frC + frB);
+			frD_PS1 =   ( frA_PS1 * frC_PS1 + frB_PS1);
+		};
+	default: break;
+	}
+	
+	switch( (opcode>>1)&0x3ff )
+	{
+	case 40: instr { // ps_neg
+			//if( cpu.hid2.b.pse == 0 ) { cpu.illegal_instruction(); return; }
+			frD = std::bit_cast<double>(std::bit_cast<u64>(frB)^BITL(63));
+			frD_PS1 = std::bit_cast<double>(std::bit_cast<u64>(frB_PS1)^BITL(63));	
+		};
+	case 72: instr { // ps_mr
+			//if( cpu.hid2.b.pse == 0 ) { cpu.illegal_instruction(); return; }
+			frD = frB;
+			frD_PS1 = frB_PS1;
+		};
+	case 528: instr { // ps_merge00
+			//if( cpu.hid2.b.pse == 0 ) { cpu.illegal_instruction(); return; }
+			frD = frA;
+			frD_PS1 = frB;
+		};
+	case 560: instr { // ps_merge01
+			//if( cpu.hid2.b.pse == 0 ) { cpu.illegal_instruction(); return; }
+			frD = frA;
+			frD_PS1 = frB_PS1;
+		};
+	case 592: instr { // ps_merge10
+			//if( cpu.hid2.b.pse == 0 ) { cpu.illegal_instruction(); return; }
+			frD = frA_PS1;
+			frD_PS1 = frB;
+		};
+	case 624: instr { // ps_merge11
+			//if( cpu.hid2.b.pse == 0 ) { cpu.illegal_instruction(); return; }
+			frD = frA_PS1;
+			frD_PS1 = frB_PS1;
+		};
+
+	default:
+		std::println("psingle opc = {}dec or {}dec", (opcode>>1)&0x1f, (opcode>>1)&0x3ff);
+		return nullptr;
+	}
+}
 
 
 

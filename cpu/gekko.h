@@ -47,7 +47,7 @@ public:
 		
 		void set_bit(u32 bt, u32 val) { u32 old=get()&~BIT(31-bt); set(old|(val<<(31-bt))); }		
 		u32 bit(u32 bt) { return (get()>>(31-bt))&1; }
-		u32 get() { u32 r = 0; for(u32 i = 0; i < 8; ++i) { r |= b[i]<<((7-i)*4); } return r; }
+		u32 get() { u32 res = 0; for(u32 i = 0; i < 8; ++i) { res |= b[i]<<((7-i)*4); } return res; }
 		void set(u32 v) { for(u32 i = 0; i < 8; ++i) { b[i] = ((v>>((7-i)*4))&0xf); } }
 	} PACKED cond;
 	
@@ -132,6 +132,24 @@ public:
 		} PACKED b;
 		u32 v;
 	} PACKED fpscr;
+	
+	union gqr_t
+	{
+		struct {
+			bitfield s_type : 3;
+			bitfield pad0 : 5;
+			bitfield s_scale : 6;
+			bitfield pad1 : 2;
+			bitfield l_type : 3;
+			bitfield pad2 : 5;
+			bitfield l_scale : 6;
+			bitfield pad3 : 2;
+		} PACKED b;
+		u32 v;
+	} PACKED gqr[8];
+	
+	float dequant(u32 val, u32 type, u32 scale);
+	u64 quantize(double v, u32 type, u32 scale);
 	
 	void setCR0(u32 v)
 	{

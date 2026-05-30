@@ -1,3 +1,4 @@
+#include <iostream>
 #include <algorithm>
 #include <cstdio>
 #include <print>
@@ -7,7 +8,7 @@
 void GameCube::run_frame()
 {
 	vi.dpv = 1;
-	while( vi.dpv < 525 )
+	while( vi.dpv < 264 )
 	{
 		if( vi.dcr & 1 )
 		for(u32 i = 0; i < 4; ++i)
@@ -288,15 +289,21 @@ u64 GameCube::read(u32 addr, int size)
 		static u32 line = 0;
 		if( addr == 0xcc00202c ) { line++; if(line==263){ line = 0; } return line; }
 		
+		if( addr >= 0xcc003000 && addr < 0xcc003031 ) std::println("${:X}: read{} ${:X}", cpu.pc-4, size, addr);
+		
 		if( addr == 0xcc003000 )
 		{
+			//if( size == 16 ) { return pi.INTSR>>16; }
 			//std::println("PI INTSR reads ${:X}", pi.INTSR);
-			return pi.INTSR;
+			return pi.INTSR | 0x10000;
 		}
 		
-		if( addr == 0xcc003004 ) return pi.INTMR;
+		if( addr == 0xcc003004 )
+		{
+			if( size == 16 ) { return pi.INTMR>>16; }
+			return pi.INTMR;
+		}
 		
-		std::println("${:X}: read{} ${:X}", cpu.pc-4, size, addr);
 		
 		
 		return 0;
@@ -322,14 +329,27 @@ u64 GameCube::read(u32 addr, int size)
 
 void GameCube::write(u32 addr, u64 v, int size)
 {
+	if( addr >= 0xcc008000 && addr < 0xcc008008 )
+	{
+		switch( size )
+		{
+		case 8: gx_fifo.push_back(v); break;
+		case 16: gx_fifo.push_back(v>>8); gx_fifo.push_back(v); break;
+		case 32: gx_fifo.push_back(v>>24); gx_fifo.push_back(v>>16); gx_fifo.push_back(v>>8); gx_fifo.push_back(v); break;
+		case 64: gx_fifo.push_back(v>>56); gx_fifo.push_back(v>>48); gx_fifo.push_back(v>>40); gx_fifo.push_back(v>>32);
+			 gx_fifo.push_back(v>>24); gx_fifo.push_back(v>>16); gx_fifo.push_back(v>>8); gx_fifo.push_back(v); break;
+		}
+		gx_exec();
+		return;
+	}
 	if( ((addr >> 24)&0xf) == 0x0c )
 	{
 		addr |= 0xc0000000u;
-		std::println("${:X}: write{} ${:X} = ${:X}", cpu.pc-4, size, addr, v);
+		//std::println("${:X}: write{} ${:X} = ${:X}", cpu.pc-4, size, addr, v);
 		
 		if( addr == 0xcc002000 && size == 32 ) { vi.dcr = v&~2; return; }
 		if( addr == 0xcc002002 ) { vi.dcr = v&~2; return; }
-		if( addr == 0xcc003004 ) { pi.INTMR = v; return; }
+		if( addr == 0xcc003004 ) { if(size==16) { std::println("16bit write to pi.INTMR"); char c; std::cin>>c; } pi.INTMR = v; return; }
 		if( addr >= 0xcc002030 && addr <= 0xcc00203c ) 
 		{
 			u32 direg = (addr>>2)&3;
@@ -345,7 +365,24 @@ void GameCube::write(u32 addr, u64 v, int size)
 			//std::println("{}: di{} = 0x{:X}, e = {}", size, direg, v, (int)vi.di[direg].b.e);
 			return;
 		}
-		if( addr == 0xcc00201c ) { vi.fbaddr = v&0x1fffFFFFu; return; }
+		if( addr == 0xcc00201c )
+		{
+			if( size == 16 )
+			{
+				vi.fbaddr &= 0xffff;
+				vi.fbaddr |= v<<16;
+				vi.fbaddr &= 0x1fffFFFFu;
+				return;
+			}
+			vi.fbaddr = v&0x1fffFFFFu;
+			return;
+		}
+		if( addr == 0xcc00201E )
+		{
+			vi.fbaddr &= 0xffff0000u;
+			vi.fbaddr |= v&0xffff;
+			return;
+		}
 		if( addr == 0xcc00302c )
 		{ // hw revision register, hopefully writing to it is simply ignored and I can use for debug output
 			//std::println("debug out = ${:X}", v);
@@ -382,7 +419,15 @@ void GameCube::write(u32 addr, u64 v, int size)
 			exi_write(addr, v, size);			
 			return;
 		}
-		//std::println("${:X}: write{} ${:X} = ${:X}", cpu.pc-4, size, addr, v);
+		
+		if( addr == 0xcc003000 || addr == 0xcc003002 )
+		{
+			std::println("write to pi.INTSR = ${:X}", v);
+			char c;
+			std::cin >> c;
+			return;
+		}
+		std::println("${:X}: write{} ${:X} = ${:X}", cpu.pc-4, size, addr, v);
 		return;
 	}
 	if( (addr >> 24) == 0xe0 )
