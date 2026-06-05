@@ -20,6 +20,9 @@ public:
 	u8 io_read(u32 addr);
 	void io_write(u32 addr, u8 v);
 	
+	u8 keys();
+	u8 keyport;
+	
 	struct {
 		u8 latch;
 		u16 memaddr, rdbuf;

@@ -509,6 +509,22 @@ void imgui_run()
 			
 			if( ImGui::BeginMenu("Beta") ) 
 			{				
+				if( ImGui::MenuItem("TurboGrafx-16") )
+				{
+					std::string f = getOpenFile("TurboGrafx-16");
+					if( !f.empty() )
+					{
+						delete sys;
+						sys = new tg16;
+						if( ! sys->loadROM(f) ) 
+						{
+							printf("unable to load ROM\n");
+							exit(1);
+						}
+						else newinstance = true;
+						crt_scale = 2.f;
+					}				
+				}
 				if( ImGui::MenuItem("Apple IIe") )
 				{
 					std::string f = getOpenFile("Apple IIe");
@@ -591,22 +607,6 @@ void imgui_run()
 			}
 			if( ImGui::BeginMenu("Alpha") )
 			{
-				if( ImGui::MenuItem("TurboGrafx-16") )
-				{
-					std::string f = getOpenFile("TurboGrafx-16");
-					if( !f.empty() )
-					{
-						delete sys;
-						sys = new tg16;
-						if( ! sys->loadROM(f) ) 
-						{
-							printf("unable to load ROM\n");
-							exit(1);
-						}
-						else newinstance = true;
-						crt_scale = 2.f;
-					}				
-				}
 				if( ImGui::MenuItem("Nintendo DS") )
 				{
 					std::string f = getOpenFile("Nintendo DS");

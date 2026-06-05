@@ -29,13 +29,30 @@ u8 tg16::io_read(u32 addr)
 	}
 	if( addr == 0x1403 ) { return (cpu.irq_line ? BIT(1):0); }
 	
-	auto keys = SDL_GetKeyboardState(nullptr);
-	if( addr == 0x1000 ) return 0xbf ^ keys[SDL_SCANCODE_S];
+	if( addr == 0x1000 ) return 0xb0|keys();
 	if( addr >= 0x1A00 && addr < 0x1C00 ) return 0;
 	std::println("TG16: io rd ${:X}", addr);
 	return 0xff;
 }
 
+u8 tg16::keys()
+{
+	auto keys = SDL_GetKeyboardState(nullptr);
+	u8 v = 0xf;
+	if( keyport & 1 )
+	{
+		if( keys[SDL_SCANCODE_UP] ) v ^= 1;
+		if( keys[SDL_SCANCODE_RIGHT] ) v ^= 2;
+		if( keys[SDL_SCANCODE_DOWN] ) v ^= 4;
+		if( keys[SDL_SCANCODE_LEFT] ) v ^= 8;
+	} else {
+		if( keys[SDL_SCANCODE_Z] ) v ^= 1;
+		if( keys[SDL_SCANCODE_X] ) v ^= 2;
+		if( keys[SDL_SCANCODE_A] ) v ^= 4;
+		if( keys[SDL_SCANCODE_S] ) v ^= 8;
+	}
+	return v;
+}
 
 void tg16::io_write(u32 addr, u8 v)
 {
@@ -96,7 +113,7 @@ void tg16::io_write(u32 addr, u8 v)
 		cpu.irq_enable = v;
 		return;
 	}
-	
+	if( addr==0x1000 ) { keyport = v; return; }
 	//std::println("TG16: io wr ${:X} = ${:X}", addr, v);
 }
 
@@ -196,6 +213,8 @@ void tg16::draw_line(u32 scanline, u32 bgline)
 			}		
 		}
 		
+		u8 sbit[256] = {0};
+		
 		for(int S = 0; S < sprs; ++S)
 		{
 			u32 i = sprnum[S];
@@ -210,10 +229,10 @@ void tg16::draw_line(u32 scanline, u32 bgline)
 						
 			for(int tx=0; tx<swidth; ++pX, ++tx)
 			{
-				if( pX < 0 || pX > 255 ) continue;
+				if( pX < 0 || pX > 255 || sbit[pX] ) continue;
 				
 				int x = (vdc.sat[i*4+3]&BIT(11)) ? ((swidth - 1) - tx) : tx;
-				int col_offset = (x / 16); 
+				int col_offset = (x / 16);
 				int row_offset = (Y / 16);
 				
 				int tile_width = (swidth / 16);			
@@ -232,6 +251,7 @@ void tg16::draw_line(u32 scanline, u32 bgline)
 				u16 pal = (b3<<3)|(b2<<2)|(b1<<1)|b0;
 				if( pal ) 
 				{
+					sbit[pX] = 1;
 					//if( vdc.bg[pX] && !(vdc.sat[i*4+3]&0x80) ) continue;
 					pal |= (vdc.sat[i*4+3]&0xf)<<4; 
 					pal += 0x100; 
