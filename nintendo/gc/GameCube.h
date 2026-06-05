@@ -26,9 +26,6 @@ public:
 	u64 read(u32, int);
 	void write(u32, u64, int);
 	
-	double read_double(u32);
-	void write_double(u32, double);
-	
 	void setINTSR(u32);
 	void clearINTSR(u32);
 	
@@ -69,9 +66,20 @@ public:
 		u32 bp[0x100];
 		u32 cp[0x100];
 		u32 xf[0x4000];
+		u32 vatcache[8];
+		
+		struct vert_t
+		{
+			float p[4];
+			float c0[4];
+			float c1[4];
+			float tex[16];
+			float norms[9];
+		} verts[4];
 	} gx;
 	void gx_exec();
 	std::deque<u8> gx_fifo;
+	u32 gx_vert_size(u32);
 	
 	GCDsp dsp;	
 	void dsp_io_write(u32, u32, int);

@@ -59,6 +59,7 @@
 #include "nintendo/pokemini.h"
 #include "nintendo/ds/nds.h"
 #include "avi_rec.h"
+#include "other/tg16.h"
 void try_kirq();
 void gdb_start();
 extern std::atomic<int> gdb_active;
@@ -590,6 +591,22 @@ void imgui_run()
 			}
 			if( ImGui::BeginMenu("Alpha") )
 			{
+				if( ImGui::MenuItem("TurboGrafx-16") )
+				{
+					std::string f = getOpenFile("TurboGrafx-16");
+					if( !f.empty() )
+					{
+						delete sys;
+						sys = new tg16;
+						if( ! sys->loadROM(f) ) 
+						{
+							printf("unable to load ROM\n");
+							exit(1);
+						}
+						else newinstance = true;
+						crt_scale = 2.f;
+					}				
+				}
 				if( ImGui::MenuItem("Nintendo DS") )
 				{
 					std::string f = getOpenFile("Nintendo DS");

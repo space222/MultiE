@@ -125,7 +125,7 @@ struct modrm
 	}
 	
 	u8 segreg_ind;
-	u16 ea_seg, ea_off;
+	u16 ea_seg{}, ea_off{};
 	c8086& cpu;
 	u8 m;
 };

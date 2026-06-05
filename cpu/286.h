@@ -193,7 +193,7 @@ public:
 		return true;
 	}
 	
-	bool validate_lea(bool isWrite, bool doExcept, u32 size)
+	bool validate_lea(bool /*isWrite*/, bool /*doExcept*/, u32 /*size*/)
 	{
 		return true;
 		//return modrm.mod==3 || validate_mem(segment, desc[PDATA], offset, isStack, isWrite, doExcept, size);

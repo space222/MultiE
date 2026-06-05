@@ -31,7 +31,7 @@ public:
 	bool loaded_elf = false;
 	u32 elf_entry = 0xbad0e1f;
 	
-	void key_down(int f)
+	void key_down(int f) override
 	{ 
 		if( f == SDL_SCANCODE_ESCAPE ) logall = !logall;
 		if( f == SDL_SCANCODE_F ) { std::println("IOP stat/mask = S${:X}/M${:X}", iop_int.I_STAT, iop_int.I_MASK); }
@@ -179,7 +179,7 @@ public:
 		u32 last_fifo=0;
 		u32 pop_fifo() { if( !sif_fifo.empty() ) { last_fifo = sif_fifo.back(); sif_fifo.pop_back(); } return last_fifo; }
 		
-		u32 chan[13][4] = {0};
+		u32 chan[13][4] = {};
 	} iop_dma;
 	void iop_dma_ctrl(u32 c,u32 v);
 	void iop_sif_dest_chain(); // called by ee_dma_chain

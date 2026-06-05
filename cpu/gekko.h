@@ -17,12 +17,12 @@ public:
 
 	u32 r[32];
 	u32 pc, LR, CTR;
-	u8 f[32*8];
+	double f[32];
 	double ps1[32];
-	bool irq_line;
+	bool irq_line, in_infinite_loop;
 	u8 reserve;
 	
-	union {
+	union xer_t {
 		struct {
 			bitfield bc : 7;
 			bitfield pad : 21;

@@ -12,7 +12,7 @@ public:
 	msx();
 	~msx();
 	
-	virtual void key_down(int sc)
+	void key_down(int sc) override
 	{
 		if( sc == SDL_SCANCODE_F12 ) 
 		{

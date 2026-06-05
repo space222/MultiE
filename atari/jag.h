@@ -7,9 +7,9 @@
 class jaguar : public console
 {
 public:
-	u32 fb_width() { return 720; }
-	u32 fb_height() { return 448; }
-	u8* framebuffer() { return (u8*)&fbuf[0]; }
+	u32 fb_width() override { return 720; }
+	u32 fb_height() override { return 448; }
+	u8* framebuffer() override { return (u8*)&fbuf[0]; }
 	
 	bool loadROM(const std::string) override;
 	void reset() override;

@@ -22,13 +22,13 @@
 #define MB ((opc>>6)&0x1F)
 #define ME ((opc>>1)&0x1F)
 #define SH ((opc>>11)&0x1F)
-#define frD (*(double*)&cpu.f[((opc>>21)&0x1F)<<3])
+#define frD cpu.f[((opc>>21)&0x1F)]
 #define frD_PS1 cpu.ps1[((opc>>21)&0x1F)]
-#define frA (*(double*)&cpu.f[((opc>>16)&0x1F)<<3])
+#define frA cpu.f[((opc>>16)&0x1F)]
 #define frA_PS1 cpu.ps1[((opc>>16)&0x1F)]
-#define frB (*(double*)&cpu.f[((opc>>11)&0x1F)<<3])
+#define frB cpu.f[((opc>>11)&0x1F)]
 #define frB_PS1 cpu.ps1[((opc>>11)&0x1F)]
-#define frC (*(double*)&cpu.f[((opc>>6)&0x1F)<<3])
+#define frC cpu.f[((opc>>6)&0x1F)]
 #define frC_PS1 cpu.ps1[((opc>>6)&0x1F)]
 #define frS frD
 #define MSR_TO_SRR_MASK 0x87c0ffff
@@ -39,15 +39,15 @@ static gekko::instr_type decode_59(u32 opcode)
 {
 	switch( (opcode>>1)&0x1F )
 	{
-	case 18: instr { frD = (float)(frA / frB); if( cpu.hid2.b.pse ) { frD_PS1 = frD; } if(Rc){ /*cpu.updateCR1();*/ } }; // fdivs
-	case 20: instr { frD = (float)(frA - frB); if( cpu.hid2.b.pse ) { frD_PS1 = frD; } if(Rc){ /*cpu.updateCR1();*/ } }; // fsubs
-	case 21: instr { frD = (float)(frA + frB); if( cpu.hid2.b.pse ) { frD_PS1 = frD; } if(Rc){ /*cpu.updateCR1();*/ } }; // fadds
-	case 24: instr { frD = (float)(1.0 / frB); if( cpu.hid2.b.pse ) { frD_PS1 = frD; } if(Rc){ /*cpu.updateCR1();*/ } }; // fres	
-	case 25: instr { frD = (float)(frA * frC); if( cpu.hid2.b.pse ) { frD_PS1 = frD; } if(Rc){ /*cpu.updateCR1();*/ } }; // fmuls
-	case 28: instr { frD = (float)(frA * frC - frB); if( cpu.hid2.b.pse ) { frD_PS1 = frD; } if(Rc){ /*cpu.updateCR1();*/ } }; // fmsubs
-	case 29: instr { frD = (float)(frA * frC + frB); if( cpu.hid2.b.pse ) { frD_PS1 = frD; } if(Rc){ /*cpu.updateCR1();*/ } }; // fmadds
-	case 30: instr { frD = (float)-(frA * frC - frB); if( cpu.hid2.b.pse ) { frD_PS1 = frD; } if(Rc){ /*cpu.updateCR1();*/ } }; // fnmsubs
-	case 31: instr { frD = (float)-(frA * frC + frB); if( cpu.hid2.b.pse ) { frD_PS1 = frD; } if(Rc){ /*cpu.updateCR1();*/ } }; // fnmadds
+	case 18: instr { frD = (double)(frA / frB); if( cpu.hid2.b.pse ) { frD_PS1 = frD; } if(Rc){ /*cpu.updateCR1();*/ } }; // fdivs
+	case 20: instr { frD = (double)(frA - frB); if( cpu.hid2.b.pse ) { frD_PS1 = frD; } if(Rc){ /*cpu.updateCR1();*/ } }; // fsubs
+	case 21: instr { frD = (double)(frA + frB); if( cpu.hid2.b.pse ) { frD_PS1 = frD; } if(Rc){ /*cpu.updateCR1();*/ } }; // fadds
+	case 24: instr { frD = (double)(1.0 / frB); if( cpu.hid2.b.pse ) { frD_PS1 = frD; } if(Rc){ /*cpu.updateCR1();*/ } }; // fres	
+	case 25: instr { frD = (double)(frA * frC); if( cpu.hid2.b.pse ) { frD_PS1 = frD; } if(Rc){ /*cpu.updateCR1();*/ } }; // fmuls
+	case 28: instr { frD = (double)(frA * frC - frB); if( cpu.hid2.b.pse ) { frD_PS1 = frD; } if(Rc){ /*cpu.updateCR1();*/ } }; // fmsubs
+	case 29: instr { frD = (double)(frA * frC + frB); if( cpu.hid2.b.pse ) { frD_PS1 = frD; } if(Rc){ /*cpu.updateCR1();*/ } }; // fmadds
+	case 30: instr { frD = (double)-(frA * frC - frB); if( cpu.hid2.b.pse ) { frD_PS1 = frD; } if(Rc){ /*cpu.updateCR1();*/ } }; // fnmsubs
+	case 31: instr { frD = (double)-(frA * frC + frB); if( cpu.hid2.b.pse ) { frD_PS1 = frD; } if(Rc){ /*cpu.updateCR1();*/ } }; // fnmadds
 	default:
 		std::println("Unimpl opc59, bot5 = {:05b}", (opcode>>1)&0x1f);
 		break;
@@ -225,7 +225,7 @@ static gekko::instr_type decode_opcode(u32 opcode)
 			}
 		};
 	case 17: instr { cpu.SRR0 = cpu.pc; cpu.SRR1 = cpu.msr.v & MSR_TO_SRR_MASK; cpu.msr.b.ee = cpu.msr.b.ri = 0; cpu.pc = 0xc00; }; // sc (syscall)	
-	case 18: instr { u32 exts = (s32(opc<<6)>>6)&~3; if(!(opc&BIT(1))) { exts+=cpu.pc-4; } if(opc&1) { cpu.LR=cpu.pc; } cpu.pc = exts;}; // Bx
+	case 18: instr { if(opc==0x48000000){cpu.in_infinite_loop=true;} u32 exts = (s32(opc<<6)>>6)&~3; if(!(opc&BIT(1))) { exts+=cpu.pc-4; } if(opc&1) { cpu.LR=cpu.pc; } cpu.pc = exts;}; // Bx
 	case 19: return decode_19(opcode);
 	case 20: instr { // rlwimi
 			u32 r = std::rotl(rS, SH);
@@ -316,7 +316,7 @@ static gekko::instr_type decode_opcode(u32 opcode)
 			{ // either undefined or float
 				frD = std::bit_cast<float>((u32)cpu.read(EA, 32));
 				frD_PS1 = ( W ? 1.0 : std::bit_cast<float>((u32)cpu.read(EA+4, 32)) );
-				std::println("${:X}: PSQ_L got {}f, and {}f", cpu.pc-4, frD, frD_PS1);
+				//std::println("${:X}: PSQ_L got {}f, and {}f", cpu.pc-4, frD, frD_PS1);
 			} else {
 				frD = cpu.dequant(cpu.read(EA, (type&1)?16:8), type, scale);
 				frD_PS1 = ( W ? 1.0 : cpu.dequant(cpu.read(EA+((type&1)?2:1), (type&1)?16:8), type, scale) );
@@ -332,7 +332,7 @@ static gekko::instr_type decode_opcode(u32 opcode)
 			if( type < 4 )
 			{ // either undefined or float
 				frD = std::bit_cast<float>((u32)cpu.read(EA, 32));
-				frD_PS1 = ( W ? 1.0 : std::bit_cast<float>((u32)cpu.read(EA+4, 32)) );
+				frD_PS1 = ( W ? 1.0 : std::bit_cast<float>((u32)cpu.read(EA, 32)) );
 			} else {
 				frD = cpu.dequant(cpu.read(EA, (type&1)?16:8), type, scale);
 				frD_PS1 = ( W ? 1.0 : cpu.dequant(cpu.read(EA+((type&1)?2:1), (type&1)?16:8), type, scale) );
@@ -353,7 +353,7 @@ static gekko::instr_type decode_opcode(u32 opcode)
 				{
 					cpu.write(EA, std::bit_cast<u32>((float)frD), 32);
 					cpu.write(EA+4, std::bit_cast<u32>((float)frD_PS1), 32);
-					std::println("${:X}: PSQ_ST got {}f, and {}f", cpu.pc-4, frD, frD_PS1);
+					//std::println("${:X}: PSQ_ST got {}f, and {}f", cpu.pc-4, frD, frD_PS1);
 				} else {
 					cpu.write(EA, std::bit_cast<u32>((float)frD), 32);
 				}

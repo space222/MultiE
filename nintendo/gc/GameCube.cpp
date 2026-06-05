@@ -21,10 +21,13 @@ void GameCube::run_frame()
 			}
 		}
 	
-		for(u32 i = 0; i < 31000; ++i)
+		if( !cpu.in_infinite_loop ) 
 		{
-			//if( cpu.pc >= 0x80003c8c && cpu.pc < 0x80004000 ) std::println("pc = ${:X}", cpu.pc);
-			cpu.step();
+			for(u32 i = 0; i < 31000; ++i)
+			{
+				//if( cpu.pc >= 0x80003c8c && cpu.pc < 0x80004000 ) std::println("pc = ${:X}", cpu.pc);
+				cpu.step();
+			}
 		}
 		vi.dpv += 1;
 	}
@@ -67,11 +70,25 @@ void GameCube::run_frame()
 void GameCube::reset()
 {
 	cpu.reset();
+	cpu.in_infinite_loop = false;
 	debug_type = 0;
 	vi.di[0].v = vi.di[1].v = vi.di[2].v = vi.di[3].v = 0;
 	cpu.msr.v = 0;
 	cpu.msr.b.ri = 1;
 	cpu.SPRs[1009] = 0x80000000u;
+	for(u32 i = 0; i < 8; ++i) { cpu.gqr[i].v = 0; }
+	
+	cpu.r[1] = 24*1024*1024-4;
+	
+	*(u32*)&mem1[0x28] = __builtin_bswap32(24*1024*1024);
+	*(u32*)&mem1[0x20] = __builtin_bswap32(0xD15EA5E);
+	
+	*(u32*)&mem1[0xF8] = __builtin_bswap32(0x09a7ec80);
+	*(u32*)&mem1[0xFC] = __builtin_bswap32(0x1cf7c580);
+	*(u32*)&mem1[0x300] = __builtin_bswap32(0x4c000064);
+	*(u32*)&mem1[0x800] = __builtin_bswap32(0x4c000064);
+	*(u32*)&mem1[0xC00] = __builtin_bswap32(0x4c000064);
+	
 	/* //seeing what kind of stuff Dolphin writes to RAM in order to HLE the bootrom
 	// Booted from bootrom. 0xE5207C22 = booted from jtag
   PowerPC::MMU::HostWrite_U32(guard, 0x0D15EA5E, 0x80000020);
@@ -80,7 +97,6 @@ void GameCube::reset()
   PowerPC::MMU::HostWrite_U32(guard, memory.GetRamSizeReal(), 0x80000028);
 
   // Console type - DevKit  (retail ID == 0x00000003) see YAGCD 4.2.1.1.2
-  // TODO: determine why some games fail when using a retail ID.
   // (Seem to take different EXI paths, see Ikaruga for example)
   const u32 console_type = static_cast<u32>(Core::ConsoleType::LatestDevkit);
   PowerPC::MMU::HostWrite_U32(guard, console_type, 0x8000002C);
@@ -106,14 +122,11 @@ static u64 tbase = 0;
 	
 bool GameCube::loadROM(std::string fname)
 {
-	//cpu.fetcher = [&](u32 a)->u32 { return fetch(a); };
-	cpu.read = [&](u32 a, int s)->u32 { return read(a, s); };
+	memset(mem1, 0, 24_MB);	
+	
+	cpu.read = [&](u32 a, int s)->u64 { return read(a, s); };
 	cpu.write = [&](u32 a, u64 v, int s) { write(a,v,s); };
 	cpu.get_tbr = [&](u32 tbr)->u32 { tbase+=1; if( tbr == 268 ) return tbase; return tbase>>32; };
-	//cpu.readf = [&](u32 a)->float { float v = 0; u32 b = read(a,32); memcpy(&v,&b,4); return v; };
-	//cpu.readd = [&](u32 a)->double { return read_double(a); };
-	//cpu.writef = [&](u32 a, float f) { u32 b = 0; memcpy(&b,&f,4); write(a,b,32); };
-	//cpu.writed = [&](u32 a, double d) { write_double(a, d); };
 
 	if( fname.ends_with("dol") || fname.ends_with("DOL") )
 	{
@@ -403,7 +416,8 @@ void GameCube::write(u32 addr, u64 v, int size)
 				std::fprintf(stderr, "%u", (unsigned int)v);
 			} else if( debug_type == 3 ) {
 				float a = 0;
-				memcpy(&a, &v, 4);
+				u32 fv = v;
+				memcpy(&a, &fv, 4);
 				std::fprintf(stderr, "%f", a);
 			}
 			debug_type = 0;
@@ -449,50 +463,11 @@ void GameCube::write(u32 addr, u64 v, int size)
 	exit(1);
 }
 
-void GameCube::write_double(u32 addr, double d)
-{
-	if( (addr >> 24) == 0xcc )
-	{
-		std::println("${:X}: write double to ${:X}", cpu.pc-4, addr);
-		return;
-	}
-	if( (addr&0x1fffFFFFu) < 24*1024*1024 )
-	{
-		u64 v = 0;
-		memcpy(&v,&d,8);
-		v = __builtin_bswap64(v);
-		memcpy(mem1+(addr&0x1fffFFFFu), &v, 8);
-		return;
-	}
-	std::println("${:X}: write double to ${:X}", cpu.pc-4, addr);
-	return;
-}
-
-double GameCube::read_double(u32 addr)
-{
-	if( (addr >> 24) == 0xcc )
-	{
-		std::println("${:X}: read double from ${:X}", cpu.pc-4, addr);
-		return 0;
-	}
-	if( (addr&0x1fffFFFFu) < 24*1024*1024 )
-	{
-		u64 u = 0;
-		memcpy(&u, mem1+(addr&0x1fffFFFFu), 8);
-		u = __builtin_bswap64(u);
-		double dd = 0;
-		memcpy(&dd, &u, 8);
-		return dd;
-	}
-	std::println("${:X}: read double from ${:X}", cpu.pc-4, addr);
-	return 42;
-}
-
-
 void GameCube::setINTSR(u32 b)
 {
 	pi.INTSR |= b;
 	cpu.irq_line = ( pi.INTSR & pi.INTMR & 0x3fff );
+	if( cpu.irq_line ) { cpu.in_infinite_loop = false; }
 }
 
 void GameCube::clearINTSR(u32 b)

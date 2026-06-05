@@ -234,7 +234,7 @@ public:
 	u32 maple_keys1();
 	
 	bool debug_on;
-	void key_down(int k)
+	void key_down(int k) override
 	{
 		if( k == SDL_SCANCODE_ESCAPE ) debug_on = !debug_on;
 		if( k == SDL_SCANCODE_P )
