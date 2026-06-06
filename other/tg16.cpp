@@ -27,6 +27,10 @@ u8 tg16::io_read(u32 addr)
 		}
 		return 0;
 	}
+	if( addr == 0xc00 )
+	{
+		return tmr.value;
+	}
 	if( addr == 0x1403 ) { return (cpu.irq_line ? BIT(1):0); }
 	
 	if( addr == 0x1000 ) return 0xb0|keys();
@@ -91,7 +95,7 @@ void tg16::io_write(u32 addr, u8 v)
 			}
 			if( vdc.latch == 0x13 )
 			{
-				vdc_sat_dma();
+				vdc.do_sat_dma = true;
 				return;
 			}
 			//if( vdc.latch==19 || vdc.latch == 0 || vdc.latch == 5 || vdc.latch == 6 || vdc.latch == 7 || vdc.latch == 8 ) return;
@@ -106,6 +110,37 @@ void tg16::io_write(u32 addr, u8 v)
 		if( addr == 3 ) { vdc.paddr &= 0x00ff; vdc.paddr |= (v&1)<<8; return; }
 		if( addr == 4 ) { vdc.palram[vdc.paddr] &= 0xff00; vdc.palram[vdc.paddr] |= v; return; }
 		if( addr == 5 ) { vdc.palram[vdc.paddr&0x1ff] &= 0x00ff; vdc.palram[vdc.paddr&0x1ff] |= v<<8; vdc.paddr = (vdc.paddr+1)&0x1ff; return; }
+		return;
+	}
+	if( addr < 0xC00 )
+	{
+		if( addr == 0x800 ) { pchan = v; if( pchan > 5 ) pchan = 5; return; }
+		if( addr == 0x801 ) { /*todo: global volume */ return; }
+		if( addr == 0x802 ) { psg[pchan].freq_lo = v; return; }
+		if( addr == 0x803 ) { psg[pchan].freq_hi = v&15; return; }
+		if( addr == 0x804 ) { psg[pchan].ctrl = v; if( (v&0xc0)==0x40 ) { psg[pchan].index=0; } return; }
+		if( addr == 0x805 ) { psg[pchan].vol = v; return; }
+		if( addr == 0x806 ) { psg[pchan].data = v; if( (v&0x40)==0 ) { psg[pchan].wave[psg[pchan].index++] = v; psg[pchan].index&=31; } return; }
+		if( addr == 0x807 ) { psg[pchan].noise = v; return; }
+		if( addr == 0x808 ) { psg[pchan].lfo_freq = v; return; }
+		if( addr == 0x809 ) { psg[pchan].lfo_ctrl = v; return; }
+		return;
+	}
+	if( addr < 0x1000 )
+	{
+		if( addr == 0xc00 )
+		{
+			tmr.reload = v&0x7f;
+		}
+		if( addr == 0xc01 )
+		{
+			tmr.ctrl = v;
+			if( v & 1 )
+			{
+				tmr.div = 0;
+				tmr.value = tmr.reload;
+			}
+		}
 		return;
 	}
 	if( addr == 0x1402 )
@@ -148,6 +183,51 @@ void tg16::write(u32 addr, u8 v)
 
 void tg16::system_cycles(u64 cyc)
 {
+	for(u32 psg_chan = 0; psg_chan < 6; ++psg_chan)
+	{
+		auto& P = psg[psg_chan];
+		if( (P.ctrl & 0x80) == 0 ) { P.left=P.right=0; continue; }
+		if( (P.ctrl & 0xC0) == 0xC0 )
+		{
+			P.left = (((P.data&0x1F)/31.f)*2 - 1) * ((P.ctrl&31)/31.f) * (((P.vol>>4)&15)/15.f);
+			P.right = (((P.data&0x1F)/31.f)*2 - 1)  * ((P.ctrl&31)/31.f) * ((P.vol&15)/15.f);
+			continue;
+		}
+		u32 V = P.freq_lo;
+		V |= (P.freq_hi&15)<<8;
+		V <<= 1;  // freq is in ~3Mhz cycles, emulator keeps things in ~7Mhz cycles
+		P.count += cyc;
+		if( P.count >= V )
+		{
+			P.index = (P.index+1)&0x1F;
+			P.count -= V;
+		}
+		P.left  = (((P.wave[P.index]&31)/31.f)*2 - 1) * ((P.ctrl&31)/31.f) * (((P.vol>>4)&15)/15.f);
+		P.right = (((P.wave[P.index]&31)/31.f)*2 - 1) * ((P.ctrl&31)/31.f) * ((P.vol&15)/15.f);
+	}
+	
+	audio_counter += cyc;
+	if( audio_counter >= (7190000/44100) )
+	{
+		audio_counter -= (7190000/44100);
+		float L=0, R=0;
+		for(u32 i = 0; i < 6; ++i) { L+=psg[i].left; R+=psg[i].right; }
+		audio_add(L, R);
+	}
+	
+	if( tmr.ctrl & 1 )
+	{
+		tmr.div += cyc;
+		if( tmr.div >= 1024 )
+		{
+			tmr.div -= 1024;
+			tmr.value -= 1;
+			if( tmr.value == 0xff )
+			{
+				//todo: timer irq vector $fffa
+			}
+		}	
+	}
 
 }
 
@@ -225,7 +305,10 @@ void tg16::draw_line(u32 scanline, u32 bgline)
 			
 			if( vdc.sat[i*4+3]&BIT(15) ) { Y = (sheight-1)-Y; }
 			
-			int base_tile = ((vdc.sat[i*4+2]>>1)&0x3ff)*1;
+			int base_tile = ((vdc.sat[i*4+2]>>1)&0x3ff);
+			if( vdc.sat[i*4+3] & BIT(8) ) base_tile &= ~1;
+			if( ((vdc.sat[i*4+3]>>12)&3) == 1 ) base_tile &= ~2;
+			else if( ((vdc.sat[i*4+3]>>12)&3) >= 2 ) base_tile &= ~6;
 						
 			for(int tx=0; tx<swidth; ++pX, ++tx)
 			{
@@ -233,10 +316,8 @@ void tg16::draw_line(u32 scanline, u32 bgline)
 				
 				int x = (vdc.sat[i*4+3]&BIT(11)) ? ((swidth - 1) - tx) : tx;
 				int col_offset = (x / 16);
-				int row_offset = (Y / 16);
-				
-				int tile_width = (swidth / 16);			
-				int tile_start = (base_tile + (row_offset*tile_width) + col_offset) * 128;
+				int row_offset = (Y / 16)*2; //long narrow sprites still use tiles like there was a second column
+				int tile_start = (base_tile + row_offset + col_offset) * 128;
 					    
 				u16 w1 = *(u16*)&VRAM[tile_start+(Y&15)*2+00];
 				u16 w2 = *(u16*)&VRAM[tile_start+(Y&15)*2+32];
@@ -283,8 +364,9 @@ void tg16::run_frame()
 	{
 		if( line == 242 )
 		{
-			if( vdc.regs[0xF] & BIT(4) )
+			if( (vdc.regs[0xF] & BIT(4)) || vdc.do_sat_dma )
 			{
+				vdc.do_sat_dma = false;
 				vdc_sat_dma();
 			}
 			if( vdc.regs[5] & 8 )
@@ -337,6 +419,8 @@ void tg16::reset()
 {
 	stamp = last_target = 0;
 	for(u32 i = 0; i < 0x20; ++i) vdc.regs[i]=0;
+	
+	tmr.div = tmr.ctrl = tmr.value = tmr.reload = 0;
 	cpu.reset();
 }
 

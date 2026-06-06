@@ -7,6 +7,7 @@
 class tg16 : public console
 {
 public:
+	tg16() { setVsync(0); }
 	u32 fb_width() override { return 256; }
 	u32 fb_height() override { return 240; }
 	u32 fb_bpp() override { return 16; }
@@ -24,6 +25,27 @@ public:
 	u8 keyport;
 	
 	struct {
+		u8 ctrl;
+		u8 reload;
+		u8 value;
+		u16 div;
+	} tmr;
+	
+	struct {
+		u32 count;
+		u8 freq_lo, freq_hi;
+		u8 ctrl, vol;
+		u8 data, noise, lfo_freq, lfo_ctrl;
+		u8 wave[32];
+		u8 index;
+		
+		float left = 0;
+		float right = 0;
+	} psg[6];
+	u8 pchan = 0;
+	u32 audio_counter = 0;
+	
+	struct {
 		u8 latch;
 		u16 memaddr, rdbuf;
 		u16 regs[0x20];
@@ -31,6 +53,7 @@ public:
 		u16 paddr;
 		
 		u16 sat[4*64];
+		bool do_sat_dma;
 		
 		union stat_t
 		{
