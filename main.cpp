@@ -504,11 +504,8 @@ void imgui_run()
 				}
 				ImGui::EndMenu();
 			}
-			
-			ImGui::Separator();
-			
-			if( ImGui::BeginMenu("Beta") ) 
-			{				
+			if( ImGui::BeginMenu("NEC") )
+			{
 				if( ImGui::MenuItem("TurboGrafx-16") )
 				{
 					std::string f = getOpenFile("TurboGrafx-16");
@@ -525,6 +522,12 @@ void imgui_run()
 						crt_scale = 2.f;
 					}				
 				}
+				ImGui::EndMenu();
+			}
+			ImGui::Separator();
+			
+			if( ImGui::BeginMenu("Beta") ) 
+			{				
 				if( ImGui::MenuItem("Apple IIe") )
 				{
 					std::string f = getOpenFile("Apple IIe");

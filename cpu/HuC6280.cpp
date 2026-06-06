@@ -6,7 +6,7 @@ u64 HuC6280::step()
 {
 	if( continueXfer == 0 )
 	{
-		if( !irq_blocked && F.b.I==0 && irq_line && !(irq_enable&BIT(1)) )
+		if( !irq_blocked && F.b.I==0 && irq1_line && !(irq_enable&BIT(1)) )
 		{
 			push(pc>>8);
 			push(pc);
@@ -16,6 +16,17 @@ u64 HuC6280::step()
 			F.b.I = 1;
 			pc = read(0xFFF8);
 			pc |= read(0xFFF9)<<8;
+			irq_blocked = false;
+			return 7;
+		} else if( !irq_blocked && F.b.I==0 && timer_irq_line && !(irq_enable&BIT(2)) ) {
+			push(pc>>8);
+			push(pc);
+			F.b.T = nextT;
+			nextT = 0;
+			push(F.v);
+			F.b.I = 1;
+			pc = read(0xFFFA);
+			pc |= read(0xFFFB)<<8;
 			irq_blocked = false;
 			return 7;
 		}
@@ -650,7 +661,7 @@ void HuC6280::reset()
 	pc |= read(0xFFFF)<<8;
 	F.v = 0;
 	F.b.I = 1;
-	irq_blocked = irq_line = false;
+	irq_blocked = irq1_line = timer_irq_line = false;
 	continueXfer = 0;
 	mmr[7] = 0;
 }

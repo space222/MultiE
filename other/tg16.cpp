@@ -12,7 +12,7 @@ u8 tg16::io_read(u32 addr)
 	if( addr < 0x400 )
 	{
 		addr &= 3;
-		if( addr == 0 ) { u8 res = vdc.stat.v; vdc.stat.v = 0; cpu.irq_line = false; return res; }
+		if( addr == 0 ) { u8 res = vdc.stat.v; vdc.stat.v = 0; cpu.irq1_line = false; return res; }
 		if( addr == 2 ) { return vdc.rdbuf; }	
 		if( addr == 3 ) 
 		{
@@ -31,7 +31,7 @@ u8 tg16::io_read(u32 addr)
 	{
 		return tmr.value;
 	}
-	if( addr == 0x1403 ) { return (cpu.irq_line ? BIT(1):0); }
+	if( addr == 0x1403 ) { return (cpu.irq1_line ? BIT(1):0); }
 	
 	if( addr == 0x1000 ) return 0xb0|keys();
 	if( addr >= 0x1A00 && addr < 0x1C00 ) return 0;
@@ -148,6 +148,11 @@ void tg16::io_write(u32 addr, u8 v)
 		cpu.irq_enable = v;
 		return;
 	}
+	if( addr == 0x1403 )
+	{
+		cpu.timer_irq_line = false;
+		return;
+	}
 	if( addr==0x1000 ) { keyport = v; return; }
 	//std::println("TG16: io wr ${:X} = ${:X}", addr, v);
 }
@@ -224,7 +229,8 @@ void tg16::system_cycles(u64 cyc)
 			tmr.value -= 1;
 			if( tmr.value == 0xff )
 			{
-				//todo: timer irq vector $fffa
+				cpu.timer_irq_line = true;
+				tmr.value = tmr.reload;
 			}
 		}	
 	}
@@ -372,13 +378,13 @@ void tg16::run_frame()
 			if( vdc.regs[5] & 8 )
 			{
 				vdc.stat.b.vd = 1;
-				cpu.irq_line = true;
+				cpu.irq1_line = true;
 			}
 		}
 		if( line+0x40 == vdc.regs[6] && (vdc.regs[5] & 4) )
 		{
 			vdc.stat.b.rr = 1;
-			cpu.irq_line = true;
+			cpu.irq1_line = true;
 		}		
 				
 		u64 target = last_target + 454;

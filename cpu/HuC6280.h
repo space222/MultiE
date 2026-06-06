@@ -20,7 +20,7 @@ public:
 	u8 A, X, Y, S, mmr[8], lastmmr, irq_enable;
 	u16 pc;
 	u8 nextT, continueXfer;
-	bool irq_blocked, irq_line, high_speed;
+	bool irq_blocked, irq1_line, timer_irq_line, high_speed;
 	
 	u16 xfer_src, xfer_dst, xfer_len, xfer_alt;
 	
