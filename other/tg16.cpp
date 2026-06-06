@@ -73,8 +73,16 @@ void tg16::io_write(u32 addr, u8 v)
 			vdc.regs[vdc.latch] |= v<<8;
 			if( vdc.latch == 0x12 )
 			{
-				std::println("dmalen hi written. dmalen =${:X}", vdc.regs[0x12]);
-				exit(1);
+				u16& len = vdc.regs[0x12];
+				u16& src = vdc.regs[0x10];
+				u16& dst = vdc.regs[0x11];
+				u16 ctrl = vdc.regs[0x0F];
+				do {
+					*(u16*)&VRAM[(dst&0x7fff)*2] = *(u16*)&VRAM[(src&0x7fff)*2];
+					if( ctrl & BIT(2) ) { src -= 1; } else { src += 1; }
+					if( ctrl & BIT(3) ) { dst -= 1; } else { dst += 1; }
+					len -= 1;
+				} while( len > 0 );
 				return;
 			}
 			if( vdc.latch == 2 )
