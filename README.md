@@ -15,6 +15,7 @@ See todo.txt for the full status information. Systems that I've declared out of 
 * Atari: 2600
 * Sega: SMS, Genesis
 * Colecovision
+* TurboGrafx-16/PC Engine
 
 ## Building
 
