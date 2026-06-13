@@ -36,6 +36,11 @@ u8 tg16::io_read(u32 addr)
 	if( addr == 0x1000 ) return 0xb0|keys();
 	if( addr >= 0x1A00 && addr < 0x1C00 ) return 0;
 	std::println("TG16: io rd ${:X}", addr);
+	
+	if( addr >= 0x1800 && addr < 0x1850 )
+	{
+		//cd todo
+	}
 	return 0xff;
 }
 
@@ -162,7 +167,7 @@ void tg16::io_write(u32 addr, u8 v)
 		return;
 	}
 	if( addr==0x1000 ) { keyport = v; return; }
-	//std::println("TG16: io wr ${:X} = ${:X}", addr, v);
+	std::println("TG16: io wr ${:X} = ${:X}", addr, v);
 }
 
 u8 tg16::read(u32 addr)
