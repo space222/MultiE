@@ -1,4 +1,5 @@
 #include <print>
+#include <bit>
 #include "z80_new.h"
 
 //#define BIT(a) (1u<<(a))

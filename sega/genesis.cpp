@@ -117,13 +117,24 @@ void genesis::write(u32 addr, u32 val, int size)
 	
 	if( addr == 0xA11200 )
 	{
+		auto old = z80_reset;
 		if( size == 8 ) 
 		{
 			z80_reset = val<<8;
 		} else {
 			z80_reset = val;
 		}
-		spu.pc = 0;
+		if( old && !z80_reset )
+		{
+			spu.pc = 0;
+			spu.sp = 0x1ff0;
+			OPN2_Reset(&synth);
+			OPN2_SetChipType(3);
+			fm_stamp = 0;
+			fm_count = 0;
+			fm_total = 0;
+			fm_out = 0;		
+		}
 		return;
 	}
 	

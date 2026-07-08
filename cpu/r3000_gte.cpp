@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <algorithm>
+#include <utility>
 #include <bit>
 #include "r3000.h"
 
@@ -1142,7 +1143,7 @@ u64 r3000::strange_div(u16 h, u16 SZ)
         u64 u = divtable[(d - 0x7fc0) >> 7] + 0x101;
         u64 d2 = (0x2000080 - (d * u)) >> 8;
         u64 d3 = (0x80 + (d2 * u)) >> 8;
-        return std::min(0x1fffful, (((n*d3) + 0x8000) >> 16));
+        return std::min<u64>(0x1fffful, (((n*d3) + 0x8000) >> 16));
 
 /*	if( SZ == 0 || h < SZ*2 )
 	{

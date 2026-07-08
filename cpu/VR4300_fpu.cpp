@@ -163,7 +163,7 @@ static vr4300_instr decode_fpu_long(VR4300&,u32 opcode)
 	}
 	instr_nop;
 }
-
+/*
 vr4300_instr cop1_d(VR4300&, u32 opcode)
 {
 	if( (opcode & 0x3F) >= 0x30 )
@@ -1107,7 +1107,7 @@ vr4300_instr cop1_s(VR4300&, u32 opcode)
 	default: return [](VR4300& cpu, u32) { if( cpu.COPUnusable(1) ) return; cpu.FCSR &= ~0x3f000; cpu.signal_fpu(cpu.FPU_UNIMPL); };
 	}
 }
-
+*/
 vr4300_instr cop1(VR4300& proc, u32 opcode)
 {
 	switch( (opcode>>21) & 0x1F )
@@ -1177,13 +1177,13 @@ vr4300_instr cop1(VR4300& proc, u32 opcode)
 				}
 				if( true ) //oldrnd != (cpu.FCSR&3) )
 				{
-					switch( cpu.FCSR&3 )
-					{
-					case 0: fesetround(FE_TONEAREST); break;
-					case 1: fesetround(FE_TOWARDZERO); break;
-					case 2: fesetround(FE_UPWARD); break;
-					case 3: fesetround(FE_DOWNWARD); break;
-					}
+					//switch( cpu.FCSR&3 )
+					//{
+					//case 0: fesetround(FE_TONEAREST); break;
+					//case 1: fesetround(FE_TOWARDZERO); break;
+					//case 2: fesetround(FE_UPWARD); break;
+					//case 3: fesetround(FE_DOWNWARD); break;
+					//}
 				}
 				cpu.fpu_cond = cpu.FCSR & BIT(23);
 			}
@@ -1242,7 +1242,7 @@ vr4300_instr cop1(VR4300& proc, u32 opcode)
 }
 
 
-
+/*
 vr4300_instr cop1_word(VR4300&, u32 opcode)
 {
 	switch( opcode & 0x3F )
@@ -1314,5 +1314,5 @@ vr4300_instr cop1_long(VR4300&, u32 opcode)
 		return [](VR4300& cpu, u32) { if( cpu.COPUnusable(1) ) return; cpu.FCSR &= ~0x3f000; cpu.signal_fpu(cpu.FPU_UNIMPL); };
 	}
 }
-
+*/
 

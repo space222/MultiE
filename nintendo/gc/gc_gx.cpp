@@ -1,5 +1,6 @@
 #include <print>
 #include <string>
+#include <bit>
 #include "GameCube.h"
 
 void GameCube::gx_exec()

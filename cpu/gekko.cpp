@@ -1,6 +1,7 @@
 #include <print>
 #include <cmath>
 #include <string>
+#include <bit>
 #include "gekko.h"
 #define instr return [](gekko& cpu, u32 opc)
 #define instr_nop return [](gekko&,u32){}

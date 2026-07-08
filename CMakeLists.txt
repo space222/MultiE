@@ -7,8 +7,11 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 #set(CMAKE_CXX_FLAGS "-g -fabi-version=16 -fsanitize=address -ftree-vectorize -march=native -Wall -Wpedantic -Wextra -Wshadow -Wimplicit-fallthrough")
 set(CMAKE_CXX_FLAGS "-O3 -ftree-vectorize -march=native -Wall -Wpedantic -Wextra -Wshadow -Wimplicit-fallthrough")
+#set(CMAKE_CXX_FLAGS "-O3 -sUSE_SDL=2 -ftree-vectorize -Wall -Wpedantic -Wextra -Wshadow -Wimplicit-fallthrough")
 set(CMAKE_CXX_COMPILER clang++)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+#set(CMAKE_EXECUTABLE_SUFFIX ".html")
+
 
 add_executable(test main.cpp imgui/backends/imgui_impl_sdl2.cpp progopt.cpp commodore/c64.cpp commodore/TAPFile.cpp 
 atari/a26.cpp atari/a52.cpp atari/antic.cpp atari/tia.cpp cpu/6502.cpp
@@ -35,7 +38,7 @@ sony/ps2/iop.cpp cpu/EEngine.cpp sony/ps2/gs.cpp cpu/6809.cpp other/trs80cc3.cpp
 other/vectrex.cpp cpu/65816.cpp nintendo/snes/snes.cpp nintendo/snes/ppu.cpp cpu/spc700.cpp nintendo/snes/snd.cpp
 nintendo/snes/superfx.cpp nintendo/snes/cart.cpp nintendo/snes/dspn.cpp nintendo/pokemini.cpp cpu/s1c88.cpp
 cpu/arm946e.cpp nintendo/ds/nds.cpp nintendo/ds/arm7.cpp nintendo/ds/arm9.cpp avi_rec.cpp nintendo/gc/gc_gx.cpp
-cpu/HuC6280.cpp other/tg16.cpp
+cpu/HuC6280.cpp other/tg16.cpp 
 #stub/gdb_stub.cpp
 )
 
@@ -47,6 +50,6 @@ add_library(ym3438 SHARED sega/ym3438.cpp)
 
 target_include_directories(test PUBLIC . ./imgui ./include ./sony ./other ./coleco
 	./cpu ./atari ./commodore ./sega ./ibm ./nintendo ./mattel ./neogeo ./libs/sockpp/include ${SDL2_INCLUDE_DIRS} )
-target_link_libraries(test PRIVATE ym3438 dl GL GLEW ${CMAKE_SOURCE_DIR}/libs/sockpp/src/libsockpp.a ${SDL2_LIBRARIES})
-#${CMAKE_SOURCE_DIR}/libfmt.a 
+target_link_libraries(test PRIVATE dl GL GLEW ym3438 ${SDL2_LIBRARIES})
+#${CMAKE_SOURCE_DIR}/libs/sockpp/src/libsockpp.a
 
