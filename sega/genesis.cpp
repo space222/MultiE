@@ -130,10 +130,10 @@ void genesis::write(u32 addr, u32 val, int size)
 			spu.sp = 0x1ff0;
 			OPN2_Reset(&synth);
 			OPN2_SetChipType(3);
-			fm_stamp = 0;
-			fm_count = 0;
-			fm_total = 0;
-			fm_out = 0;		
+			//fm_stamp = 0;
+			//fm_count = 0;
+			//fm_total = 0;
+			//fm_out = 0;		
 		}
 		return;
 	}
