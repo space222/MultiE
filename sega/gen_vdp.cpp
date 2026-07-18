@@ -251,9 +251,12 @@ void genesis::vdp_data(u16 val)
 			printf("VDP Fill CD = $%X\n", vdp_cd);
 			//exit(1);
 		}
+		VRAM[vdp_addr] = val>>8;
+		VRAM[vdp_addr^1] = val;			
+		vdp_addr += vreg[0xf];
 		for(u32 i = 0; i < len; ++i) 
 		{
-			VRAM[vdp_addr] = val;
+			VRAM[vdp_addr^1] = val;
 			vdp_addr += vreg[0xf];
 		}
 		vreg[0x14] = vreg[0x13] = 0;
