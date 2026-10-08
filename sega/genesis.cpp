@@ -13,10 +13,13 @@ void genesis::write(u32 addr, u32 val, int size)
 	addr &= 0xffFFff;
 	if( addr < 0x400000 ) 
 	{
+		printf("Gen: rom write (save ram?) $%X = $%X\n", addr, val);
 		if( ROM.size() <= 2*1024*1024 && addr > 0x200000 && addr <= 0x20FFFF )
 		{
-			printf("Gen: save ram write $%X = $%X\n", addr, val);
 			save[(addr&0xffff)>>1] = val;
+		} else if( addr == 0x200001 ) {
+			written_eeprom = true;
+			eeprom = val;
 		}
 		return;
 	}
@@ -105,6 +108,7 @@ void genesis::write(u32 addr, u32 val, int size)
 	
 	if( addr == 0xA11100 )
 	{
+		//std::println("busreq write{} ${:X} = ${:X}", size, addr, val);
 		if( size == 8 ) 
 		{
 			z80_busreq = val<<8;
@@ -128,8 +132,7 @@ void genesis::write(u32 addr, u32 val, int size)
 		{
 			spu.pc = 0;
 			spu.sp = 0x1ff0;
-			OPN2_Reset(&synth);
-			OPN2_SetChipType(3);
+			fmsynth.reset();
 			//fm_stamp = 0;
 			//fm_count = 0;
 			//fm_total = 0;
@@ -167,6 +170,7 @@ u32 genesis::read(u32 addr, int size)
 	addr &= 0xffFFff;
 	if( adapter_ctrl&1 ) return read32x(addr, size);
 	
+	if( addr == 0x200000 && written_eeprom ) { return eeprom; }
 	if( addr < ROM.size() ) return __builtin_bswap16(*(u16*)&ROM[addr]);
 	if( ROM.size() <= 2*1024*1024 && addr > 0x200000 && addr <= 0x20FFFF )
 	{
@@ -182,7 +186,10 @@ u32 genesis::read(u32 addr, int size)
 	
 	if( addr >= 0xA04000 && addr < 0xA05000 )
 	{
-		return fm_read();
+		//std::println("audio rd{} ${:X}", size, addr);
+		u16 v = fm_read();
+		if( size == 16 ) { v<<=8; }
+		return v;
 	}
 	
 	// Chaotix on 32X needs to see bit 6 set, everything else requires unset to detect NTSC
@@ -215,11 +222,17 @@ u32 genesis::read(u32 addr, int size)
 	{
 		std::println("HV counter read");
 		//exit(1);
-		return 0;
+		u32 val = vdp_v_line;
+		if( vdp_v_line > 0xea ) { val = 0xe5 + (val-0xeb); }
+		if( size == 16 ) return val<<8;
+		return val;
 	}
 	
 	if( addr == 0xA11100 )
 	{
+		//std::println("z80 busreq returns rd{} ${:X}", size, z80_busreq);
+		//return 0;
+		if( size == 8 ) { return z80_busreq>>8; }
 		return z80_busreq;	
 	}
 	
@@ -266,9 +279,9 @@ u8 genesis::z80_read(u16 addr)
 {
 	//printf("z80 read $%X\n",addr);
 	if( addr < 0x4000 ) return ZRAM[addr&0x1fff];
-	if( addr < 0x5000 ) { return fm_read(); }//todo: return fm.status
+	if( addr < 0x5000 ) { return fm_read(); }
 	if( addr == 0x6000 )
-	{ // bank reg. looks like reading resets?
+	{ // bank reg. some sources say this resets z80 bank, but no.
 		//z80_bank = 0;
 		return 0xff;
 	}
@@ -282,8 +295,26 @@ u8 genesis::z80_read(u16 addr)
 		a ^= 1;
 		return v >> ((a&1)*8);
 	}
+	printf("z80 read $%X\n",addr);
 	return 0;
 }
+
+static double prev_sample{};
+static double prev_output{};
+static float filter(double sample)
+{
+        const double B0 = 0.1684983368367697;
+        const double B1 = 0.1684983368367697;
+        const double A1 = -0.6630033263264605;
+
+        auto output = B0 * sample + B1 * prev_sample - A1 * prev_output;
+
+        prev_sample = sample;
+        prev_output = output;
+
+        return output;
+}
+
 
 void genesis::run_frame()
 {
@@ -295,7 +326,8 @@ void genesis::run_frame()
 	
 	for(u32 line = 0; line < 262; ++line)
 	{
-		u64 target = last_target + 3420; // 3360;
+		vdp_v_line = line;
+		u64 target = last_target + 3420;
 		while( stamp < target )
 		{
 			// run the 68k
@@ -308,13 +340,14 @@ void genesis::run_frame()
 			{
 				while( spu_stamp < stamp )
 				{
+					//std::println("spu pc = ${:X}", spu.pc);
 					spu_stamp += spu.step() * 15;
 				}
 			} else {
 				spu_stamp = stamp;
 			}
+			fm_run(cpu.icycles);
 			// run the psg
-			fm_run();
 			while( psg_stamp*15 < stamp )
 			{
 				psg_stamp += 1;
@@ -324,11 +357,11 @@ void genesis::run_frame()
 				{
 					sample_cycles -= 81;
 					float sm = ((t/60.f)*2 - 1);
-					float fm = fm_out/float(fm_count);
-					sm = (sm/5.f) + fm; //(fm*2 - 1);
+					float fm = fmsynth.currentL;//fm_out/float(fm_count);
+					sm = (sm/3.f) + fm;
 					fm_count = fm_total = fm_out = 0;
 					
-					sm = std::clamp(sm, -1.f, 1.f);
+					sm = filter(std::clamp(sm, -1.f, 1.f));
 					audio_add(sm,sm);
 				}
 			}
@@ -346,18 +379,21 @@ void genesis::run_frame()
 		}
 		last_target = target;
 		
-		if( line < 224 )
+		if( line < 224 ) 
 		{
-			draw_line(line);
-			vdp_hcnt -= 1;
+			draw_line(line); 
 			if( vdp_hcnt == 0 )
 			{
 				vdp_hcnt = vreg[0xA];
 				if( (vreg[0]&BIT(4)) && cpu.pending_irq == 0  ) cpu.pending_irq = 4;
+			} else {
+				vdp_hcnt -= 1;
 			}
-		} else {
+		}
+		if( line == 224 ) {
 			vdp_hcnt = vreg[0xA];
 		}
+		
 		if( line == 223 ) 
 		{
 			if( (vreg[1]&BIT(5))  ) { cpu.pending_irq = 6; spu.irq_line = 1; }
@@ -378,6 +414,8 @@ void genesis::reset()
 	memset(&spu, 0, sizeof(spu));
 	//memset(&cpu, 0, sizeof(cpu));
 	memset(&vreg, 0, 0x20);
+	memset(&RAM, 0, 0x10000);
+	memset(&save, 0, 0x10000);
 	
 	spu.reset();
 	spu.sp = 0x1ff0;
@@ -387,7 +425,10 @@ void genesis::reset()
 		cpu.r[16] = cpu.r[15] = __builtin_bswap32(cpu.r[15]);
 		cpu.pc = *(u32*)&ROM[4];
 		cpu.pc = __builtin_bswap32(cpu.pc);
-		cpu.sr.raw = 0x2700;	
+		cpu.sr.raw = 0x2700;
+		cpu.pending_irq = 0;
+		cpu.halted = false;
+		cpu.icycles = 0;
 	}
 	
 	cpu.mem_read8 = [&](u32 a) -> u8 { return read(a&~1, 16) >> (((a&1)^1)*8); };
@@ -420,10 +461,12 @@ void genesis::reset()
 	sample_cycles = 0;
 	z80_reset = 0x100;
 	z80_busreq = 0x100;
+	z80_bank = 0;
 	psg_stamp = 0;
 	
-	OPN2_Reset(&synth);
-	OPN2_SetChipType(3);
+	//OPN2_Reset(&synth);
+	//OPN2_SetChipType(3);
+	fmsynth.reset();
 	fm_stamp = 0;
 	fm_count = 0;
 	fm_total = 0;
@@ -457,8 +500,11 @@ void genesis::reset()
 	cpu32x[0].r[15] = __builtin_bswap32(*(u32*)&bios32xM[4]);
 	cpu32x[1].r[15] = __builtin_bswap32(*(u32*)&bios32xS[4]);
 	
+	
 	adapter_ctrl = fbctrl = bmp_mode = 0;
 	next_frame = current_frame = 0;
+	stamp = last_target = spu_stamp = psg_stamp = 0;
+	psg.reset();
 	return;
 }
 

@@ -59,10 +59,9 @@ struct m68k
 	std::function<u16(u32)> read_code16;
 	std::function<u32(u32)> mem_read32;
 
-	
-	u32 icycles;
-	u64 stamp;
-	bool halted;
+	u32 icycles{};
+	u64 stamp{};
+	bool halted{};
 	
 	u32 autovector; // added for Jaguar. uses level 2 IRQ, but not addr 0x68
 };

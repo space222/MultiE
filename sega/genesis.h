@@ -7,6 +7,7 @@
 #include "SN79489.h"
 #include "sh2.h"
 #include "ym3438.h"
+#include "ym2612.h"
 
 class genesis : public console
 {
@@ -50,15 +51,17 @@ public:
 	u32 vdp_width;
 	u8 vdp_cd, vdp_hcnt;
 	u8 sprbuf[320];
+	u32 vdp_v_line{};
 	
 	void fm_write(u32, u8);
 	u8 fm_read();
-	void fm_run();
+	void fm_run(u64);
 	float fm_out;
 	int fm_total;
 	int fm_count;
 	u64 fm_stamp;
 	ym3438_t synth;
+	ym2612 fmsynth;
 	
 	u32 pcycle, pcycle2;
 	u16 key1, key2, key3;
@@ -104,6 +107,9 @@ public:
 	u32 current_frame, next_frame;
 	u8 cacheM[0x800];
 	u8 cacheS[0x800];
+	
+	bool written_eeprom{};
+	u8 eeprom{};
 };
 
 #define PAD_DATA_DEFAULT 0x40
