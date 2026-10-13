@@ -133,8 +133,12 @@ Genesis Todo List
 1. shadow/highlight
 2. better timing in the 68k (maybe just go microcode?)
 3. cycle-stepped z80
-4. my own fm synth based on jsgroth blogs
-Status: YM2612 uses the Nuken OPN library... Poorly? Fantastic Dizzy and UMK3 lack sound.
+Status: 
+	After implementing sprite cache, Zero Wing still doesn't display any sprites
+	Window was using Plane A WxH instead of proper 64vs32 based on vdp_width, 
+		fixes Sonic 3 save screen + power rangers + possibly BattleToads&DoubleDragon interstage dialog
+	Now using my own YM2612 based on jsgroth blog. Fantastic Dizzy and UMK3 have sound.
+	YM2612 uses the Nuken OPN library... Poorly? Fantastic Dizzy and UMK3 lack sound.
 	Only a few games with graphical bugs left, not including lack of shadow/highlight.
 	Did the SH2 for the 32X, but nowhere near working yet.
 

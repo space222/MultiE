@@ -1,5 +1,6 @@
 #include <cstdio>
 #include <cstdlib>
+#include <print>
 #include "genesis.h"
 
 static u32 ntsize[] = { 32, 64, 128, 128 };
@@ -43,24 +44,26 @@ void genesis::eval_sprites(u32 line)
 	u32 pix = 0;
 	u32 spr = 0;
 	u32 max = 0;
-	
+		
 	do {
 		max += 1;
-		u32 vpos = (0x3FF & __builtin_bswap16(*(u16*)&VRAM[spraddr + (spr*8)]));
-		u32 vs = (VRAM[spraddr + (spr*8) + 2]&3)+1;
+		u32 vpos = 0x3FF & __builtin_bswap16(*(u16*)&spr_cache[spr*8]); // disable sprite cache until I have time to test it
+		u32 vs = (spr_cache[spr*8 + 2]&3)+1;
+		//u32 vpos = (0x3FF & __builtin_bswap16(*(u16*)&VRAM[spraddr + (spr*8)]));
+		//u32 vs = (VRAM[spraddr + (spr*8) + 2]&3)+1;
 		if( (line+128) >= vpos && (line+128) - vpos < (vs*8) )
 		{
-			num+=1;
 			u16 hpos = (0x1FF & __builtin_bswap16(*(u16*)&VRAM[spraddr + (spr*8) + 6]));
-			if( hpos == 0 ) break; //also needs low pri?
-			u32 hs = ((VRAM[spraddr + (spr*8) + 2]>>2)&3)+1;
+			if( num && hpos == 0 ) break; // based on num at all? also needs low pri?
+			num+=1;
+			u32 hs = ((spr_cache[spr*8+2]>>2)&3)+1;// ((VRAM[spraddr + (spr*8) + 2]>>2)&3)+1;
 			pix += hs*8;
 			u16 entry = __builtin_bswap16(*(u16*)&VRAM[spraddr + (spr*8) + 4]);
 			render_sprite((line+128)-vpos, hpos, hs, vs, entry);	
 		}
 	} while( max < (vdp_width==320 ? 80:64) &&
 		 num < (vdp_width==320 ? 20:16) && 
-		 pix < vdp_width && (spr=VRAM[spraddr + (spr*8) + 3]&0x7f)  );	
+		 pix < vdp_width && (spr=spr_cache[spr*8+3]&0x7f) ); // (spr=VRAM[spraddr + (spr*8) + 3]&0x7f)  );	
 }
 
 bool genesis::vdp_in_window(u32 line, u32 px)
@@ -127,8 +130,9 @@ void genesis::draw_line(u32 line)
 		u16 entryA = 0;		
 		u8 tA = 0;	
 		if( vdp_in_window(line, px) )
-		{
-			entryA = __builtin_bswap16(*(u16*)&VRAM[ntW + (((line&vmask)/8)*nt_width + ((px&hmask)/8))*2]);
+		{ // missed this for so long. window size is fixed based on image width, not shared with plane A
+			const u32 window_width = (vdp_width==320 ? 64 : 32);
+			entryA = __builtin_bswap16(*(u16*)&VRAM[ntW + (((line&vmask)/8)*window_width + ((px&hmask)/8))*2]);
 			u32 lXW = ((px&7) ^ ((entryA&BIT(11))?7:0));
 			tA = VRAM[(entryA&0x7ff)*32 + ((line&7) ^ ((entryA&BIT(12))?7:0))*4 + (lXW>>1)];
 			tA >>= (lXW&1)?0:4;
@@ -201,12 +205,15 @@ void genesis::vdp_ctrl(u16 val)
 				u32 len = (vreg[0x14]<<8)|vreg[0x13];
 				if( len == 0 ) len = 0xffff;
 				u32 src = 0;
-				for(u32 i = 0; i < len; ++i)
-				{
-					src = (vreg[0x17]<<16)|(vreg[0x16]<<8)|vreg[0x15];
-					vdp_data(read(src<<1,16));
-					vreg[0x15] += 1;
-					vreg[0x16] += ((vreg[0x15]==0)?1:0);
+				if( vreg[1] & BIT(4) )
+				{ // only do dma if it's enabled
+					for(u32 i = 0; i < len; ++i)
+					{
+						src = (vreg[0x17]<<16)|(vreg[0x16]<<8)|vreg[0x15];
+						vdp_data(read(src<<1,16));
+						vreg[0x15] += 1;
+						vreg[0x16] += ((vreg[0x15]==0)?1:0);
+					}
 				}
 				vreg[0x14] = vreg[0x13] = 0;
 			}
@@ -252,11 +259,14 @@ void genesis::vdp_data(u16 val)
 			//exit(1);
 		}
 		VRAM[vdp_addr] = val>>8;
+			sprite_cache(vdp_addr, val>>8);
 		VRAM[vdp_addr^1] = val;			
+			sprite_cache(vdp_addr^1, val);
 		vdp_addr += vreg[0xf];
 		for(u32 i = 0; i < len; ++i) 
 		{
 			VRAM[vdp_addr^1] = val;
+				sprite_cache(vdp_addr^1, val);
 			vdp_addr += vreg[0xf];
 		}
 		vreg[0x14] = vreg[0x13] = 0;
@@ -269,8 +279,8 @@ void genesis::vdp_data(u16 val)
 	switch( vdp_cd & 0xf )
 	{
 	case 1:
-		VRAM[index] = val>>8;
-		VRAM[index^1] = val;	
+		VRAM[index] = val>>8; sprite_cache(index, val>>8);
+		VRAM[index^1] = val; sprite_cache(index^1, val);
 		break;
 	case 3:
 		index = (index>>1)&0x3F;
@@ -286,6 +296,19 @@ void genesis::vdp_data(u16 val)
 		//exit(1);
 	}
 	
+}
+
+void genesis::sprite_cache(u16 addr, u8 val)
+{
+	u16 spraddr = vreg[5]&0x7f;
+	if( vdp_width == 320 ) spraddr &= ~1;
+	spraddr <<= 9;
+
+	if( addr >= spraddr && addr < spraddr + 80*8 )
+	{ // system only actually uses vpos and link
+		spr_cache[addr - spraddr] = val;
+		//std::println("${:X} = ${:X}", addr, val);
+	}
 }
 
 void genesis::vdp_vram2vram()
