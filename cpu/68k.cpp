@@ -1,3 +1,4 @@
+#include <print>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -123,28 +124,28 @@ struct M
 		if( m == 2 )
 		{
 			EA = cpu.r[r];
-			cpu.icycles += (s==4)?4:0;
+			cpu.icycles += (s==4)?8:4;
 			return;
 		}
 		if( m == 3 )
 		{
 			EA = cpu.r[r];
 			cpu.r[r] += (( r >= 15 && size == 1 ) ? 2 : size);
-			cpu.icycles += (s==4)?4:0;
+			cpu.icycles += (s==4)?8:4;
 			return;
 		}
 		if( m == 4 )
 		{
 			cpu.r[r] -= (( r >= 15 && size == 1 ) ? 2 : size);		
 			EA = cpu.r[r];
-			cpu.icycles += (s==4)?6:2;
+			cpu.icycles += (s==4)?10:6;
 			return;
 		}
 		if( m == 5 )
 		{
 			EA = cpu.r[r] + se16to32(cpu.read_code16(cpu.pc));
 			cpu.pc += 2;
-			cpu.icycles += (s==4)?8:4;
+			cpu.icycles += (s==4)?12:8;
 			return;
 		}
 		if( m == 6 )
@@ -156,7 +157,7 @@ struct M
 			bew >>= 12;
 			if( bew == 15 ) bew += (cpu.sr.b.S^1);
 			EA += (wl ? cpu.r[bew] : se16to32(cpu.r[bew]));
-			cpu.icycles += (s==4)?12:8; // (s==4)?14:10;
+			cpu.icycles += (s==4)?14:10;
 			return;
 		}
 		// if we get here, m==7 and operation depends on Xn
@@ -164,7 +165,7 @@ struct M
 		{
 			EA = se16to32(cpu.read_code16(cpu.pc));
 			cpu.pc += 2;
-			cpu.icycles += (s==4)?8:4;
+			cpu.icycles += (s==4)?12:8;
 			return;
 		}
 		if( Xn == 1 )
@@ -173,7 +174,7 @@ struct M
 			cpu.pc += 2;
 			EA += cpu.read_code16(cpu.pc);
 			cpu.pc += 2;
-			cpu.icycles += (s==4)?12:8;
+			cpu.icycles += (s==4)?16:12;
 			return;
 		}
 		if( Xn == 2 )
@@ -181,7 +182,7 @@ struct M
 			EA = se16to32(cpu.read_code16(cpu.pc));
 			EA += cpu.pc;
 			cpu.pc += 2;
-			cpu.icycles += (s==4)?8:4;
+			cpu.icycles += (s==4)?12:8;
 			return;		
 		}
 		if( Xn == 3 )
@@ -193,7 +194,7 @@ struct M
 			bew >>= 12;
 			if( bew == 15 ) bew += (cpu.sr.b.S^1);
 			EA += (wl ? cpu.r[bew] : se16to32(cpu.r[bew]));
-			cpu.icycles += (s==4)?12:10;
+			cpu.icycles += (s==4)?14:10;
 			return;
 		}
 		if( Xn == 4 )
@@ -207,7 +208,7 @@ struct M
 				EA = cpu.read_code16(cpu.pc);
 				if( size == 1 ) EA &= 0xff;
 			}
-			cpu.icycles += (s==4)?4:0;
+			cpu.icycles += (s==4)?8:4;
 			cpu.pc+=2;
 			isImm = true;
 			return;
@@ -340,14 +341,17 @@ void ori(m68k& cpu, u16 opc)
 	case 0:
 		cpu.sr.b.Z = (imm&0xff)==0;
 		cpu.sr.b.N = (imm&0x80)?1:0;
+		cpu.icycles += (t.isReg ? 4:8);
 		break;
 	case 1:
 		cpu.sr.b.Z = (imm&0xffff)==0;
 		cpu.sr.b.N = (imm&0x8000)?1:0;		
+		cpu.icycles += (t.isReg ? 4:8);
 		break;
 	default:
 		cpu.sr.b.Z = imm==0;
 		cpu.sr.b.N = (imm&(1u<<31))?1:0;
+		cpu.icycles += (t.isReg ? 12:16);
 		break;
 	}
 	t.set(imm);
@@ -389,14 +393,17 @@ void eori(m68k& cpu, u16 opc)
 	case 0:
 		cpu.sr.b.Z = (imm&0xff)==0;
 		cpu.sr.b.N = (imm&0x80)?1:0;
+		cpu.icycles += (t.isReg ? 4:8);
 		break;
 	case 1:
 		cpu.sr.b.Z = (imm&0xffff)==0;
 		cpu.sr.b.N = (imm&0x8000)?1:0;		
+		cpu.icycles += (t.isReg ? 4:8);
 		break;
 	default:
 		cpu.sr.b.Z = imm==0;
 		cpu.sr.b.N = (imm&(1u<<31))?1:0;
+		cpu.icycles += (t.isReg ? 12:16);
 		break;
 	}
 	t.set(imm);
@@ -419,18 +426,21 @@ void cmpi(m68k& cpu, u16 opc)
 		cpu.sr.b.Z = (res&0xff)==0;
 		cpu.sr.b.V = ((res ^ v) & (res ^ R) & 0x80) ? 1 : 0;
 		cpu.sr.b.N = (res&0x80) ? 1 : 0;
+		cpu.icycles += 4;
 		break;
 	case 1:
 		cpu.sr.b.C = ((res>>16)&1)^1;
 		cpu.sr.b.Z = (res&0xffff)==0;
 		cpu.sr.b.V = ((res ^ v) & (res ^ R) & 0x8000) ? 1 : 0;
 		cpu.sr.b.N = (res&0x8000) ? 1 : 0;
+		cpu.icycles += 4;
 		break;
 	default:
 		cpu.sr.b.C = ((res>>32)&1)^1;
 		cpu.sr.b.Z = u32(res)==0;
 		cpu.sr.b.V = ((res ^ v) & (res ^ R) & (1ul<<31)) ? 1 : 0;
 		cpu.sr.b.N = (res&(1ul<<31)) ? 1 : 0;
+		cpu.icycles += (t.isReg ? 10:8);
 		break;
 	}
 }
@@ -443,9 +453,11 @@ void btst(m68k& cpu, u16 opc)
 	if( t.m == 0 )
 	{
 		cpu.sr.b.Z = (cpu.r[t.r]&(1<<(imm&0x1F)))?0:1;
+		cpu.icycles += 6;
 	} else {
 		u8 val = t.value();
 		cpu.sr.b.Z = (val&(1<<(imm&7)))?0:1;
+		cpu.icycles += 4;
 	}
 }
 
@@ -457,9 +469,11 @@ void btst2(m68k& cpu, u16 opc)
 	if( t.m == 0 )
 	{
 		cpu.sr.b.Z = (cpu.r[t.r]&(1<<(imm&0x1F)))?0:1;
+		cpu.icycles += 2;
 	} else {
 		u8 val = t.value();
 		cpu.sr.b.Z = (val&(1<<(imm&7)))?0:1;
+		if( t.isImm ) { cpu.icycles += 2; /*??*/ }
 	}
 }
 
@@ -471,11 +485,13 @@ void bchg(m68k& cpu, u16 opc)
 	{
 		cpu.sr.b.Z = (cpu.r[t.r]&(1<<(imm&0x1F)))?0:1;
 		cpu.r[t.r] ^= (1<<(imm&0x1F));
+		cpu.icycles += (((imm&0x1F)<16) ? 6:8);
 	} else {
 		u8 val = t.value();
 		cpu.sr.b.Z = (val&(1<<(imm&7)))?0:1;
 		val ^= (1<<(imm&7));
 		t.set(val);	
+		cpu.icycles += 8;
 	}	
 }
 
@@ -487,11 +503,13 @@ void bchg2(m68k& cpu, u16 opc)
 	{
 		cpu.sr.b.Z = (cpu.r[t.r]&(1<<(imm&0x1F)))?0:1;
 		cpu.r[t.r] ^= (1<<(imm&0x1F));
+		cpu.icycles += (((imm&0x1F)<16) ? 2:4);
 	} else {
 		u8 val = t.value();
 		cpu.sr.b.Z = (val&(1<<(imm&7)))?0:1;
 		val ^= (1<<(imm&7));
-		t.set(val);	
+		t.set(val);
+		cpu.icycles += 4;
 	}
 }
 
@@ -503,11 +521,13 @@ void bclr(m68k& cpu, u16 opc)
 	{
 		cpu.sr.b.Z = (cpu.r[t.r]&(1<<(imm&0x1F)))?0:1;
 		cpu.r[t.r] &= ~(1<<(imm&0x1F));
+		cpu.icycles += (((imm&0x1F)<16) ? 8:10);
 	} else {
 		u8 val = t.value();
 		cpu.sr.b.Z = (val&(1<<(imm&7)))?0:1;
 		val &= ~(1<<(imm&7));
-		t.set(val);	
+		t.set(val);
+		cpu.icycles += 8;
 	}
 }
 
@@ -519,11 +539,13 @@ void bclr2(m68k& cpu, u16 opc)
 	{
 		cpu.sr.b.Z = (cpu.r[t.r]&(1<<(imm&0x1F)))?0:1;
 		cpu.r[t.r] &= ~(1<<(imm&0x1F));
+		cpu.icycles += (((imm&0x1F)<16) ? 4:6);
 	} else {
 		u8 val = t.value();
 		cpu.sr.b.Z = (val&(1<<(imm&7)))?0:1;
 		val &= ~(1<<(imm&7));
 		t.set(val);	
+		cpu.icycles += 4;
 	}
 }
 
@@ -535,11 +557,13 @@ void bset(m68k& cpu, u16 opc)
 	{
 		cpu.sr.b.Z = (cpu.r[t.r]&(1<<(imm&0x1F)))?0:1;
 		cpu.r[t.r] |= (1<<(imm&0x1F));
+		cpu.icycles += (((imm&0x1F)<16) ? 6:8);
 	} else {
 		u8 val = t.value();
 		cpu.sr.b.Z = (val&(1<<(imm&7)))?0:1;
 		val |= (1<<(imm&7));
 		t.set(val);	
+		cpu.icycles += 8;
 	}
 }
 
@@ -551,11 +575,13 @@ void bset2(m68k& cpu, u16 opc)
 	{
 		cpu.sr.b.Z = (cpu.r[t.r]&(1<<(imm&0x1F)))?0:1;
 		cpu.r[t.r] |= (1<<(imm&0x1F));
+		cpu.icycles += (((imm&0x1F)<16) ? 2:4);
 	} else {
 		u8 val = t.value();
 		cpu.sr.b.Z = (val&(1<<(imm&7)))?0:1;
 		val |= (1<<(imm&7));
 		t.set(val);	
+		cpu.icycles += 4;
 	}
 }
 
@@ -574,18 +600,21 @@ void addi(m68k& cpu, u16 opc)
 		cpu.sr.b.Z = (res&0xff)==0;
 		cpu.sr.b.V = ((res ^ v) & (res ^ R) & 0x80) ? 1 : 0;
 		cpu.sr.b.N = (res&0x80) ? 1 : 0;
+		cpu.icycles += (t.isReg ? 4 : 8);
 		break;
 	case 1:
 		cpu.sr.b.X = cpu.sr.b.C = (res>>16)&1;
 		cpu.sr.b.Z = (res&0xffff)==0;
 		cpu.sr.b.V = ((res ^ v) & (res ^ R) & 0x8000) ? 1 : 0;
 		cpu.sr.b.N = (res&0x8000) ? 1 : 0;
+		cpu.icycles += (t.isReg ? 4 : 8);
 		break;
 	default:
 		cpu.sr.b.X = cpu.sr.b.C = (res>>32)&1;
 		cpu.sr.b.Z = u32(res)==0;
 		cpu.sr.b.V = ((res ^ v) & (res ^ R) & (1ul<<31)) ? 1 : 0;
 		cpu.sr.b.N = (res&(1ul<<31)) ? 1 : 0;
+		cpu.icycles += (t.isReg ? 12 : 16);
 		break;
 	}
 	t.set(res);
@@ -606,18 +635,21 @@ void subi(m68k& cpu, u16 opc)
 		cpu.sr.b.Z = (res&0xff)==0;
 		cpu.sr.b.V = ((res ^ v) & (res ^ R) & 0x80) ? 1 : 0;
 		cpu.sr.b.N = (res&0x80) ? 1 : 0;
+		cpu.icycles += (t.isReg ? 4 : 8);
 		break;
 	case 1:
 		cpu.sr.b.X = cpu.sr.b.C = ((res>>16)&1)^1;
 		cpu.sr.b.Z = (res&0xffff)==0;
 		cpu.sr.b.V = ((res ^ v) & (res ^ R) & 0x8000) ? 1 : 0;
 		cpu.sr.b.N = (res&0x8000) ? 1 : 0;
+		cpu.icycles += (t.isReg ? 4 : 8);
 		break;
 	default:
 		cpu.sr.b.X = cpu.sr.b.C = ((res>>32)&1)^1;
 		cpu.sr.b.Z = u32(res)==0;
 		cpu.sr.b.V = ((res ^ v) & (res ^ R) & (1ul<<31)) ? 1 : 0;
 		cpu.sr.b.N = (res&(1ul<<31)) ? 1 : 0;
+		cpu.icycles += (t.isReg ? 12 : 16);
 		break;
 	}
 	t.set(res);
@@ -634,16 +666,19 @@ void andi(m68k& cpu, u16 opc)
 		imm = (imm&~0xff) | (imm&t.value()&0xff);
 		cpu.sr.b.Z = (imm&0xff)==0;
 		cpu.sr.b.N = (imm&0x80)?1:0;
+		cpu.icycles += (t.isReg ? 4:8);
 		break;
 	case 1:
 		imm = (imm&~0xffff) | (imm&t.value()&0xffff);
 		cpu.sr.b.Z = (imm&0xffff)==0;
 		cpu.sr.b.N = (imm&0x8000)?1:0;		
+		cpu.icycles += (t.isReg ? 4:8);
 		break;
 	default:
 		imm &= t.value();
 		cpu.sr.b.Z = imm==0;
 		cpu.sr.b.N = (imm&(1u<<31))?1:0;
+		cpu.icycles += (t.isReg ? 12:16);
 		break;
 	}
 	t.set(imm);
@@ -762,6 +797,7 @@ void move_from_sr(m68k& cpu, u16 opc)
 	cpu.sr.b.pad2 = 0;
 	cpu.sr.b.pad3 = 0;
 	t.set(cpu.sr.raw);
+	cpu.icycles += (t.isReg ? 2:4);
 }
 
 void move_to_ccr(m68k& cpu, u16 opc)
@@ -794,6 +830,8 @@ void clr(m68k& cpu, u16 opc)
 	target();
 	t.value(); // original 68k issues a read before clearing
 	t.set(0);
+	if( !t.isReg ) cpu.icycles += (t.s==4 ? 8:4);
+	else cpu.icycles += (t.s==4 ? 2:0);
 	cpu.sr.b.Z = 1;
 	cpu.sr.b.C = cpu.sr.b.N = cpu.sr.b.V = 0;
 }
@@ -803,7 +841,9 @@ void op_not(m68k& cpu, u16 opc)
 	target();
 	u32 v = ~t.value();
 	cpu.sr.b.V = cpu.sr.b.C = 0;
-	if( !t.isReg ) cpu.icycles += 8;
+	if( !t.isReg ) { cpu.icycles += (t.s==4 ? 8:4); }
+	else { cpu.icycles += (t.s==4 ? 2:0); }
+
 	switch( S1(opc) )
 	{
 	case 0:
@@ -815,7 +855,6 @@ void op_not(m68k& cpu, u16 opc)
 		cpu.sr.b.Z = (v&0xffff)==0;
 		break;
 	case 2:
-		cpu.icycles += 2;
 		cpu.sr.b.N = (v&(1u<<31)) ? 1 : 0;
 		cpu.sr.b.Z = v==0;
 		break;	
@@ -827,6 +866,8 @@ void neg(m68k& cpu, u16 opc)
 {
 	target();
 	u32 v = t.value();
+	if( !t.isReg ) { cpu.icycles += (t.s==4 ? 8:4); }
+	else { cpu.icycles += (t.s==4 ? 2:0); }
 	switch( S1(opc) )
 	{
 	case 0:
@@ -857,8 +898,8 @@ void neg(m68k& cpu, u16 opc)
 void nbcd(m68k& cpu, u16 opc)
 {
 	M t(cpu, (opc>>3)&7, opc&7, 1);
-	if( t.isReg ) cpu.icycles += 2;
-	else cpu.icycles += 8;
+	if( t.isReg ) { cpu.icycles += 2; }
+	else { cpu.icycles += 4; }
 	
 	// copied from: https://gendev.spritesmind.net/forum/viewtopic.php?t=1964
 	u8 src = t.value();
@@ -956,8 +997,6 @@ void stop(m68k& cpu, u16)
 	cpu.sr.b.pad2 = 0;
 	cpu.sr.b.pad3 = 0;
 	cpu.pc += 2;
-	printf("halted\n");
-	exit(1);
 }
 
 void move_usp(m68k& cpu, u16 opc)
@@ -1011,6 +1050,7 @@ void tas(m68k& cpu, u16 opc)
 	cpu.sr.b.N = (v&0x80)?1:0;
 	cpu.sr.b.Z = (v==0);
 	t.set(v|0x80); // possibly doesn't happen on genesis, which is my primary goal, we'll see.
+	if( !t.isReg ) { cpu.icycles += 6; }
 }
 
 void tst(m68k& cpu, u16 opc)
@@ -1080,8 +1120,25 @@ void jsr(m68k& cpu, u16 opc)
 	M t(cpu, (opc>>3)&7, opc&7, 4);
 	push32(cpu, cpu.pc);
 	cpu.pc = t.EA;
-	cpu.icycles += 4;
-	if( t.isReg ) cpu.icycles += 2;
+	switch( t.m )
+	{
+	case 2: cpu.icycles = 16; break;
+	case 5: cpu.icycles = 18; break;
+	case 6: cpu.icycles = 22; break;
+	case 7:
+		switch( opc&7 )
+		{
+		case 0: cpu.icycles = 18; break;
+		case 1: cpu.icycles = 20; break;
+		case 2: cpu.icycles = 18; break;
+		case 3: cpu.icycles = 22; break;		
+		default:
+			std::println("jsr unimpl cycle count {}", opc&7);
+			//exit(1);
+		}
+		break;
+	default: break;
+	}
 	if( cpu.pc & 1 ) throw "dang"; //todo: exceptions
 	//printf("jsr to $%X\n", cpu.pc);
 }
@@ -1090,7 +1147,25 @@ void jmp(m68k& cpu, u16 opc)
 {
 	M t(cpu, (opc>>3)&7, opc&7, 4);
 	cpu.pc = t.EA;
-	cpu.icycles -= 4;
+	switch( t.m )
+	{
+	case 2: cpu.icycles = 16-8; break;
+	case 5: cpu.icycles = 18-8; break;
+	case 6: cpu.icycles = 22-8; break;
+	case 7:
+		switch( opc&7 )
+		{
+		case 0: cpu.icycles = 18-8; break;
+		case 1: cpu.icycles = 20-8; break;
+		case 2: cpu.icycles = 18-8; break;
+		case 3: cpu.icycles = 22-8; break;		
+		default:
+			std::println("jsr unimpl cycle count {}", opc&7);
+			//exit(1);
+		}
+		break;
+	default: break;
+	}
 	if( cpu.pc & 1 ) throw "dang"; //todo: exceptions
 }
 
@@ -1098,13 +1173,13 @@ void movem(m68k& cpu, u16 opc)
 {
 	u8 dir = (opc>>10)&1;
 	u8 sz = (opc&0x40)?4:2;
-		
 	if( dir )
 	{ // mem2reg
 		u16 rlist = cpu.read_code16(cpu.pc);
 		cpu.pc += 2;
 		M t(cpu, (opc>>3)&7, opc&7, sz);
-	
+		cpu.icycles += 8;
+			
 		//printf("m2r s%i m%i r$%X\n", sz, t.m, rlist);
 		for(u32 i = 0; i < 16; ++i)
 		{
@@ -1113,9 +1188,11 @@ void movem(m68k& cpu, u16 opc)
 			{
 				if( !cpu.sr.b.S && i == 15 ) i = 16;
 				cpu.regs[i].L = se16to32(cpu.mem_read16(t.EA));
+				cpu.icycles += 4;
 			} else {
 				if( !cpu.sr.b.S && i == 15 ) i = 16;
 				cpu.regs[i].L = cpu.mem_read32(t.EA);
+				cpu.icycles += 8;
 			}
 			t.EA += sz;		
 		}
@@ -1128,18 +1205,21 @@ void movem(m68k& cpu, u16 opc)
 			R[i] = cpu.r[i];
 		}
 		if( cpu.sr.b.S == 0 ) R[15] = R[16];
-		
+
 		u16 rlist = cpu.read_code16(cpu.pc);
 		cpu.pc += 2;
 		M t(cpu, (opc>>3)&7, opc&7, sz);
+		cpu.icycles = 8;
 		for(u32 i = 0; i < 16; ++i)
 		{
 			if( (rlist & (1<<i)) == 0 ) continue;
 			if( sz == 2 )
 			{
 				cpu.mem_write16(t.EA, R[(t.m==4)?(15-i):i]);
+				cpu.icycles += 4;
 			} else {
 				cpu.mem_write32(t.EA, R[(t.m==4)?(15-i):i]);
+				cpu.icycles += 8;
 			}
 			if( t.m == 4 ) t.EA -= sz;
 			else t.EA += sz;
@@ -1177,7 +1257,9 @@ void chk(m68k& cpu, u16 opc)
 	if( Dn < 0 || Dn > v ) 
 	{
 		m68k_trap(cpu, EXC_CHK, false);
-		cpu.icycles += 34;	
+		cpu.icycles += 32;	
+	} else {
+		cpu.icycles += 6;
 	}
 }
 
@@ -1206,6 +1288,7 @@ void Scc(m68k& cpu, u16 opc)
 {
 	M t(cpu, (opc>>3)&7, opc&7, 1);
 	t.value(); // 68000&68008 read before write
+	if( !t.isReg ) cpu.icycles += 4;
 	if( isCond(cpu, (opc>>8)&0xf) ) 
 	{
 		t.set(0xff);
@@ -1218,6 +1301,7 @@ void Scc(m68k& cpu, u16 opc)
 void addq(m68k& cpu, u16 opc)
 {
 	target();
+	cpu.icycles += 4;
 	u8 imm = (opc>>9)&7;
 	if( imm == 0 ) imm = 8;
 	if( t.m == 1 )
@@ -1236,18 +1320,21 @@ void addq(m68k& cpu, u16 opc)
 		cpu.sr.b.Z = ((res&0xff)==0);
 		cpu.sr.b.N = (res&0x80)?1:0;
 		cpu.sr.b.V = ((res ^ val) & (res ^ imm) & 0x80)?1:0;
+		if( t.r < 8 ) cpu.icycles -= 4;
 		break;
 	case 1:
 		cpu.sr.b.C = cpu.sr.b.X = (res>>16)&1;
 		cpu.sr.b.Z = ((res&0xffff)==0);
 		cpu.sr.b.N = (res&0x8000)?1:0;
 		cpu.sr.b.V = ((res ^ val) & (res ^ imm) & 0x8000)?1:0;
-		break;	
+		if( t.r < 8 ) cpu.icycles -= 4;
+		break;
 	case 2:
 		cpu.sr.b.C = cpu.sr.b.X = (res>>32)&1;
 		cpu.sr.b.Z = (u32(res)==0);
 		cpu.sr.b.N = (res&(1ul<<31))?1:0;
 		cpu.sr.b.V = ((res ^ val) & (res ^ imm) & (1ul<<31))?1:0;
+		if( !t.isReg ) cpu.icycles += 4;
 		break;	
 	}
 }
@@ -1255,6 +1342,7 @@ void addq(m68k& cpu, u16 opc)
 void subq(m68k& cpu, u16 opc)
 {
 	target();
+	cpu.icycles += 4;
 	u64 imm = ((opc>>9)&7);	
 	if( imm == 0 ) imm = 8;
 	if( t.m == 1 )
@@ -1274,6 +1362,7 @@ void subq(m68k& cpu, u16 opc)
 		cpu.sr.b.Z = ((res&0xff)==0);
 		cpu.sr.b.N = (res&0x80)?1:0;
 		cpu.sr.b.V = ((res ^ val) & (res ^ imm) & 0x80)?1:0;
+		if( t.r < 8) cpu.icycles -= 4;
 		break;
 	case 2:
 		res = val + (imm&0xffff) + 1;
@@ -1281,6 +1370,7 @@ void subq(m68k& cpu, u16 opc)
 		cpu.sr.b.Z = ((res&0xffff)==0);
 		cpu.sr.b.N = (res&0x8000)?1:0;
 		cpu.sr.b.V = ((res ^ val) & (res ^ imm) & 0x8000)?1:0;
+		if( t.r < 8) cpu.icycles -= 4;
 		break;	
 	case 4:
 		res = val + (imm&0xffffFFFF) + 1;
@@ -1288,6 +1378,7 @@ void subq(m68k& cpu, u16 opc)
 		cpu.sr.b.Z = (u32(res)==0);
 		cpu.sr.b.N = (res&(1ul<<31))?1:0;
 		cpu.sr.b.V = ((res ^ val) & (res ^ imm) & (1ul<<31))?1:0;
+		if( !t.isReg ) cpu.icycles += 4;
 		break;	
 	}
 	t.set(res);		
@@ -1323,17 +1414,18 @@ void Bcc(m68k& cpu, u16 opc)
 	s16 imm = (s16)(s8)(opc&0xff);
 	u32 pc = cpu.pc;
 	cpu.icycles = 8;
+	bool W = false;
 	if( imm == 0 )
 	{
 		imm = cpu.read_code16(cpu.pc);
 		cpu.pc += 2;
-		cpu.icycles += 2;
+		W = true;
 	}
 	if( isCond(cpu, (opc>>8)&0xf) )
 	{
 		cpu.pc = pc + imm;
 		cpu.icycles += 2;
-	}
+	} else if( W ) { cpu.icycles += 4; }
 }
 
 void moveq(m68k& cpu, u16 opc)
@@ -1431,6 +1523,7 @@ void op_or(m68k& cpu, u16 opc)
 		if( opc & 0x100 ) 
 		{
 			t.set(res&0xff);
+			cpu.icycles += 4;
 		} else {
 			cpu.regs[(opc>>9)&7].B = res;
 		}
@@ -1441,6 +1534,7 @@ void op_or(m68k& cpu, u16 opc)
 		if( opc & 0x100 ) 
 		{
 			t.set(res);
+			cpu.icycles += 4;
 		} else {
 			cpu.regs[(opc>>9)&7].W = res;
 		}
@@ -1451,8 +1545,10 @@ void op_or(m68k& cpu, u16 opc)
 		if( opc & 0x100 )
 		{
 			t.set(res);
+			cpu.icycles += 8;
 		} else {
 			cpu.regs[(opc>>9)&7].L = res;
+			cpu.icycles += ((t.isReg || t.isImm) ? 4:2);
 		}
 		break;
 	}
@@ -1514,11 +1610,13 @@ void suba(m68k& cpu, u16 opc)
 {
 	u8 r = 8 + ((opc>>9)&7);
 	if( r == 15 ) r += cpu.sr.b.S^1;
+	cpu.icycles += 4;
 	if( opc & 0x100 )
 	{
 		M t(cpu, (opc>>3)&7, opc&7, 4);
 		u32 src = t.value();
 		cpu.r[r] -= src;
+		if( !t.isReg && !t.isImm ) cpu.icycles -= 2;
 	} else {
 		M t(cpu, (opc>>3)&7, opc&7, 2);
 		u32 src = se16to32(t.value());
@@ -1552,6 +1650,7 @@ void sub(m68k& cpu, u16 opc)
 		if( opc & 0x100 )
 		{
 			t.set(res&0xff);
+			cpu.icycles += 4;
 		} else {
 			cpu.regs[(opc>>9)&7].B = res;
 		}
@@ -1564,6 +1663,7 @@ void sub(m68k& cpu, u16 opc)
 		if( opc & 0x100 ) 
 		{
 			t.set(res);
+			cpu.icycles += 4;
 		} else {
 			cpu.regs[(opc>>9)&7].W = res;
 		}
@@ -1576,8 +1676,10 @@ void sub(m68k& cpu, u16 opc)
 		if( opc & 0x100 )
 		{
 			t.set(res);
+			cpu.icycles += 8;
 		} else {
 			cpu.regs[(opc>>9)&7].L = res;
+			cpu.icycles += ((t.isReg || t.isImm) ? 4:2);
 		}
 		break;
 	}
@@ -1612,6 +1714,7 @@ void cmp(m68k& cpu, u16 opc)
 		cpu.sr.b.Z = u32(res)==0;
 		cpu.sr.b.V = ((res ^ v) & (res ^ R) & (1ul<<31)) ? 1 : 0;
 		cpu.sr.b.N = (res&(1ul<<31)) ? 1 : 0;
+		cpu.icycles += 2;
 		break;
 	}
 }
@@ -1637,6 +1740,7 @@ void cmpm(m68k& cpu, u16 opc)
 		cpu.sr.b.Z = (r==0);
 		cpu.sr.b.N = (r&0x80)?1:0;
 		cpu.sr.b.V = ((r^s)&(r^d)&0x80)?1:0;
+		cpu.icycles += 8;
 	} else if( sz == 1 ) {
 		u32 s = cpu.mem_read16(cpu.r[Ay]);
 		cpu.r[Ay] += 2;
@@ -1649,6 +1753,7 @@ void cmpm(m68k& cpu, u16 opc)
 		cpu.sr.b.Z = (r==0);
 		cpu.sr.b.N = (r&0x8000)?1:0;
 		cpu.sr.b.V = ((r^s)&(r^d)&0x8000)?1:0;	
+		cpu.icycles += 8;
 	} else {
 		u64 s = cpu.mem_read32(cpu.r[Ay]);
 		cpu.r[Ay] += 4;
@@ -1660,7 +1765,8 @@ void cmpm(m68k& cpu, u16 opc)
 		r &= 0xffffFFFF;
 		cpu.sr.b.Z = (r==0);
 		cpu.sr.b.N = (r&(1ul<<31))?1:0;
-		cpu.sr.b.V = ((r^s)&(r^d)&(1ul<<31))?1:0;	
+		cpu.sr.b.V = ((r^s)&(r^d)&(1ul<<31))?1:0;
+		cpu.icycles += 16;
 	}
 }
 
@@ -1678,33 +1784,20 @@ void eor(m68k& cpu, u16 opc)
 	case 0:
 		cpu.sr.b.Z = (res&0xff)==0;
 		cpu.sr.b.N = (res&0x80) ? 1 : 0;
-		if( opc & 0x100 ) 
-		{
-			t.set(res&0xff);
-		} else {
-			cpu.regs[(opc>>9)&7].B = res;
-		}
+		t.set(res&0xff);
+		cpu.icycles += (t.isReg ? 0:4);
 		break;
 	case 1:
 		cpu.sr.b.Z = (res&0xffff)==0;
 		cpu.sr.b.N = (res&0x8000) ? 1 : 0;
-		if( opc & 0x100 ) 
-		{
-			t.set(res);
-		} else {
-			cpu.regs[(opc>>9)&7].W = res;
-		}
+		t.set(res);
+		cpu.icycles += (t.isReg ? 0:4);
 		break;
 	default:
 		cpu.sr.b.Z = u32(res)==0;
 		cpu.sr.b.N = (res&(1ul<<31)) ? 1 : 0;
-		cpu.icycles += 4;
-		if( opc & 0x100 )
-		{
-			t.set(res);
-		} else {
-			cpu.regs[(opc>>9)&7].L = res;
-		}
+		t.set(res);
+		cpu.icycles += (t.isReg ? 4:8);
 		break;
 	}
 }
@@ -1724,6 +1817,7 @@ void cmpa(m68k& cpu, u16 opc)
 	cpu.sr.b.Z = u32(res)==0;
 	cpu.sr.b.V = ((res ^ v) & (res ^ R) & (1ul<<31)) ? 1 : 0;
 	cpu.sr.b.N = (res&(1ul<<31)) ? 1 : 0;
+	cpu.icycles += 2;
 }
 
 void mulu(m68k& cpu, u16 opc)
@@ -1731,23 +1825,35 @@ void mulu(m68k& cpu, u16 opc)
 	M t(cpu, (opc>>3)&7, opc&7, 2);
 	u32 v = t.value();
 	u32 s = cpu.regs[(opc>>9)&7].W;
-	v *= s;
-	cpu.regs[(opc>>9)&7].L = v;
+	u32 res = v * s;
+	cpu.regs[(opc>>9)&7].L = res;
 	cpu.sr.b.C = cpu.sr.b.V = 0;
-	cpu.sr.b.Z = v==0;
-	cpu.sr.b.N = (v&(1u<<31))?1:0;
+	cpu.sr.b.Z = res==0;
+	cpu.sr.b.N = (res&(1u<<31))?1:0;
+	cpu.icycles += 34 + std::popcount((u16)v)*2;
 }
 
 void muls(m68k& cpu, u16 opc)
 {
 	M t(cpu, (opc>>3)&7, opc&7, 2);
-	s32 v = (s32)(s16)t.value();
+	u32 T = t.value();
+	s32 v = (s32)(s16)T;
 	s32 s = (s32)(s16)cpu.regs[(opc>>9)&7].W;
 	v *= s;
 	cpu.regs[(opc>>9)&7].L = v;
 	cpu.sr.b.C = cpu.sr.b.V = 0;
 	cpu.sr.b.Z = (v==0)?1:0;
 	cpu.sr.b.N = (v<0)?1:0;
+	cpu.icycles += 34;
+	T <<= 1;
+	for(u32 i = 0; i < 16; ++i)
+	{
+		if( (T&3) == 1 || (T&3) == 2 )
+		{
+			cpu.icycles += 2;
+		}
+		T >>= 1;
+	}
 }
 
 void exg(m68k& cpu, u16 opc)
@@ -1835,6 +1941,7 @@ void op_and(m68k& cpu, u16 opc)
 		if( opc & 0x100 ) 
 		{
 			t.set(res&0xff);
+			cpu.icycles += 4;
 		} else {
 			cpu.regs[(opc>>9)&7].B = res;
 		}
@@ -1845,6 +1952,7 @@ void op_and(m68k& cpu, u16 opc)
 		if( opc & 0x100 ) 
 		{
 			t.set(res);
+			cpu.icycles += 4;
 		} else {
 			cpu.regs[(opc>>9)&7].W = res;
 		}
@@ -1855,8 +1963,10 @@ void op_and(m68k& cpu, u16 opc)
 		if( opc & 0x100 )
 		{
 			t.set(res);
+			cpu.icycles += 8;
 		} else {
 			cpu.regs[(opc>>9)&7].L = res;
+			cpu.icycles += ((t.isReg || t.isImm) ? 4:2);
 		}
 		break;
 	}
@@ -1866,11 +1976,13 @@ void adda(m68k& cpu, u16 opc)
 {
 	u8 r = 8 + ((opc>>9)&7);
 	if( r == 15 ) r += cpu.sr.b.S^1;
+	cpu.icycles += 4;
 	if( opc & 0x100 )
 	{
 		M t(cpu, (opc>>3)&7, opc&7, 4);
 		u32 src = t.value();
 		cpu.r[r] += src;
+		if( !t.isReg && !t.isImm ) cpu.icycles -= 2;
 	} else {
 		M t(cpu, (opc>>3)&7, opc&7, 2);
 		u32 src = (s32)(s16)t.value();
@@ -1893,6 +2005,7 @@ void addx8(m68k& cpu, u16 opc)
 		src = cpu.mem_read8(cpu.r[Dsrc]);
 		cpu.r[Ddst] -= (Ddst >= 15) ? 2 : 1;
 		dst = cpu.mem_read8(cpu.r[Ddst]);
+		cpu.icycles += 14;
 	} else {
 		dst = cpu.regs[(opc>>9)&7].B;
 		src = cpu.regs[opc&7].B;
@@ -1928,6 +2041,7 @@ void addx16(m68k& cpu, u16 opc)
 		src = cpu.mem_read16(cpu.r[Dsrc]);
 		cpu.r[Ddst] -= 2;
 		dst = cpu.mem_read16(cpu.r[Ddst]);
+		cpu.icycles += 14;
 	} else {
 		dst = cpu.regs[(opc>>9)&7].W;
 		src = cpu.regs[opc&7].W;
@@ -1963,9 +2077,11 @@ void addx32(m68k& cpu, u16 opc)
 		src = cpu.mem_read32(cpu.r[Dsrc]);
 		cpu.r[Ddst] -= 4;
 		dst = cpu.mem_read32(cpu.r[Ddst]);
+		cpu.icycles += 26;
 	} else {
 		dst = cpu.regs[(opc>>9)&7].L;
 		src = cpu.regs[opc&7].L;
+		cpu.icycles += 4;
 	}
 	
 	u64 sum = src + dst + cpu.sr.b.X;
@@ -2008,6 +2124,7 @@ void subx8(m68k& cpu, u16 opc)
 		src = cpu.mem_read8(cpu.r[Dsrc]);
 		cpu.r[Ddst] -= (Ddst >= 15) ? 2 : 1;
 		dst = cpu.mem_read8(cpu.r[Ddst]);
+		cpu.icycles += 14;
 	} else {
 		dst = cpu.regs[(opc>>9)&7].B;
 		src = cpu.regs[opc&7].B;
@@ -2044,6 +2161,7 @@ void subx16(m68k& cpu, u16 opc)
 		src = cpu.mem_read16(cpu.r[Dsrc]);
 		cpu.r[Ddst] -= 2;
 		dst = cpu.mem_read16(cpu.r[Ddst]);
+		cpu.icycles += 14;
 	} else {
 		dst = cpu.regs[(opc>>9)&7].W;
 		src = cpu.regs[opc&7].W;
@@ -2080,9 +2198,11 @@ void subx32(m68k& cpu, u16 opc)
 		src = cpu.mem_read32(cpu.r[Dsrc]);
 		cpu.r[Ddst] -= 4;
 		dst = cpu.mem_read32(cpu.r[Ddst]);
+		cpu.icycles += 26;
 	} else {
 		dst = cpu.regs[(opc>>9)&7].L;
 		src = cpu.regs[opc&7].L;
+		cpu.icycles += 4;
 	}
 	
 	src ^= 0xffffFFFF;
@@ -2126,6 +2246,7 @@ void negx(m68k& cpu, u16 opc)
 		cpu.sr.b.V = ((res^dst)&(res^0)&0x80)?1:0;
 		cpu.sr.b.C = cpu.sr.b.X = (res>>8)^1;
 		res &= 0xff;
+		cpu.icycles += (!t.isReg ? 4:0);
 		break;
 	case 1:
 		dst ^= 0xffff;
@@ -2135,6 +2256,7 @@ void negx(m68k& cpu, u16 opc)
 		cpu.sr.b.V = ((res^dst)&(res^0)&0x8000)?1:0;
 		cpu.sr.b.C = cpu.sr.b.X = (res>>16)^1;
 		res &= 0xffff;
+		cpu.icycles += (!t.isReg ? 4:0);
 		break;
 	default:
 		dst ^= 0xffffFFFF;
@@ -2144,6 +2266,7 @@ void negx(m68k& cpu, u16 opc)
 		cpu.sr.b.V = ((res^dst)&(res^0)&(1ul<<31))?1:0;
 		cpu.sr.b.C = cpu.sr.b.X = (res>>32)^1;
 		res &= 0xffffFFFF;	
+		cpu.icycles += (!t.isReg ? 8:2);
 		break;
 	}
 	t.set(res);
@@ -2166,6 +2289,7 @@ void add(m68k& cpu, u16 opc)
 		if( opc & 0x100 ) 
 		{
 			t.set(res&0xff);
+			cpu.icycles += 4;
 		} else {
 			cpu.regs[(opc>>9)&7].B = res;
 		}
@@ -2178,6 +2302,7 @@ void add(m68k& cpu, u16 opc)
 		if( opc & 0x100 ) 
 		{
 			t.set(res);
+			cpu.icycles += 4;
 		} else {
 			cpu.regs[(opc>>9)&7].W = res;
 		}
@@ -2190,8 +2315,10 @@ void add(m68k& cpu, u16 opc)
 		if( opc & 0x100 )
 		{
 			t.set(res);
+			cpu.icycles += 8;
 		} else {
 			cpu.regs[(opc>>9)&7].L = res;
+			cpu.icycles += ((t.isReg || t.isImm) ? 4:2);
 		}
 		break;
 	}
@@ -2202,6 +2329,8 @@ void ASd_mem(m68k& cpu, u16 opc)
 	M t(cpu, (opc>>3)&7, opc&7, 2);
 	u16 v = t.value();
 	cpu.sr.b.V = 0;
+	cpu.icycles += 4;
+
 	if( opc & 0x100 )
 	{ // left
 		u32 ov = v;
@@ -2231,6 +2360,7 @@ void ASd_reg(m68k& cpu, u16 opc)
 		if( amt == 0 ) amt = 8;
 	}
 	cpu.sr.b.V = 0;
+	cpu.icycles += amt*2 + (sz>1 ? 4:2);
 	
 	if( opc & 0x100 )
 	{	// left
@@ -2378,6 +2508,8 @@ void ROXd_mem(m68k& cpu, u16 opc)
 	M t(cpu, (opc>>3)&7, opc&7, 2);
 	u32 v = 0;
 	cpu.sr.b.V = 0;
+	cpu.icycles += 4;
+
 	if( opc & 0x100 )
 	{  // left
 		v = cpu.sr.b.X;
@@ -2418,6 +2550,7 @@ void ROXd_reg(m68k& cpu, u16 opc)
 		if( amt == 0 ) amt = 8;
 	}
 	cpu.sr.b.V = 0;
+	cpu.icycles += amt*2 + (sz>1 ? 4:2);
 	
 	if( opc & 0x100 )
 	{	// left
@@ -2537,6 +2670,8 @@ void ROd_mem(m68k& cpu, u16 opc)
 	M t(cpu, (opc>>3)&7, opc&7, 2);
 	u16 v = t.value();
 	cpu.sr.b.V = 0;
+	cpu.icycles += 4;
+
 	if( opc & 0x100 )
 	{  // left
 		cpu.sr.b.C = (v>>15);
@@ -2564,6 +2699,7 @@ void ROd_reg(m68k& cpu, u16 opc)
 		if( amt == 0 ) amt = 8;
 	}
 	cpu.sr.b.V = 0;
+	cpu.icycles += amt*2 + (sz>1 ? 4:2);
 	
 	if( opc & 0x100 )
 	{	// left
@@ -2655,6 +2791,7 @@ void LSd_mem(m68k& cpu, u16 opc)
 	M t(cpu, (opc>>3)&7, opc&7, 2);
 	u16 v = t.value();
 	cpu.sr.b.V = 0;
+	cpu.icycles += 4;
 	
 	if( opc & 0x100 )
 	{  // left
@@ -2683,6 +2820,8 @@ void LSd_reg(m68k& cpu, u16 opc)
 		if( amt == 0 ) amt = 8;
 	}
 	cpu.sr.b.V = 0;
+	
+	cpu.icycles += amt*2 + (sz>1 ? 4:2);
 	
 	if( opc & 0x100 )
 	{	// left
@@ -2775,7 +2914,7 @@ void LSd_reg(m68k& cpu, u16 opc)
 	return;
 }
 
-void line_a(m68k& cpu, u16 opc)
+void line_a(m68k& cpu, u16 /*opc*/)
 {
 	//printf("68k:%X: line A opc = $%X\n", cpu.pc, opc);
 	m68k_trap(cpu, EXC_LINE_A, true);
@@ -2891,13 +3030,14 @@ void m68k::init()
 	for(u32 opc = 0; opc < 0x10000; ++opc)
 	{
 		opcodes[opc] = nullptr;
-		for(u32 i = 0; i < sizeof(map)/sizeof(opcode); ++i)
+		//for(u32 i = 0; i < sizeof(map)/sizeof(opcode); ++i)
+		for(const auto& I : map)
 		{
-			if( (opc&map[i].mask) == map[i].res )
+			if( (opc & I.mask) == I.res )
 			{
 				//printf("$%X: running opcode = $%X = %i\n", pc-2, opc, i);
-				opcodes[opc] = map[i].i;
-				break;		
+				opcodes[opc] = I.i;
+				break;
 			}
 		}
 	}
@@ -2914,7 +3054,7 @@ void m68k::step()
 		m68k_trap(*this, trapaddr, false);
 		//printf("68K: IRQ %i, vector $%X\n", pending_irq, trapaddr);
 		sr.b.IPL = pending_irq;
-		pending_irq = 0;
+		//pending_irq = 0;
 		intack();
 		if( halted )
 		{

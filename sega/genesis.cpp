@@ -133,10 +133,6 @@ void genesis::write(u32 addr, u32 val, int size)
 			spu.pc = 0;
 			spu.sp = 0x1ff0;
 			fmsynth.reset();
-			//fm_stamp = 0;
-			//fm_count = 0;
-			//fm_total = 0;
-			//fm_out = 0;		
 		}
 		return;
 	}
@@ -220,11 +216,10 @@ u32 genesis::read(u32 addr, int size)
 	
 	if( addr == 0xC00008 )
 	{
-		std::println("HV counter read");
-		//exit(1);
+		//std::println("HV counter read");
 		u32 val = vdp_v_line;
 		if( vdp_v_line > 0xea ) { val = 0xe5 + (val-0xeb); }
-		if( size == 16 ) return val<<8;
+		if( size == 16 ) return (val<<8)|((stamp-last_target)&0xff);
 		return val;
 	}
 	
@@ -359,15 +354,13 @@ void genesis::run_frame()
 					float sm = ((t/60.f)*2 - 1);
 					float fm = fmsynth.currentL;//fm_out/float(fm_count);
 					sm = (sm/3.f) + fm;
-					fm_count = fm_total = fm_out = 0;
-					
 					sm = filter(std::clamp(sm, -1.f, 1.f));
 					audio_add(sm,sm);
 				}
 			}
 			
 			// run the 32X
-			if( (adapter_ctrl&3) == 3 )
+			if( 0 )// (adapter_ctrl&3) == 3 )
 			{
 				//std::println("SH2s PC = ${:X}", cpu32x[1].pc);
 				for(u32 i = 0; i < cpu.icycles*3; ++i)
@@ -385,7 +378,11 @@ void genesis::run_frame()
 			if( vdp_hcnt == 0 )
 			{
 				vdp_hcnt = vreg[0xA];
-				if( (vreg[0]&BIT(4)) && cpu.pending_irq == 0  ) cpu.pending_irq = 4;
+				vdp_hint_active = true;
+				if( (vreg[0]&BIT(4))  ) 
+				{
+					cpu.pending_irq = 4;
+				}
 			} else {
 				vdp_hcnt -= 1;
 			}
@@ -396,7 +393,9 @@ void genesis::run_frame()
 		
 		if( line == 223 ) 
 		{
-			if( (vreg[1]&BIT(5))  ) { cpu.pending_irq = 6; spu.irq_line = 1; }
+			vdp_vint_active = true;
+			if( (vreg[1]&BIT(5)) ) { cpu.pending_irq = 6; }
+			spu.irq_line = 1; // used to be in the conditional above (vreg1&b5), but moving it out fixed Battletoads/DoubleDragon Ultimate Team
 			vdp_stat |= 8;
 			//fb_ctrl |= 0x8000;
 			//fb_ctrl &= ~1;
@@ -412,7 +411,7 @@ void z80write(u16 addr, u8 v) { dynamic_cast<genesis*>(sys)->z80_write(addr,v); 
 void genesis::reset()
 {
 	memset(&spu, 0, sizeof(spu));
-	//memset(&cpu, 0, sizeof(cpu));
+	memset((void*)&cpu, 0, sizeof(cpu));
 	memset(&vreg, 0, 0x20);
 	memset(&RAM, 0, 0x10000);
 	memset(&save, 0, 0x10000);
@@ -441,7 +440,16 @@ void genesis::reset()
 	cpu.mem_write8 = [&](u32 a, u8 v) { write(a, v, 8); };
 	cpu.mem_write16 = [&](u32 a, u16 v) { write(a, v, 16); };
 	cpu.mem_write32 = [&](u32 a, u32 v) { write(a, v>>16, 16); write(a+2, v&0xffff, 16); };
-	cpu.intack = []{};
+	cpu.intack = [&]{
+		if( vdp_vint_active )
+		{
+			vdp_vint_active = false;
+			cpu.pending_irq = ( ((vreg[0]&BIT(4)) && vdp_hint_active) ? 4 : 0);
+		} else if( vdp_hint_active ) {
+			vdp_hint_active = false;
+			cpu.pending_irq = 0;
+		}
+	};
 	
 	spu.write = z80write;
 	spu.read = z80read;
@@ -464,14 +472,10 @@ void genesis::reset()
 	z80_bank = 0;
 	psg_stamp = 0;
 	
-	//OPN2_Reset(&synth);
-	//OPN2_SetChipType(3);
 	fmsynth.reset();
 	fm_stamp = 0;
-	fm_count = 0;
-	fm_total = 0;
-	fm_out = 0;
 	
+	/*	
 	*(u32*)&vecrom[0] = 0;
 	for(u32 i = 1; i < 0x30; ++i)
 	{
@@ -499,7 +503,7 @@ void genesis::reset()
 	printf("32X SH2 PCs = $%X, $%X\n", cpu32x[0].pc, cpu32x[1].pc);
 	cpu32x[0].r[15] = __builtin_bswap32(*(u32*)&bios32xM[4]);
 	cpu32x[1].r[15] = __builtin_bswap32(*(u32*)&bios32xS[4]);
-	
+	*/
 	
 	adapter_ctrl = fbctrl = bmp_mode = 0;
 	next_frame = current_frame = 0;
@@ -544,6 +548,7 @@ bool genesis::loadROM(const std::string fname)
 	auto fsz = ftell(fp);
 	fseek(fp, 0, SEEK_SET);
 	
+	ROM.clear();
 	ROM.resize(fsz);
 	[[maybe_unused]] int unu = fread(ROM.data(), 1, fsz, fp);
 	fclose(fp);

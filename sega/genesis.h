@@ -6,7 +6,6 @@
 #include "68k.h"
 #include "SN79489.h"
 #include "sh2.h"
-#include "ym3438.h"
 #include "ym2612.h"
 
 class genesis : public console
@@ -45,10 +44,12 @@ public:
 	void eval_sprites(u32);
 	void render_sprite(u32 y, u32 x, u32 hs, u32 vs, u16 entry);
 	bool vdp_in_window(u32 line, u32 px);
-	bool vdp_latch, fill_pending;
+	void sprite_cache(u16 addr, u8 val);
+	bool vdp_latch{}, fill_pending{}, vdp_hint_active{}, vdp_vint_active{};
+	u8 spr_cache[80*8];
 	u8 vreg[0x20];
 	u16 vdp_addr, vdp_stat;
-	u32 vdp_width;
+	u32 vdp_width{320};
 	u8 vdp_cd, vdp_hcnt;
 	u8 sprbuf[320];
 	u32 vdp_v_line{};
@@ -56,11 +57,7 @@ public:
 	void fm_write(u32, u8);
 	u8 fm_read();
 	void fm_run(u64);
-	float fm_out;
-	int fm_total;
-	int fm_count;
 	u64 fm_stamp;
-	ym3438_t synth;
 	ym2612 fmsynth;
 	
 	u32 pcycle, pcycle2;
