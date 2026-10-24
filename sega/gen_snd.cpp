@@ -2,7 +2,6 @@
 #include <cstdlib>
 #include <string>
 #include "genesis.h"
-#include "ym3438.h"
 
 void genesis::fm_write(u32 addr, u8 val)
 {

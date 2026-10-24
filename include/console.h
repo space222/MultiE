@@ -20,6 +20,11 @@ public:
 	
 	virtual void key_down(int) {}
 	virtual void key_up(int) {}
+	virtual void keysym_down(int) {}
+	virtual void keysym_up(int) {}
+	
+	virtual void mouse_move(u32 /*x*/, u32 /*y*/, int /*relx*/, int /*rely*/) {}
+	virtual void mouse(u32 /*button*/, u32 /*state*/) {} // state=1-down, 0-up
 	
 	virtual float pop_sample() { return 0; }
 	

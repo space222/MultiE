@@ -6,7 +6,7 @@ find_package(SDL2 REQUIRED)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 #set(CMAKE_CXX_FLAGS "-g -fabi-version=16 -fsanitize=address -ftree-vectorize -march=native -Wall -Wpedantic -Wextra -Wshadow -Wimplicit-fallthrough")
-set(CMAKE_CXX_FLAGS "-O3 -ftree-vectorize -march=native -Wall -Wpedantic -Wextra -Wshadow -Wimplicit-fallthrough")
+set(CMAKE_CXX_FLAGS "-O3 -ftree-vectorize -march=native -ftrivial-auto-var-init=zero -Wall -Wpedantic -Wextra -Wshadow -Wimplicit-fallthrough")
 #set(CMAKE_CXX_FLAGS "-O3 -sUSE_SDL=2 -ftree-vectorize -Wall -Wpedantic -Wextra -Wshadow -Wimplicit-fallthrough")
 set(CMAKE_CXX_COMPILER clang++)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
@@ -23,8 +23,8 @@ imgui/imgui.cpp imgui/imgui_draw.cpp imgui/imgui_tables.cpp
 imgui/imgui_widgets.cpp other/SN79489.cpp sega/genesis.cpp sega/gen_vdp.cpp sega/gen_snd.cpp 
 other/casio_pv1k.cpp sega/gen_pad.cpp Settings.cpp cpu/sh2.cpp sega/gen_32x.cpp atari/jag.cpp
 coleco/colecovision.cpp other/TMS9918A.cpp other/msx.cpp other/AY-3-8910.cpp
-other/macplus.cpp nintendo/nes_fds.cpp cpu/f8.cpp other/fc_chanf.cpp nintendo/gbc.cpp nintendo/gbc_apu.cpp
- cpu/arm7tdmi.cpp cpu/arm7tdmi_arm.cpp nintendo/gba.cpp cpu/nvc.cpp nintendo/virtualboy.cpp
+other/macplus.cpp other/moof.cpp nintendo/nes_fds.cpp cpu/f8.cpp other/fc_chanf.cpp nintendo/gbc.cpp nintendo/gbc_apu.cpp
+cpu/arm7tdmi.cpp cpu/arm7tdmi_arm.cpp nintendo/gba.cpp cpu/nvc.cpp nintendo/virtualboy.cpp
 other/WonderSwan.cpp other/CreatiVision.cpp cpu/6502coru.cpp other/apple2e.cpp other/wozfile.cpp
 cpu/VR4300.cpp nintendo/n64.cpp nintendo/n64_vi.cpp nintendo/n64_pi.cpp nintendo/n64_ai.cpp nintendo/n64_si.cpp
 cpu/VR4300_fpu.cpp nintendo/n64_rdp.cpp nintendo/n64_dp.cpp nintendo/n64_sp.cpp cpu/n64_rsp.cpp cpu/n64_rsp_vu.cpp
@@ -38,11 +38,11 @@ sony/ps2/iop.cpp cpu/EEngine.cpp sony/ps2/gs.cpp cpu/6809.cpp other/trs80cc3.cpp
 other/vectrex.cpp cpu/65816.cpp nintendo/snes/snes.cpp nintendo/snes/ppu.cpp cpu/spc700.cpp nintendo/snes/snd.cpp
 nintendo/snes/superfx.cpp nintendo/snes/cart.cpp nintendo/snes/dspn.cpp nintendo/pokemini.cpp cpu/s1c88.cpp
 cpu/arm946e.cpp nintendo/ds/nds.cpp nintendo/ds/arm7.cpp nintendo/ds/arm9.cpp avi_rec.cpp nintendo/gc/gc_gx.cpp
-cpu/HuC6280.cpp other/tg16.cpp 
+cpu/HuC6280.cpp other/tg16.cpp sega/ym2612.cpp
 #stub/gdb_stub.cpp
 )
 
-add_library(ym3438 SHARED sega/ym3438.cpp)
+#add_library(ym3438 SHARED sega/ym3438.cpp)
 
 #set(SOCKPP_BUILD_STATIC ON)
 #set(SOCKPP_BUILD_SHARED OFF)
@@ -50,6 +50,6 @@ add_library(ym3438 SHARED sega/ym3438.cpp)
 
 target_include_directories(test PUBLIC . ./imgui ./include ./sony ./other ./coleco
 	./cpu ./atari ./commodore ./sega ./ibm ./nintendo ./mattel ./neogeo ./libs/sockpp/include ${SDL2_INCLUDE_DIRS} )
-target_link_libraries(test PRIVATE dl GL GLEW ym3438 ${SDL2_LIBRARIES})
+target_link_libraries(test PRIVATE dl GL GLEW ${SDL2_LIBRARIES})
 #${CMAKE_SOURCE_DIR}/libs/sockpp/src/libsockpp.a
 

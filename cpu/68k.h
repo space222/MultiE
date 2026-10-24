@@ -48,8 +48,10 @@ struct m68k
 	static void init();
 	
 	//bool hip, vip;
-	u32 pending_irq;
-	std::function<void()> intack;
+	u32 pending_irq{};
+	std::function<void()> intack = []{};
+	void setIPL(u8 p) { pending_irq = p; }
+	u8 getIPL() { return pending_irq; }
 	
 	std::function<void(u32, u8)> mem_write8;
 	std::function<void(u32, u16)> mem_write16;

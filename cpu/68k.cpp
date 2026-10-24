@@ -1178,7 +1178,7 @@ void movem(m68k& cpu, u16 opc)
 		u16 rlist = cpu.read_code16(cpu.pc);
 		cpu.pc += 2;
 		M t(cpu, (opc>>3)&7, opc&7, sz);
-		cpu.icycles += 8;
+		//cpu.icycles += 8;
 			
 		//printf("m2r s%i m%i r$%X\n", sz, t.m, rlist);
 		for(u32 i = 0; i < 16; ++i)
@@ -1188,11 +1188,11 @@ void movem(m68k& cpu, u16 opc)
 			{
 				if( !cpu.sr.b.S && i == 15 ) i = 16;
 				cpu.regs[i].L = se16to32(cpu.mem_read16(t.EA));
-				cpu.icycles += 4;
+				cpu.icycles += 2;
 			} else {
 				if( !cpu.sr.b.S && i == 15 ) i = 16;
 				cpu.regs[i].L = cpu.mem_read32(t.EA);
-				cpu.icycles += 8;
+				cpu.icycles += 4;
 			}
 			t.EA += sz;		
 		}
@@ -1209,17 +1209,17 @@ void movem(m68k& cpu, u16 opc)
 		u16 rlist = cpu.read_code16(cpu.pc);
 		cpu.pc += 2;
 		M t(cpu, (opc>>3)&7, opc&7, sz);
-		cpu.icycles = 8;
+		//cpu.icycles = 8;
 		for(u32 i = 0; i < 16; ++i)
 		{
 			if( (rlist & (1<<i)) == 0 ) continue;
 			if( sz == 2 )
 			{
 				cpu.mem_write16(t.EA, R[(t.m==4)?(15-i):i]);
-				cpu.icycles += 4;
+				cpu.icycles += 2;
 			} else {
 				cpu.mem_write32(t.EA, R[(t.m==4)?(15-i):i]);
-				cpu.icycles += 8;
+				cpu.icycles += 4;
 			}
 			if( t.m == 4 ) t.EA -= sz;
 			else t.EA += sz;

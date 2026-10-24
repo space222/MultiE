@@ -29,7 +29,7 @@
 #include "sms.h"
 #include "genesis.h"
 #include "intellivision.h"
-#include "ibmpc.h"
+//#include "ibmpc.h"
 #ifndef _WIN32
 #include "psx.h"
 #endif
@@ -80,6 +80,7 @@ std::vector<SDL_GameController*> conts;
 
 bool Running = true;
 bool Paused = false;
+bool AllowMove = true;
 std::string modal_msg;
 void keys();
 void resize_screen();
@@ -87,6 +88,10 @@ u32 oldbpp = 32;
 u32 oldwidth = 0;
 u32 oldheight = 0;
 std::string dialog_msg;
+u32 window_x = 0;
+u32 window_y = 0;
+float crt_scale = 2;
+
 
 console* sys = nullptr;
 
@@ -225,8 +230,34 @@ int main(int argc, char** args)
 			case SDL_CLIPBOARDUPDATE:
 				//printf("huh? <%s>\n", SDL_GetClipboardText());
 				break;
+			case SDL_MOUSEBUTTONDOWN:
+				if( sys )
+				{
+					sys->mouse(0, 1); //todo: individual buttons
+				}
+				break;
+			case SDL_MOUSEBUTTONUP:
+				if( sys )
+				{
+					sys->mouse(0, 0); //todo: individual buttons
+				}
+				break;
+			case SDL_MOUSEMOTION:
+				if( sys )
+				{
+					if( e.motion.x > window_x && e.motion.y > window_y )
+					{
+						sys->mouse_move((e.motion.x-window_x)/crt_scale, (e.motion.y-window_y)/crt_scale, 
+									e.motion.xrel/crt_scale, e.motion.yrel/crt_scale);
+					}
+				}			
+				break;
 			case SDL_KEYDOWN:
-				if( sys ) sys->key_down(e.key.keysym.scancode);
+				if( sys )
+				{
+					sys->key_down(e.key.keysym.scancode);
+					sys->keysym_down(e.key.keysym.sym);
+				}
 				if( e.key.keysym.scancode == SDL_SCANCODE_P )
 				{
 					//try_kirq();
@@ -237,7 +268,11 @@ int main(int argc, char** args)
 				}
 				break;
 			case SDL_KEYUP:
-				if( sys ) sys->key_up(e.key.keysym.scancode);
+				if( sys ) 
+				{
+					sys->key_up(e.key.keysym.scancode);
+					sys->keysym_up(e.key.keysym.sym);
+				}
 				break;
 			case SDL_QUIT:
 				Running = false;
@@ -274,7 +309,6 @@ int main(int argc, char** args)
 	return 0;
 }
 
-float crt_scale = 2;
 
 void resize_screen()
 {
@@ -528,6 +562,23 @@ void imgui_run()
 			
 			if( ImGui::BeginMenu("Beta") ) 
 			{				
+				if( ImGui::MenuItem("Apple Mac Plus") )
+				{
+					std::string f = getOpenFile("Mac plus");
+					if( !f.empty() )
+					{
+						delete sys;
+						sys = new macplus;
+						if( ! sys->loadROM(f) ) 
+						{
+							printf("unable to load ROM\n");
+							exit(1);
+						}
+						else newinstance = true;
+						crt_scale = 1;
+						AllowMove = false;
+					}				
+				}
 				if( ImGui::MenuItem("Apple IIe") )
 				{
 					std::string f = getOpenFile("Apple IIe");
@@ -834,22 +885,6 @@ void imgui_run()
 						crt_scale = 3;
 					}				
 				}
-				if( ImGui::MenuItem("Apple Mac Plus") )
-				{
-					std::string f = getOpenFile("Mac plus");
-					if( !f.empty() )
-					{
-						delete sys;
-						sys = new macplus;
-						if( ! sys->loadROM(f) ) 
-						{
-							printf("unable to load ROM\n");
-							exit(1);
-						}
-						else newinstance = true;
-						crt_scale = 2;
-					}				
-				}
 				if( ImGui::MenuItem("Fairchild Channel F") )
 				{
 					std::string f = getOpenFile("Channel F");
@@ -866,7 +901,7 @@ void imgui_run()
 						crt_scale = 5;
 					}				
 				}
-				if( ImGui::MenuItem("IBM PC XT") )
+				/*if( ImGui::MenuItem("IBM PC XT") )
 				{
 					std::string f = getOpenFile("IBM PC BIOS");
 					if( !f.empty() )
@@ -881,7 +916,7 @@ void imgui_run()
 						else newinstance = true;
 						crt_scale = 1;
 					}				
-				}
+				}*/
 				if( ImGui::MenuItem("Commodore C64 Tape") )
 				{
 					std::string f = getOpenFile("C64");
@@ -930,6 +965,7 @@ void imgui_run()
 			{
 				delete sys;
 				sys = nullptr;
+				AllowMove = true;
 			}
 			ImGui::EndMenu();
 		}
@@ -1035,7 +1071,18 @@ void imgui_run()
 	if( Screen && sys )
 	{
 		ImGui::SetNextWindowContentSize(ImVec2(sys->fb_scale_w()*crt_scale,sys->fb_scale_h()*crt_scale));
-		ImGui::Begin("CRT", nullptr, ImGuiWindowFlags_AlwaysAutoResize|ImGuiWindowFlags_NoNav);
+		ImGui::Begin("CRT", nullptr, ImGuiWindowFlags_AlwaysAutoResize|ImGuiWindowFlags_NoNav|(AllowMove?0:ImGuiWindowFlags_NoMove));
+			if( !AllowMove )
+			{ // AllowMove is currently only used by the Mac Plus emulator, so hide the host cursor as well.
+				if( ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) )
+				{
+					ImGui::SetMouseCursor(ImGuiMouseCursor_None);
+				}
+			}
+
+			auto winpos = ImGui::GetCursorScreenPos();
+			window_x = winpos.x;
+			window_y = winpos.y;
 			ImGui::Image((void*)Screen, ImVec2(sys->fb_scale_w()*crt_scale,sys->fb_scale_h()*crt_scale));
 			//ImGui::Dummy(ImVec2(sys->fb_width()*crt_scale,sys->fb_height()*crt_scale));
 		ImGui::End();
