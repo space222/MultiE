@@ -7,6 +7,7 @@
 class macplus : public console
 {
 public:
+	macplus() { setVsync(false); }
 	void reset() override;
 	void run_frame() override;
 	bool loadROM(const std::string) override;
@@ -44,10 +45,17 @@ public:
 	u32 floppy_div{0};
 
 	u8 iwm_q6{}, iwm_q7{}, iwm_enable{}, iwm_mode{}, iwm_ca2{}, iwm_ca1{}, iwm_ca0{}, iwm_strobe{}, iwm_internal{};
-	u8 via_vIFR{}, via_vIER{}, via_vPCR{}, via_vACR{}, via_vBufA{}, via_vSR{};
+	u8 via_vIFR{}, via_vIER{}, via_vPCR{}, via_vACR{}, via_vBufA{}, via_vBufB{}, via_vDirB{}, via_vSR{};
 	u8 via_tmr2latch{}, via_tmr2irq{};
 	u16 via_tmr2{};
 	u16 via_tmr2div{};
+	
+	u8 rtc_in{}, rtc_clock{}, rtc_en{4}, rtc_state{0}, rtc_cmd{};
+	u32 curtime;
+	const u32 epoch_diff = 2082844800u;
+	const u32 RTC_EN = 4;
+	const u32 RTC_CLK = 2;
+	const u32 RTC_DATA = 1;
 
 	bool mouse_down{};
 	int tachdiv = 0;
@@ -61,6 +69,9 @@ public:
 	u8 last_key{0x7B};
 	u8 kb_cmd = 0;
 	int kb_shift = 0;
+	
+	u16 sample_index{};
+	u64 sample_div{}, sample_out_div{};
 
 	void write_iwm_cmd();
 	u8 read_sense();

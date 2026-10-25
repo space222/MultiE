@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <utility>
+#include <chrono>
 #include "macplus.h"
 #include "util.h"
 extern console* sys;
@@ -27,6 +28,12 @@ void macplus::step()
 			via_vIFR |= BIT(7);
 			cpu.setIPL(cpu.getIPL()|1);
 		}
+		
+		auto current_zone = std::chrono::current_zone();
+		auto local_time = current_zone->to_local(std::chrono::system_clock::now());
+		auto duration = local_time.time_since_epoch();
+		auto seconds_since_1970 = std::chrono::duration_cast<std::chrono::seconds>(duration).count();
+		curtime = seconds_since_1970 + epoch_diff; //2082844800u;
 	}
 
 	// run via timer 2
@@ -97,6 +104,28 @@ Zone 4	Tracks 64 – 79	590.6 RPM	~1181.2 Hz	Toggle every 6,632 cycles
 				cpu.setIPL(cpu.getIPL()|1);
 			}
 		}
+	}
+	
+	// sound
+	sample_div += cc;
+	while( sample_div >= 352 )
+	{
+		sample_div -= 352;
+		sample_index += 1;
+		if( sample_index >= 370 )
+		{
+			sample_index = 0;
+		}	
+	}
+	
+	sample_out_div += cc;
+	while( sample_out_div >= 178 )
+	{
+		sample_out_div -= 178;
+		u32 base = (!(via_vBufA & BIT(3)) ? 0x3FA100 : 0x3FFD00);
+		u8 samp = mainRAM[base + sample_index*2];
+		float s = (float(samp) - 128)/128.f;
+		audio_add((via_vBufB&BIT(7)) ? 0 : s, (via_vBufB&BIT(7)) ? 0 : s);
 	}
 }
 
@@ -185,9 +214,30 @@ void macplus::write(u32 a, u32 v, int sz)
 		{
 		case 0:
 			//std::println("VIA BufB = ${:X}", v);
+			if( v&RTC_EN )
+			{
+				rtc_state = 0;
+			} else if( !(via_vBufB&RTC_CLK) && (v&RTC_CLK) ) {
+				if( rtc_state < 8 )
+				{
+					rtc_cmd = (rtc_cmd<<1)|((v&RTC_DATA)?1:0);
+					rtc_state += 1;
+				} else {
+					std::println("got rtc cmd = ${:X}", rtc_cmd);
+					//char c; std::cin>>c;
+					u8 ra = (rtc_cmd>>2)&0x3;
+					if( ra < 4 )
+					{
+						rtc_in = ((curtime >> (ra*8)) >> (7-(rtc_state-8)))&1;
+					}
+					rtc_state += 1;
+				}
+			}
+			via_vBufB = v;
 			return;
 		case 2:
 			//std::println("VIA DirB = ${:X}", v);
+			via_vDirB = v;
 			return;
 		case 3:
 			//std::println("VIA DirA = ${:X}", v);
@@ -439,11 +489,16 @@ u32 macplus::read(u32 a, int sz)
 		switch( (a-0xEFE1FE)/512 )
 		{
 		case 0:
+			{
+			u8 v = via_vBufB & via_vDirB;
 			//std::println("VIA Read BufB");
-			return mouse_down ? 0xf7 : 0xff;
+			u8 md = (mouse_down ? 0 : 8);
+			v |= ((md | rtc_in) & ~via_vDirB);
+			return v;
+			}
 		case 2:
 			//std::println("VIA Read DirB");
-			return 0x87;
+			return via_vDirB;
 		case 8:
 			//std::println("VIAr Tmr2_lo");
 			return via_tmr2;
@@ -647,7 +702,7 @@ u8 macplus::read_sense()
 	return 0;
 }
 
-void macplus::mouse_move(u32 x, u32 y, int relx, int rely)
+void macplus::mouse_move(u32 x, u32 y, int /*relx*/, int /*rely*/)
 {
 	*(u16*)&mainRAM[0x82C] = *(u16*)&mainRAM[0x828] = __builtin_bswap16(u16(y));
 	*(u16*)&mainRAM[0x82E] = *(u16*)&mainRAM[0x82A] = __builtin_bswap16(u16(x));
