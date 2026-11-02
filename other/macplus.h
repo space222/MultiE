@@ -49,6 +49,8 @@ public:
 	u8 via_tmr2latch{}, via_tmr2irq{};
 	u16 via_tmr2{};
 	u16 via_tmr2div{};
+	u16 via_tmr1latch{};
+	u16 via_tmr1{}, via_tmr1div{};
 	
 	u8 rtc_in{}, rtc_clock{}, rtc_en{4}, rtc_state{0}, rtc_cmd{};
 	u32 curtime;
@@ -56,6 +58,9 @@ public:
 	const u32 RTC_EN = 4;
 	const u32 RTC_CLK = 2;
 	const u32 RTC_DATA = 1;
+	
+	u8 sccA[0x20];
+	u8 sccB[0x20];
 
 	bool mouse_down{};
 	int tachdiv = 0;

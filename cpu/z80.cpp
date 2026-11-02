@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <utility>
+#include <print>
 #include "z80.h"
 
 #define B r[0]
@@ -66,7 +67,7 @@ u64 z80::step()
 	if( halted ) return 4;
 	
 	u8 opc = read(pc++);
-	
+		
 	while( opc == 0xFD || opc == 0xDD )
 	{
 		prefix = opc;
@@ -1187,7 +1188,7 @@ void z80::reset()
 {
 	pc = 0;
 	sp = 0xdff0;
-	irq_line = 0;
+	irq_line = nmi_line = 0;
 	iff1 = iff2 = 0;
 	intr_blocked = halted = false;
 }

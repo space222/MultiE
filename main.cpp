@@ -60,6 +60,7 @@
 #include "nintendo/ds/nds.h"
 #include "avi_rec.h"
 #include "other/tg16.h"
+#include "other/zx_spectrum.h"
 void try_kirq();
 void gdb_start();
 extern std::atomic<int> gdb_active;
@@ -661,6 +662,22 @@ void imgui_run()
 			}
 			if( ImGui::BeginMenu("Alpha") )
 			{
+				if( ImGui::MenuItem("Sinclair ZX Spectrum 48k") )
+				{
+					//std::string f = getOpenFile("ZX Spectrum");
+					//if( !f.empty() )
+					{
+						delete sys;
+						sys = new zx_spectrum;
+						if( ! sys->loadROM("") ) 
+						{
+							printf("unable to load ROM\n");
+							exit(1);
+						}
+						else newinstance = true;
+						crt_scale = 2.f;
+					}				
+				}
 				if( ImGui::MenuItem("Nintendo DS") )
 				{
 					std::string f = getOpenFile("Nintendo DS");

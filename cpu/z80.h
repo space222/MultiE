@@ -1,9 +1,10 @@
 #pragma once
 #include <bit>
+#include <functional>
 #include "itypes.h"
 
-typedef void (*z80_write8)(u16, u8);
-typedef u8 (*z80_read8)(u16);
+//typedef void (*z80_write8)(u16, u8);
+//typedef u8 (*z80_read8)(u16);
 
 union z80_flags
 {
@@ -48,8 +49,8 @@ struct z80
 	u8& IYL() { return r[10]; }
 	u8& IYH() { return r[11]; }
 	
-	z80_write8 write, out;
-	z80_read8 read, in;
+	std::function<void(u16,u8)> write, out;
+	std::function<u8(u16)> read, in;
 	
 	u16 read16(u16 addr)
 	{

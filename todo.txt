@@ -426,7 +426,15 @@ It was hard to find the info that tall narrow (16x32+) sprites use tile numbers 
 
 
 
-
+Mac Plus Todo List
+---------------------
+1. Finish RTC reads, possibly including whatever System 6+ wants to boot without SCC support
+2. SCC support
+3. External floppy?
+4. SCSI and harddrives?
+Status: Up through system 4 are almost completely functional (even date/time on the Alarm Clock), 
+just don't have a second floppy to run software off of. Had to add a bespoke window lock and 
+cursor hiding to the main framework so mouse drags would work rather than move the imgui window.
 
 
 

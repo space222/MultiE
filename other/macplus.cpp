@@ -1,4 +1,5 @@
 #include <string>
+#include <iostream>
 #include <cstdio>
 #include <cstdlib>
 #include <utility>
@@ -29,6 +30,12 @@ void macplus::step()
 			cpu.setIPL(cpu.getIPL()|1);
 		}
 		
+		if( via_vIER & BIT(6) )
+		{
+			std::println("timer 1 irq enabled");
+			char c; std::cin>>c;
+		}
+		
 		auto current_zone = std::chrono::current_zone();
 		auto local_time = current_zone->to_local(std::chrono::system_clock::now());
 		auto duration = local_time.time_since_epoch();
@@ -51,6 +58,18 @@ void macplus::step()
 				via_vIFR |= BIT(7);
 				cpu.setIPL(cpu.getIPL()|1);
 			}
+		}
+	}
+	
+	// run via timer 1
+	via_tmr1div += cc;
+	while( via_tmr1div >= 10 )
+	{
+		via_tmr1div -= 10;
+		via_tmr1 -= 1;
+		if( via_tmr1 == 0 )
+		{
+			via_tmr1 = via_tmr1latch;
 		}
 	}
 	
@@ -97,7 +116,7 @@ Zone 4	Tracks 64 – 79	590.6 RPM	~1181.2 Hz	Toggle every 6,632 cycles
 			kb_shift = (kb_cmd ? 8000 : 0);
 			kb_cmd = 0;
 			via_vIFR |= BIT(2);
-			std::println("IRQ b2 keyboard");
+			//std::println("IRQ b2 keyboard");
 			if( (via_vIFR & via_vIER & 0x7f) )
 			{
 				via_vIFR |= BIT(7);
@@ -223,7 +242,7 @@ void macplus::write(u32 a, u32 v, int sz)
 					rtc_cmd = (rtc_cmd<<1)|((v&RTC_DATA)?1:0);
 					rtc_state += 1;
 				} else {
-					std::println("got rtc cmd = ${:X}", rtc_cmd);
+					//std::println("got rtc cmd = ${:X}", rtc_cmd);
 					//char c; std::cin>>c;
 					u8 ra = (rtc_cmd>>2)&0x3;
 					if( ra < 4 )
@@ -243,6 +262,22 @@ void macplus::write(u32 a, u32 v, int sz)
 			//std::println("VIA DirA = ${:X}", v);
 			return;
 		
+		case 5:
+			std::println("VIA vT1CH = ${:X}", v);
+			//{ char c; std::cin >> c; }
+			via_tmr1latch = (v<<8)|(via_tmr1latch&0xff);
+			via_tmr1 = via_tmr1latch;
+			return;
+		case 4:
+		case 6: 
+			std::println("VIA vT1L = ${:X}", v);
+			//{ char c; std::cin >> c; }
+			via_tmr1latch &= 0xff00;
+			via_tmr1latch |= v;	
+			return;
+		case 7:
+			via_tmr1latch = (v<<8)|(via_tmr1latch&0xff);
+			return;
 		case 8:
 			//std::println("VIA Tmr2_lo = ${:X}", v);
 			via_tmr2latch = v;
@@ -264,7 +299,7 @@ void macplus::write(u32 a, u32 v, int sz)
 			via_vSR = v;
 			if( v == 0x16 )
 			{
-				std::println("model number request");
+				//std::println("model number request");
 				keys.push_front(3);
 				kb_shift = 8000;
 				kb_cmd = 0x16;
@@ -272,7 +307,7 @@ void macplus::write(u32 a, u32 v, int sz)
 			}
 			if( v == 0x36 )
 			{
-				std::println("keyboard ping");
+				//std::println("keyboard ping");
 				keys.push_front(0x7D);
 				kb_shift = 8000;
 				kb_cmd = 0x36;
@@ -280,21 +315,21 @@ void macplus::write(u32 a, u32 v, int sz)
 			}
 			if( v == 0x10 || v == 0x14 )
 			{
-				std::println("key read");
+				//std::println("key read");
 				keys.push_front(last_key);
 				last_key = 0x7B;
 				kb_shift = 8000;
 				kb_cmd = v;
 				return;
 			}
-			std::println("VIA vSR = ${:X}", v);
+			//std::println("VIA vSR = ${:X}", v);
 			return;
 		case 11:
-			std::println("VIA vACR = ${:X}", v);
+			//std::println("VIA vACR = ${:X}", v);
 			via_vACR = v;
 			return;
 		case 12:
-			std::println("VIA vPCR = ${:X}", v);
+			//std::println("VIA vPCR = ${:X}", v);
 			via_vPCR = v;
 			return;
 		case 13:
@@ -352,12 +387,22 @@ void macplus::write(u32 a, u32 v, int sz)
 	
 	if( a == 0xBFFFF9 )
 	{
-		std::println("SCC ctrlB wr = ${:X}", v);
+		if( (sccB[0]&15) == 0 )
+		{
+			std::println("SCCb reg select = ${:X}", v);
+			sccB[0] = v;
+		} else {
+			std::println("SCCb reg ${:X} = ${:X}", sccB[0]&15, v);
+			sccB[sccB[0]&15] = v;
+			sccB[0] = 0;
+		}
 		return;
 	}
 	if( a == 0xBFFFF9+2 )
 	{
 		std::println("SCC ctrlA wr = ${:X}", v);
+		sccA[sccA[0]&15] = v;
+		sccA[0] = 0;
 		return;
 	}
 	if( a >= 0x580000 && a < 0x600000 )
@@ -371,6 +416,8 @@ void macplus::write(u32 a, u32 v, int sz)
 	exit(1);
 	//Running = false;
 }
+
+static u8 hblank = 0;
 
 u32 macplus::read(u32 a, int sz)
 {
@@ -494,11 +541,24 @@ u32 macplus::read(u32 a, int sz)
 			//std::println("VIA Read BufB");
 			u8 md = (mouse_down ? 0 : 8);
 			v |= ((md | rtc_in) & ~via_vDirB);
+			v &= ~BIT(6);
+			hblank ^= BIT(6);
+			v |= hblank;
 			return v;
 			}
 		case 2:
 			//std::println("VIA Read DirB");
 			return via_vDirB;
+		case 4:
+			std::println("VIA Read vT1C");
+			//{ char c; std::cin>>c; }
+			return via_tmr1;
+		case 5:
+			return via_tmr1>>8;
+		case 6:
+			return via_tmr1latch;
+		case 7:
+			return via_tmr1latch>>8;
 		case 8:
 			//std::println("VIAr Tmr2_lo");
 			return via_tmr2;
@@ -506,7 +566,7 @@ u32 macplus::read(u32 a, int sz)
 			//std::println("VIAr Tmr2_hi");
 			return via_tmr2>>8;			
 		case 10:
-			std::println("VIA read vSR");
+			//std::println("VIA read vSR");
 			if( (via_vACR&0x1C)==0xC && !keys.empty() )
 			{
 				u8 v = keys.back();
@@ -517,15 +577,15 @@ u32 macplus::read(u32 a, int sz)
 					via_vIFR &= ~BIT(7);
 					cpu.setIPL(cpu.getIPL()&~1);
 				}
-				std::println("vSR read got ${:X}", v);
+				//std::println("vSR read got ${:X}", v);
 				via_vSR = v;
 			}
 			return via_vSR;
 		case 11:
-			std::println("VIA read vACR");
+			//std::println("VIA read vACR");
 			return via_vACR;
 		case 12:
-			std::println("VIA read vPCR");
+			//std::println("VIA read vPCR");
 			return via_vPCR;
 		case 13:
 			//std::println("VIA read vIFR");
@@ -545,14 +605,14 @@ u32 macplus::read(u32 a, int sz)
 		default: break;
 		}
 		std::println("Unimpl VIA rd{} ${:X} {}", sz, a, (a-0xEFE1FE)/512);
-		exit(1);
-		//return 0;
+		//exit(1);
+		return 0;
 	}
 	
 	if( a >= 0x580000 && a < 0x600000 )
 	{
 		std::println("scsi rd{} ${:X}", sz, a);
-		return 0xffFF;
+		return 0;
 	}
 	
 	if( a == 0x9FFFF7 )
@@ -562,14 +622,23 @@ u32 macplus::read(u32 a, int sz)
 	}
 	if( a == 0x9FFFF8 )
 	{
-		std::println("SCC ctrlB rd");
-		return 0;
+		std::println("SCC ctrlB rd reg ${:X}", sccB[0]&15);
+		if( (sccB[0]&15) == 8 ) { sccB[0]=0; return 0; }
+		if( (sccB[0]&15) == 1 ) { sccB[0]=0; return 0x1; }
+		if( (sccB[0]&15) == 0 ) { sccB[0]=0; return 0x14; }
+		return sccB[std::exchange(sccB[0], 0)&15];
 	}
 	if( a == 0x9FFFF8+2 )
 	{
 		std::println("SCC ctrlA rd");
+		if( (sccA[0]&15) == 0 ) { sccA[0]=0; return 0x44; }
+		return sccA[std::exchange(sccA[0], 0)&15];
+	}
+	if( a == 0x9FFFF8+4 )
+	{
+		std::println("SCC dataB rd");
 		return 0;
-	}	
+	}
 	if( a == 0x9FFFF8+6 )
 	{
 		std::println("SCC dataA rd");
@@ -611,6 +680,9 @@ void macplus::reset()
 	stamp = last_target = 0;
 	onesec = via_tmr2irq = 0;
 	tachdiv = floppy_div = 0;
+	
+	memset(sccA, 0, 0x20);
+	memset(sccB, 0, 0x20);
 }
 
 bool macplus::loadROM(const std::string fname)
