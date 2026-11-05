@@ -142,7 +142,15 @@ void zx_spectrum::run_frame()
 				
 				if( cpu.fl.b.fC == 1 )
 				{
-					memcpy(ram+addr, tap.data()+tap_offset+3, len);
+					if( version == 128 )
+					{
+						for(u32 i = 0; i < len; ++i)
+						{
+							write(addr+i, *(tap.data()+tap_offset+3+i));
+						}
+					} else {
+						memcpy(ram+addr, tap.data()+tap_offset+3, len);
+					}
 				}
 								
 				cpu.D() = 0;

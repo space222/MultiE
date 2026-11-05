@@ -662,14 +662,30 @@ void imgui_run()
 			}
 			if( ImGui::BeginMenu("Alpha") )
 			{
+				if( ImGui::MenuItem("Sinclair ZX Spectrum 128k") )
+				{
+					std::string f = getOpenFile("ZX Spectrum 128");
+					if( !f.empty() )
+					{
+						delete sys;
+						sys = new zx_spectrum(128);
+						if( ! sys->loadROM(f) ) 
+						{
+							printf("unable to load ROM\n");
+							exit(1);
+						}
+						else newinstance = true;
+						crt_scale = 2.f;
+					}				
+				}
 				if( ImGui::MenuItem("Sinclair ZX Spectrum 48k") )
 				{
-					//std::string f = getOpenFile("ZX Spectrum");
-					//if( !f.empty() )
+					std::string f = getOpenFile("ZX Spectrum");
+					if( !f.empty() )
 					{
 						delete sys;
 						sys = new zx_spectrum;
-						if( ! sys->loadROM("") ) 
+						if( ! sys->loadROM(f) ) 
 						{
 							printf("unable to load ROM\n");
 							exit(1);
