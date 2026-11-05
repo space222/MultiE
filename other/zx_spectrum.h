@@ -7,6 +7,10 @@
 class zx_spectrum : public console
 {
 public:
+	u32 version;
+	zx_spectrum() : version(48) {}
+	zx_spectrum(u32 ver) : version(ver) {}
+
 	u32 fb_width() override { return 256; }
 	u32 fb_height() override { return 192; }
 	u8* framebuffer() override { return (u8*)&fbuf[0]; }
@@ -22,13 +26,19 @@ public:
 	void out(u16, u8);
 	
 	u64 stamp, target, last_target;
+	u8 flashdiv{};
 
 	z80 cpu;
 	
-	u8 ram[64*1024];
+	std::vector<u8> tap;
+	u32 tap_offset{};
+	
+	u8 bank_port{};
+	
+	u8 ram[128*1024];
 	
 	u32 fbuf[256*192];
-	u8 bios[16*1024];
+	u8 bios[32*1024];
 };
 
 
